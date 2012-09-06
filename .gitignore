@@ -1,0 +1,11 @@
+# Editor-generated files
+*~
+~#
+
+# Build products
+*.o
+time_calls_cc
+time_calls_cpp
+
+# File system temporaries
+.fuse_hidden*
