@@ -6,6 +6,14 @@
 *.o
 time_calls_cc
 time_calls_cpp
+fib
+handle
+msh
+myint
+mykill
+myspin
+mysplit
+mystop
 
 # File system temporaries
 .fuse_hidden*

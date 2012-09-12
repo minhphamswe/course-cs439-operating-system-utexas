@@ -1,13 +1,21 @@
 ################
 YOUR INFO
 ################
-Name1:
-EID1:
-CS login:
-Email:
-Unique Number:
+Name1: Easchner
+EID1: easchner
+CS login: easchner
+Email: eric_aschner@hotmail.com
+Unique Number: 52996
 
 Slip days used:
+----------------
+Name2: Minh Pham
+EID2: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+
+Slip days used: 0
 
 ****EACH student submits a (unique) design document.****
 
