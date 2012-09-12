@@ -1,7 +1,8 @@
 /* 
  * psh - A prototype tiny shell program with job control
  * 
- * <Put your name and login ID here>
+ * Eric Aschner - easchner
+ * Minh Pham - minhpham
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
             emit_prompt = 0;  /* handy for automatic testing */
 	    break;
 	default:
-            usage();
+        usage();
 	}
     }
 
@@ -73,22 +74,22 @@ int main(int argc, char **argv)
     /* Execute the shell's read/eval loop */
     while (1) {
 
-	/* Read command line */
-	if (emit_prompt) {
-	    printf("%s", prompt);
-	    fflush(stdout);
-	}
-	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
-	    app_error("fgets error");
-	if (feof(stdin)) { /* End of file (ctrl-d) */
-	    fflush(stdout);
-	    exit(0);
-	}
+        /* Read command line */
+        if (emit_prompt) {
+            printf("%s", prompt);
+            fflush(stdout);
+        }
+        if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+            app_error("fgets error");
+        if (feof(stdin)) { /* End of file (ctrl-d) */
+            fflush(stdout);
+            exit(0);
+        }
 
-	/* Evaluate the command line */
-	eval(cmdline);
-	fflush(stdout);
-	fflush(stdout);
+        /* Evaluate the command line */
+        eval(cmdline);
+        fflush(stdout);
+        fflush(stdout);
     } 
 
     exit(0); /* control never reaches here */
@@ -107,7 +108,12 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-    return;
+    char *argv[50];
+    int backgroundp;
+
+    backgroundp = parseline(cmdline, argv);
+    
+    builtin_cmd(argv);
 }
 
 
@@ -119,6 +125,11 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+    char* cmd = argv[0];
+    if (strcmp(cmd, "quit") == 0) {
+        printf("QUIT WAS CALLED\n");
+        exit(0);
+    }
     return 0;     /* not a builtin command */
 }
 

@@ -8,7 +8,8 @@ MSHREF = ./mshref
 MSHARGS = "-p"
 CC = gcc
 CFLAGS = -Wall -O2
-FILES = $(MSH) ./myspin ./mysplit ./mystop ./myint ./fib ./handle ./mykill
+FILES = $(MSH) ./myspin ./mysplit ./mystop ./myint ./fib ./handle ./mykill \
+        ./psh
 
 all: $(FILES)
 
