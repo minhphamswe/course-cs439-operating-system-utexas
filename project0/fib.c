@@ -10,7 +10,7 @@
 
 const int MAX = 13;
 
-static void doFib(int n, int doPrint);
+/*static void*/ int doFib(int n, int doPrint);
 
 
 /*
@@ -29,12 +29,15 @@ int main(int argc, char **argv)
   int arg;
   int print;
 
-  if(argc != 2){
+  if(argc < 2 || argc > 3){
     fprintf(stderr, "Usage: fib <num>\n");
     exit(-1);
   }
 
-  if(argc >= 3){
+  if(argc == 3){
+    print = 0;
+  }
+  else {
     print = 1;
   }
 
@@ -44,9 +47,9 @@ int main(int argc, char **argv)
     exit(-1);
   }
 
-  doFib(arg, 1);
-
-  return 0;
+//  doFib(arg, 1);
+  
+  return doFib(arg, print);
 }
 
 /* 
@@ -57,10 +60,48 @@ int main(int argc, char **argv)
  * a new child for each call. Each process should call
  * doFib() exactly once.
  */
-static void 
+//static void
+int 
 doFib(int n, int doPrint)
 {
-  
+  int returnValue = 0;
+  if(n == 0)
+    returnValue = 0;
+  else if(n == 1)
+    returnValue = 1;
+  else
+  {
+    pid_t pid1, pid2;
+    pid_t rpid1, rpid2;
+    char arg[50];
+
+    if ((pid1 = fork()) == 0) {
+      // Child process
+      sprintf(arg, "%d", n-1);
+      execl("fib", "fib", arg, "NOPRINT", NULL);
+    }
+    else if ((pid2 = fork()) == 0) {
+      // Second child process 
+      sprintf(arg, "%d", n-2);
+      execl("fib", "fib", arg, "NOPRINT", NULL);
+    }
+    else {
+      waitpid(pid1, &rpid1, 0);
+      waitpid(pid2, &rpid2, 0);
+      if (!WIFEXITED(rpid1)) {
+        printf("%s: %d\n", "Child 1 exited with error", WEXITSTATUS(rpid1));
+      }
+
+      if (!WIFEXITED(rpid2)) {
+        printf("%s: %d\n", "Child 2 exited with error", WEXITSTATUS(rpid2));
+      }
+
+      returnValue = WEXITSTATUS(rpid1) + WEXITSTATUS(rpid2);
+    }
+  }
+  if(doPrint)
+    printf("%d\n", returnValue);
+  return returnValue;
 }
 
 
