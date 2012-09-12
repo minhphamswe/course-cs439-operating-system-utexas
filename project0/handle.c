@@ -8,6 +8,7 @@
 #include "util.h"
 
 void sigint_handler(int sig);
+void sigusr_handler(int sig);
 
 /*
  * First, print out the process ID of this process.
@@ -23,6 +24,7 @@ int main(int argc, char **argv)
     printf("My PID: %d\n", getpid());
 
     Signal(SIGINT, sigint_handler);
+    Signal(SIGUSR1, sigusr_handler);
     
     struct timespec req;
     req.tv_sec = 1;
@@ -40,6 +42,20 @@ int main(int argc, char **argv)
  */
 void sigint_handler(int sig)
 {
-    printf("Nice try.\n");
+    ssize_t bytes;
+    const int STDOUT = 1;
+    bytes = write(STDOUT, "Nice Try.\n", 10);
+    if(bytes != 10)
+        exit(-999);
+}
+
+void sigusr_handler(int sig)
+{
+    ssize_t bytes;
+    const int STDOUT = 1;
+    bytes = write(STDOUT, "exiting\n", 8);
+    if(bytes != 10)
+        exit(-999);
+    exit(1);
 }
 

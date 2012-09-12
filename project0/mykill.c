@@ -9,5 +9,13 @@
 
 int main(int argc, char **argv)
 {
-  return 0;
+  if(argc != 2)
+  {
+      printf("Correct usage is 'mykill PID'");
+  }
+
+  pid_t killid;
+  killid = atoi(argv[1]);
+
+  kill(killid, SIGUSR1);
 }
