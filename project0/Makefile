@@ -7,7 +7,7 @@ MSH = ./msh
 MSHREF = ./mshref
 MSHARGS = "-p"
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -Wall -O2 -g
 FILES = $(MSH) ./myspin ./mysplit ./mystop ./myint ./fib ./handle ./mykill \
         ./psh
 
