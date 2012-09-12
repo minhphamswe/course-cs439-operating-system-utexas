@@ -113,7 +113,19 @@ void eval(char *cmdline)
 
     backgroundp = parseline(cmdline, argv);
     
-    builtin_cmd(argv);
+    if (!builtin_cmd(argv)) {
+        pid_t child;
+        if ((child = fork()) == 0) {
+            // Child process
+            setpgid(0, 0);  /* put child in new process group (id = child)*/
+            execv(argv[0], argv);
+            exit(125);      /* only if execv failed */
+        }
+        else {
+            // Parent
+            waitpid(child, 0, 0);
+        }
+    }
 }
 
 

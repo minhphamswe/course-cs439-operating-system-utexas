@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "util.h"
 
+void sigint_handler(int sig);
 
 /*
  * First, print out the process ID of this process.
@@ -19,7 +20,26 @@
  */
 int main(int argc, char **argv)
 {
-  return 0;
+    printf("My PID: %d\n", getpid());
+
+    Signal(SIGINT, sigint_handler);
+    
+    struct timespec req;
+    req.tv_sec = 1;
+    while(1) {
+        nanosleep(&req, NULL);
+        printf("%s", "Still here\n");
+    }
+
+    return 0;
 }
 
+/*
+ * sigquit_handler - The driver program can gracefully terminate the
+ *    child shell by sending it a SIGQUIT signal.
+ */
+void sigint_handler(int sig)
+{
+    printf("Nice try.\n");
+}
 
