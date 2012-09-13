@@ -1,0 +1,64 @@
+Homework #: 02
+Student Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email address: minh.pham@utexas.edu
+Unique Number: 52996
+
+1. The difference between user threads and kernel threads are:
+* Each kernel thread corresponds to a Thread Control Block in the kernel.
+TBC are not created for user threads. Instead multiple user threads
+share a PCB.
+* The O/S schedules kernel threads. User thread scheduling is left to
+the user.
+* The O/S handles context switching for kernel threads, but not for user
+threads.
+A comparison between user threads and kernel threads:
+* Context switches are less expensive for user threads than for kernel
+threads
+* Kernel threads can block, but user threads cannot.
+* In practice, it is difficult to make user threads efficient.
+
+2.
+* Re-entrant code are code that can be safely interrupted.
+* When an interrupt occurs as the code is running, and then returns, the
+re-entrant code behaves as if the interrupt never occurred. Code that is
+non-re-entrant, on the other hand, may behave differently, give a
+different result, or crash.
+* There are many reasons why re-entrancy is important in multi-threaded
+code, but a big one is that it eliminates unnecessary (and dangerous)
+dependencies in the code. A non-re-entrant piece of code will depend on
+other codes executing in a certain order, something which is usually not
+guaranteed in a multi-threaded environment.
+
+3.
+
+4.
+* The output has to be i = 0. The fork() creates 2 processes: parent and
+child. Both will modify the global variable i. We do not know which will
+be executed first. However, the parent wait for the child to terminate
+before printing the value of i. Therefore, we know that by the time the
+print statement gets executed, i has been incremented once and
+decremented once. Its value, therefore, is 0.
+* Since it does not matter whether we increment or decrement first, as
+long as both operations finish, the value of i will be 0 each time this
+program is run.
+
+5.
+* The output, in this case, is very likely to be 0. The reason is as
+explained above: i is incremented and decremented, and it doesn't matter
+which operation completes first as long as both finish.
+* However, there is a small chance it may end up to be either 1 or -1.
+The reason is that the statements i = i - 1, and i = i + 1 are not
+atomic, and each consists of at least a LOAD, an ALU operation, and a
+STORE.
+** Suppose, for example, that thread1 LOADs i (0) and then gets
+swapped out. Now thread2 LOADs i (0), ADD 1, STORE i (now 1), and
+terminate. thread1 now comes back, SUBTRACT 1 (i is still 0 here), and
+STORE i (now -1).
+* A clean way to force the program to execute the same way each time is
+to wrap the each of the statements i = i - 1 and i = i + 1 in a mutex
+lock. Then thread1 and thread2 cannot operate on its own disjointed copy
+of i and then overwrite the global value. We ensure that i is operated
+on by 1 thread at a time , in which case the order of execution doesn't
+matter, and i will come out to be 0 every time.
