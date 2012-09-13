@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
     pthread_join(thread2, NULL);
     pthread_join(thread3, NULL);
     
-    // When all threads have finished, exit
+    // When all threads have finished, print confirmation and exit
+    printf("I am DONE!\n");
     exit(0);
 }

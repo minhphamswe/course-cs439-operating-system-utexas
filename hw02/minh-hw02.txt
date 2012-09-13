@@ -32,6 +32,48 @@ other codes executing in a certain order, something which is usually not
 guaranteed in a multi-threaded environment.
 
 3.
+* Code: see threading.c and Makefile
+* Output:
+3: 1
+3: 2
+3: 3
+3: 4
+3: 5
+3: 6
+3: 7
+3: 8
+3: 9
+3: 10
+2: 1
+2: 2
+2: 3
+2: 4
+2: 5
+2: 6
+2: 7
+2: 8
+2: 9
+2: 10
+1: 1
+1: 2
+1: 3
+1: 4
+1: 5
+1: 6
+1: 7
+1: 8
+1: 9
+1: 10
+I am DONE!
+* The results are consistent across runs. I played around with the code some,
+and it appears the result depends on the order in which the threads were
+created (but not the order in which they are joined). Threads which are
+created first prints its result out last. I do not know why this is the case,
+but I have two hypotheses:
+** The order in which the threads are executed are Operating System or
+Hardware dependent, and this result may be different on another machine.
+** Threads are executed in LIFO order, like a stack, with new threads being
+given the highest priority.
 
 4.
 * The output has to be i = 0. The fork() creates 2 processes: parent and
