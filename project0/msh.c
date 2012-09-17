@@ -88,23 +88,23 @@ int main(int argc, char **argv)
     /* Execute the shell's read/eval loop */
     while (1) {
 
-	/* Read command line */
-	if (emit_prompt) {
-	    printf("%s", prompt);
-	    fflush(stdout);
-	}
-	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
-	    app_error("fgets error");
-	if (feof(stdin)) { /* End of file (ctrl-d) */
-	    fflush(stdout);
-	    exit(0);
-	}
+        /* Read command line */
+        if (emit_prompt) {
+            printf("%s", prompt);
+            fflush(stdout);
+        }
+        if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+            app_error("fgets error");
+        if (feof(stdin)) { /* End of file (ctrl-d) */
+            fflush(stdout);
+            exit(0);
+        }
 
-	/* Evaluate the command line */
-	eval(cmdline);
-	fflush(stdout);
-	fflush(stdout);
-    } 
+        /* Evaluate the command line */
+        eval(cmdline);
+        fflush(stdout);
+        fflush(stdout);
+        } 
 
     exit(0); /* control never reaches here */
 }
@@ -177,7 +177,7 @@ int builtin_cmd(char **argv)
         return 0;
     }
     else {
-        return 0;    STOP /* not a builtin command */
+        return 0;    /* not a builtin command */
     }
 }
 
@@ -193,16 +193,10 @@ void do_bgfg(char **argv)
  * waitfg - Block until process pid is no longer the foreground process
  */
 void waitfg(pid_t pid)
-{
-    int status;
-    
-    waitpid(pid, &status, WUNTRACED | WCONTINUED);
-    while (!WIFEXITED(status)) {
+{ 
+    while (getjobpid(jobs, pid)) {
         sleep(1);
-        waitpid(pid, &status, WUNTRACED | WCONTINUED);
     }
-
-    //deletejob(jobs, pid);
     return;
 }
 
