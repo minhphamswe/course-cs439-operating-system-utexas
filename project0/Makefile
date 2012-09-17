@@ -16,7 +16,6 @@ all: $(FILES)
 msh: msh.o util.o jobs.o
 	$(CC) $(CFLAGS) msh.o util.o jobs.o -o msh
 
-
 psh: psh.o util.o 
 	$(CC) $(CFLAGS) psh.o util.o -o psh
 

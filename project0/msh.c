@@ -123,6 +123,34 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    char *argv[50];
+    int backgroundp;
+
+    backgroundp = parseline(cmdline, argv);
+
+    if (!builtin_cmd(argv)) {
+        pid_t child;
+        if ((child = fork()) == 0) {
+            // Child process
+            setpgid(0, 0);  /* put child in new process group (id = child)*/
+            execv(argv[0], argv);
+            exit(125);      /* only if execv failed */
+        }
+        else {
+            // Parent
+            if (!backgroundp) {
+                // Foreground job
+                addjob(jobs, child, FG, cmdline);
+                waitpid(child, 0, 0);
+            }
+            else {
+                // Background job
+                addjob(jobs, child, BG, cmdline);
+                printf("[%d] (%d) ", pid2jid(jobs, child), child);
+                printf("%s", cmdline);
+            }
+        }
+    }
     return;
 }
 
@@ -135,7 +163,23 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+    char* cmd = argv[0];
+    if (strcmp(cmd, "quit") == 0) {
+        exit(0);
+    }
+    else if (strcmp(cmd, "jobs") == 0) {
+        listjobs(jobs);
+        return 1;
+    }
+    else if (strcmp(cmd, "bg") == 0) {
+        return 0;
+    }
+    else if (strcmp(cmd, "fg") == 0) {
+        return 0;
+    }
+    else {
+        return 0;     /* not a builtin command */
+    }
 }
 
 /* 
@@ -167,6 +211,18 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+    int child;
+    int i;
+    pid_t pid;
+
+    pid = 1;
+    while (pid > 0) {
+        pid = waitpid(-1, &child, WNOHANG | WUNTRACED);
+        if (WIFEXITED(child)) {
+            deletejob(jobs, pid);
+        }
+    }
+
     return;
 }
 
