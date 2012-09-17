@@ -42,7 +42,6 @@ void usage(void);
 void sigquit_handler(int sig);
 
 
-
 /*
  * main - The shell's main routine 
  */
@@ -141,7 +140,7 @@ void eval(char *cmdline)
             if (!backgroundp) {
                 // Foreground job
                 addjob(jobs, child, FG, cmdline);
-                waitpid(child, 0, 0);
+                waitfg(child);
             }
             else {
                 // Background job
@@ -178,7 +177,7 @@ int builtin_cmd(char **argv)
         return 0;
     }
     else {
-        return 0;     /* not a builtin command */
+        return 0;    STOP /* not a builtin command */
     }
 }
 
@@ -195,6 +194,15 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+    int status;
+    
+    waitpid(pid, &status, WUNTRACED | WCONTINUED);
+    while (!WIFEXITED(status)) {
+        sleep(1);
+        waitpid(pid, &status, WUNTRACED | WCONTINUED);
+    }
+
+    //deletejob(jobs, pid);
     return;
 }
 
@@ -218,7 +226,7 @@ void sigchld_handler(int sig)
     pid = 1;
     while (pid > 0) {
         pid = waitpid(-1, &child, WNOHANG | WUNTRACED);
-        if (WIFEXITED(child)) {
+        if (WIFEXITED(child) || WIFSIGNALED(child)) {
             deletejob(jobs, pid);
         }
     }
@@ -233,7 +241,16 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    return;
+    pid_t fgJob;
+    fgJob = fgpid(jobs);
+    ssize_t bytes;
+    const int STDOUT = 1;
+    bytes = write(STDOUT, "Test 1.\n", 9);
+    kill(fgJob * -1, SIGINT);
+    bytes = write(STDOUT, "Test 2.\n", 9);
+
+    //deletejob(jobs, fgJob);
+    //waitpid(fgJob, 0, 0);
 }
 
 /*
