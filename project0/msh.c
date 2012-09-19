@@ -137,11 +137,10 @@ void eval(char *cmdline)
         sigprocmask(SIG_BLOCK, &set, NULL);
         
         if ((child = fork()) == 0) {
-            // Unblock SIGCHLD
-            sigprocmask(SIG_UNBLOCK, &set, NULL);
-            
             // Child process
             setpgid(0, 0);  /* put child in new process group (id = child)*/
+            // Unblock SIGCHLD
+            sigprocmask(SIG_UNBLOCK, &set, NULL);
             execv(argv[0], argv);
             printf("%s: Command not found\n", argv[0]);
             exit(125);      /* only if execv failed */
@@ -158,8 +157,9 @@ void eval(char *cmdline)
             else {
                 // Background job
                 addjob(jobs, child, BG, cmdline);
-                printf("[%d] (%d) ", pid2jid(jobs, child), child);
-                printf("%s", cmdline);
+                // Unblock SIGCHLD
+                sigprocmask(SIG_UNBLOCK, &set, NULL);
+                printf("[%d] (%d) %s", pid2jid(jobs, child), child, cmdline);
             }
         }
     }
@@ -208,11 +208,11 @@ void do_bgfg(char **argv)
     }
     else {
         pid_t jobPID = 0;
-        // Extract pid from argument
         if (argv[1][0] == '%') {
+            // Input is JID
             int jobJID = atoi(argv[1] + 1);
             if (jobJID == 0) {
-                printf("%s %s", argv[0], "argument must be a PID or %jobid\n");
+                printf("%s: %s", argv[0], "argument must be a PID or %jobid\n");
                 return;
             }
 
@@ -236,9 +236,10 @@ void do_bgfg(char **argv)
             }
         }
         else {
+            // Input is PID
             jobPID = atoi(argv[1]);
             if (jobPID == 0) {
-                printf("%s %s", argv[0], "argument must be a PID or %jobid\n");
+                printf("%s: %s", argv[0], "argument must be a PID or %jobid\n");
                 return;
             }
 
@@ -273,7 +274,8 @@ void waitfg(pid_t pid)
     req.tv_sec = 1;
     while (getjobpid(jobs, pid)) {
         if (getjobpid(jobs, pid)->state == FG)
-            nanosleep(&req, NULL);
+//            nanosleep(&req, NULL);
+            sleep(1);
         else
             return;
     }
@@ -297,30 +299,47 @@ void sigchld_handler(int sig)
     pid_t jobPID;
     int jobJID;
     const int STDOUT = 1;
-    char msg[50];
+    char msg[50] = "";
     ssize_t bytes;
 
     jobPID = 1;
     // While loop because there may be more than one job that died
     while (jobPID > 0) {
         jobPID = waitpid(-1, &child, WNOHANG | WUNTRACED);
-        if (WIFEXITED(child) || WIFSIGNALED(child) || WIFSTOPPED(child)) {
-            pid2jid(jobs, jobJID);       // get JID before deleting job
-            deletejob(jobs, jobPID);
-            childsig = WTERMSIG(child);  // get signal that killed child
-
-            if (childsig == SIGINT)
-                sprintf(msg, "Job [%d] (%d) terminated by signal %d\n", jobJID, jobPID, childsig);
-            else if (childsig == SIGTSTP)
-                sprintf(msg, "Job [%d] (%d) stopped by signal %d\n", jobJID, jobPID, childsig);
-
+        if ((jobPID > 0) &&
+            (WIFEXITED(child) || WIFSIGNALED(child) || WIFSTOPPED(child))) {
+            jobJID = pid2jid(jobs, jobPID);  // get JID before deleting job
+            if (WIFEXITED(child)) {
+                deletejob(jobs, jobPID);
+            }
+            if (WIFSIGNALED(child)) {
+                childsig = WTERMSIG(child);  // get signal that killed child
+                if (childsig == SIGINT) {
+                    deletejob(jobs, jobPID);
+                    sprintf(msg, "Job [%d] (%d) terminated by signal %d\n", jobJID, jobPID, childsig);
+                }
+                else if (childsig == SIGTSTP) {
+                    // When child gets stopped but not by shell
+                    getjobpid(jobs, jobPID)->state = ST;
+                    sprintf(msg, "Job [%d] (%d) stopped by signal %d\n", jobJID, jobPID, childsig);
+                }
+            }
+            else if (WIFSTOPPED(child)) {
+                childsig = WSTOPSIG(child);  // get signal that killed child
+                if (childsig == SIGINT) {
+                    deletejob(jobs, jobPID);
+                    sprintf(msg, "Job [%d] (%d) terminated by signal %d\n", jobJID, jobPID, childsig);
+                }
+                else if (childsig == SIGTSTP) {
+                    // When child gets stopped but not by shell
+                    getjobpid(jobs, jobPID)->state = ST;
+                    sprintf(msg, "Job [%d] (%d) stopped by signal %d\n", jobJID, jobPID, childsig);
+                }
+            }
             bytes = write(STDOUT, msg, strlen(msg));
         }
-        else {
-            bytes = write(STDOUT, "Job not deleted.", 20);
-        }
     }
-    bytes++;
+    bytes++;   // Just to get rid of warning
     return;
 }
 
@@ -332,18 +351,10 @@ void sigchld_handler(int sig)
 void sigint_handler(int sig) 
 {
     pid_t fgPID;
-    int fgJID;
-    const int STDOUT = 1;
-    char msg[50];
-    ssize_t bytes;
     
     fgPID = fgpid(jobs);
     if (fgPID) {
-        fgJID = pid2jid(jobs, fgPID);
         kill(fgPID * -1, SIGINT);
-        sprintf(msg, "Job [%d] (%d) terminated by signal %d\n", fgJID, fgPID, sig);
-        bytes = write(STDOUT, msg, strlen(msg));
-        bytes++; // Just to get rid of warning
     }
 }
 
@@ -355,19 +366,11 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
     pid_t fgPID;
-    int fgJID;
-    const int STDOUT = 1;
-    char msg[50];
-    ssize_t bytes;
     
     fgPID = fgpid(jobs);
     if (fgPID) {
-        fgJID = pid2jid(jobs, fgPID);
         getjobpid(jobs, fgPID)->state = ST;
         kill(fgPID * -1, SIGTSTP);
-        sprintf(msg, "Job [%d] (%d) stopped by signal %d\n", fgJID, fgPID, sig);
-        bytes = write(STDOUT, msg, strlen(msg));
-        bytes++; // Just to get rid of warning
     }
 }
 
