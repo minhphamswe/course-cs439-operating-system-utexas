@@ -1,0 +1,19 @@
+1. How can fairness and throughput be competing goals for a scheduler? Give an example where a fair scheduler makes bad use of the CPU and an example where a high-throughput scheduler is unfair.
+
+2. Consider a uniprocessor kernel that user programs can trap into using system calls. The kernel receive and handles interrupts from I/O devices. Would there be any need for critical sections within that kernel.
+
+3. Describe the priority inversion problem and give an example situation where it may occur.
+
+4. Now consider the following program fragment:
+s1->wait();
+a++;
+s2->wait();
+v++;
+s2->signal();
+s1->signal();
+where s1 and s2 are semaphores. All variables are automatic. Now, consider two threads running this fragment of code simultaneously. Can there be a deadlock? Why or why not?
+
+5. You need two Hydrogen atoms and one Oxygen atom to make water. Using semaphores, write a solution that generates water whenever the right resources are available. You must have three functions: one to generate Oxygen, one to generate Hydrogen, and one to generate water. Assume the three methods may be executed by any number of threads concurrently.
+
+6. Solve the water problem using monitors.
+
