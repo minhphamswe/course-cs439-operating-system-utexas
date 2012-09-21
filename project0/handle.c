@@ -57,8 +57,7 @@ void sigint_handler(int sig)
 {
     // This will run whenever we are sent a SIGINT
     // Basically, just print out 'Nice Try.' to the console
-    // Don't use printf since that may take too long and we get another
-    // interrupt or get preempted
+    // Don't use printf since it is unsafe inside of signals
     ssize_t bytes;
     const int STDOUT = 1;
     bytes = write(STDOUT, "Nice Try.\n", 10);

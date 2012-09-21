@@ -157,7 +157,6 @@ int builtin_cmd(char **argv)
     char* cmd = argv[0];
     if (strcmp(cmd, "quit") == 0) {
         // Quit was called, exit the program
-        printf("QUIT WAS CALLED\n");
         exit(0);
     }
     // Line did not match any of our built in commands, so pass back to eval
