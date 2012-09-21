@@ -18,11 +18,11 @@
 
 
 /* Global variables */
-int verbose = 0;            /* if true, print additional output */
+int verbose = 0;                    /* if true, print additional output */
 
-extern char **environ;      /* defined in libc */
-static char prompt[] = "msh> ";    /* command line prompt (DO NOT CHANGE) */
-static struct job_t jobs[MAXJOBS]; /* The job list */
+extern char **environ;              /* defined in libc */
+static char prompt[] = "msh> ";     /* command line prompt (DO NOT CHANGE) */
+static struct job_t jobs[MAXJOBS];  /* The job list */
 /* End global variables */
 
 

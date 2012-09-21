@@ -1,0 +1,92 @@
+Homework #: 03
+Student Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email address: minh.pham@utexas.edu
+Unique Number: 52996
+
+1. To achieve high throughput, a scheduler must give short-running jobs higher priority in the schedule. However, this leads to starvation of long-running jobs, which is not fair. Conversely, if a schedule spends a lot of time switching between jobs in a round-robin fashion, it will be fair, but will have low CPU utilization, and therefore low throughput.
+Example:
+* Scheduler A switches context so often, it spends 90% CPU time moving between contexts and not doing any useful work. The schedule is round-robin, so in normal condition any job that enters will eventually be run (liveness) and it will wait for no longer than the number of jobs in the system (bounded waiting). Scheduler A is fair, but has low throughput.
+* Scheduler B runs only the shortest job. It achieves nearly 100% CPU utilization, and turn-around time is low. However, the long-running job responsible for the firewall hardly ever makes any progress. Scheduler B has high throughput but is unfair.
+
+2. There would still be a need for critical sections within that kernel. There would need to be, for example, a critical section for handling interrupts. The O/S should only handle one interrupt at time (I'm not sure why, but I feel like something will go horribly wrong otherwise). In this case, we have a critical section where only one interrupt handler can go in at a time (new ones will need to wait).
+
+3. As discussed above, when the O/S wants to achieve high throughput, the scheduler needs to give higher priority to shorter jobs. However, the scheduler has no idea how long a job will take to finish. As an estimation, it can use the historical amount of CPU time the job takes when it runs. When it uses this strategy, a situation may arise where:
+* Job A historically blocks for I/O a lot, therefore using little CPU, and is given high priority.
+* Job B uses a lot of CPU, and therefore is given low priority.
+* Job A blocks for input from Job B, and therefore cannot finish before Job B.
+* Job B, because of its low priority, can hardly make progress, so both jobs get stuck for a long time.
+This problematic situation, where a high-priority job is stopped from finishing by a low-priority job (effectively having a lower priority), is the priority inversion problem.
+
+4. No, there cannot be a deadlock. Suppose we had this function:
+void incr_v() {
+    s2->wait();
+    v++;
+    s2->signal();
+}
+then the original code fragment would be equivalent to:
+s1->wait();
+a++;
+incr_v();
+s1->signal();
+It's quite clear that a call to incr_v() can be treated as an atomic operation, then therefore doesn't affect either the safety or liveness property of the original code fragment. Applying the same analysis to the original code fragment, we see that it, too, can be treated as an atomic operation, which can't deadlock.
+
+5. Note: nowhere does the problem state that we must make hydrogen/oxygen only when the respective resource is completely depleted, so below pseudocode meets the minimum requirements (as per extreme programming/test-first-development rule).
+Pseudocode:
+
+Semaphore h, o, h2o;
+
+make_h() {
+    h->signal();
+}
+
+make_o() {
+    o->signal();
+}
+
+make_h2o() {
+    h->wait();
+    h->wait();
+    o->wait();
+
+    // MAGIC!
+
+    h2o->signal();
+}
+
+6. Note: see Note for problem 5.
+Pseudocode:
+
+int h, o, h2o
+Condition H, O;
+
+make_h() {
+    lock->Acquire();
+    h += 1;
+    H->Signal(lock);
+    lock->Release();
+}
+
+make_o() {
+    lock->Acquire();
+    o += 1;
+    O->Signal(lock);
+    lock->Release();
+}
+
+make_h2o() {
+    lock->Acquire();
+    while (h < 2) {
+        H->Wait(lock);
+        while (o < 1) {
+            O->Wait(lock);
+        }
+    }
+    // MAGIC!
+
+    lock->Release();
+}
+
+
+
