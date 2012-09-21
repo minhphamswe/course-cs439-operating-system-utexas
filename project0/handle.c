@@ -1,3 +1,10 @@
+/*
+ * handle.c - Practice intercepting handles
+ *
+ * Eric Aschner - easchner
+ * Minh Pham - minhpham
+ */
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -21,13 +28,19 @@ void sigusr_handler(int sig);
  */
 int main(int argc, char **argv)
 {
+    // Print my PID
     printf("My PID: %d\n", getpid());
 
+    // Set up signal handlers for SIGINT and SIGUSR1
     Signal(SIGINT, sigint_handler);
     Signal(SIGUSR1, sigusr_handler);
-    
+
+    // Required for nanosleep
     struct timespec req;
     req.tv_sec = 1;
+
+    // Until someone sends us a SIGUSR1 or kill -9's us, just keep printing
+    // out still here like a good little Troll >:O
     while(1) {
         nanosleep(&req, NULL);
         printf("%s", "Still here\n");
@@ -42,6 +55,10 @@ int main(int argc, char **argv)
  */
 void sigint_handler(int sig)
 {
+    // This will run whenever we are sent a SIGINT
+    // Basically, just print out 'Nice Try.' to the console
+    // Don't use printf since that may take too long and we get another
+    // interrupt or get preempted
     ssize_t bytes;
     const int STDOUT = 1;
     bytes = write(STDOUT, "Nice Try.\n", 10);
@@ -51,6 +68,8 @@ void sigint_handler(int sig)
 
 void sigusr_handler(int sig)
 {
+    // And this one will run whenever we receive SIGUSR1
+    // We are actually going to behave and quit now
     ssize_t bytes;
     const int STDOUT = 1;
     bytes = write(STDOUT, "exiting\n", 8);

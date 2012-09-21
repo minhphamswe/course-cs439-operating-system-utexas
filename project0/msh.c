@@ -1,14 +1,14 @@
 /* 
  * msh - A mini shell program with job control
  * 
- * <Put your name and login ID here>
+ * Eric Aschner - easchner
+ * Minh Pham - minhpham
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
-#include <time.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -18,11 +18,11 @@
 
 
 /* Global variables */
-int verbose = 0;                    /* if true, print additional output */
+int verbose = 0;            /* if true, print additional output */
 
-extern char **environ;              /* defined in libc */
-static char prompt[] = "msh> ";     /* command line prompt (DO NOT CHANGE) */
-static struct job_t jobs[MAXJOBS];  /* The job list */
+extern char **environ;      /* defined in libc */
+static char prompt[] = "msh> ";    /* command line prompt (DO NOT CHANGE) */
+static struct job_t jobs[MAXJOBS]; /* The job list */
 /* End global variables */
 
 
@@ -41,6 +41,7 @@ void sigint_handler(int sig);
 /* Here are helper routines that we've provided for you */
 void usage(void);
 void sigquit_handler(int sig);
+
 
 
 /*
@@ -126,8 +127,11 @@ void eval(char *cmdline)
     char *argv[50];
     int backgroundp;
 
+    // Check if job is background
     backgroundp = parseline(cmdline, argv);
 
+    // Check that a command is typed and it's not a builtin command
+    // If it is a builtin command, the check executes it
     if ((argv[0] != NULL) && (!builtin_cmd(argv))) {
         pid_t child;
         // Block SIGCHLD
@@ -135,7 +139,8 @@ void eval(char *cmdline)
         sigemptyset(&set);
         sigaddset(&set, SIGCHLD);
         sigprocmask(SIG_BLOCK, &set, NULL);
-        
+
+        // For a child process
         if ((child = fork()) == 0) {
             // Child process
             setpgid(0, 0);  /* put child in new process group (id = child)*/
@@ -147,6 +152,8 @@ void eval(char *cmdline)
         }
         else {
             // Parent
+            // Add job to appropriate queue, unblock SIGCHLD, and either print
+            // notification (background job) or wait (foreground job)
             if (!backgroundp) {
                 // Foreground job
                 addjob(jobs, child, FG, cmdline);
@@ -175,19 +182,24 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+    // Execute command if it is builtin, else exit
     char* cmd = argv[0];
     if (strcmp(cmd, "quit") == 0) {
+        // If command is quit, exit
         exit(0);
     }
     else if (strcmp(cmd, "jobs") == 0) {
+        // List all background jobs
         listjobs(jobs);
         return 1;
     }
     else if (strcmp(cmd, "bg") == 0) {
+        // Swap stopped job out to background
         do_bgfg(argv);
         return 1;
     }
     else if (strcmp(cmd, "fg") == 0) {
+        // Swap background or stopped job to foreground
         do_bgfg(argv);
         return 1;
     }
@@ -202,7 +214,7 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     if(argv[1] == NULL) {
-        // No argument
+        // No argument - print require argument message
         printf("%s %s", argv[0], "command requires PID or %jobid argument\n");
         return;
     }
@@ -234,7 +246,7 @@ void do_bgfg(char **argv)
             else {
                 printf("%s: No such job\n", argv[1]);
             }
-        }
+        }  // End Input is JID
         else {
             // Input is PID
             jobPID = atoi(argv[1]);
@@ -260,7 +272,7 @@ void do_bgfg(char **argv)
             else {
                 printf("(%s): No such process\n", argv[1]);
             }
-        }
+        }  // End Input is PID
         return;
     }
 }
@@ -274,7 +286,6 @@ void waitfg(pid_t pid)
     req.tv_sec = 1;
     while (getjobpid(jobs, pid)) {
         if (getjobpid(jobs, pid)->state == FG)
-//            nanosleep(&req, NULL);
             sleep(1);
         else
             return;
@@ -305,6 +316,7 @@ void sigchld_handler(int sig)
     jobPID = 1;
     // While loop because there may be more than one job that died
     while (jobPID > 0) {
+        // Reap the child
         jobPID = waitpid(-1, &child, WNOHANG | WUNTRACED);
         if ((jobPID > 0) &&
             (WIFEXITED(child) || WIFSIGNALED(child) || WIFSTOPPED(child))) {
@@ -312,6 +324,7 @@ void sigchld_handler(int sig)
             if (WIFEXITED(child)) {
                 deletejob(jobs, jobPID);
             }
+            // Handle child that got killed by signal
             if (WIFSIGNALED(child)) {
                 childsig = WTERMSIG(child);  // get signal that killed child
                 if (childsig == SIGINT) {
@@ -324,6 +337,7 @@ void sigchld_handler(int sig)
                     sprintf(msg, "Job [%d] (%d) stopped by signal %d\n", jobJID, jobPID, childsig);
                 }
             }
+            // Handle child that was stopped
             else if (WIFSTOPPED(child)) {
                 childsig = WSTOPSIG(child);  // get signal that killed child
                 if (childsig == SIGINT) {
@@ -405,6 +419,3 @@ void sigquit_handler(int sig)
     printf("Terminating after receipt of SIGQUIT signal\n");
     exit(1);
 }
-
-
-

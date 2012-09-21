@@ -108,21 +108,37 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    // We're going to break down the cmdline into chunks based on spaces
+    // we will need a place to store these
     char *argv[50];
+
+    // Bool val if the cmdline was a bg process, used later in msh
     int backgroundp;
 
+    // Parse the line and save to argv, find out if bg process
     backgroundp = parseline(cmdline, argv);
     
     if (!builtin_cmd(argv)) {
+        // Not a built in command, let's fork and make a new process to run
+        // the command and pass it the entire command line back in case it
+        // needs some of those variables back
         pid_t child;
         if ((child = fork()) == 0) {
             // Child process
-            setpgid(0, 0);  /* put child in new process group (id = child)*/
+
+            // Put the child process in a new process group (id = child PID)
+            // If we don't then parent signals affect the child
+            setpgid(0, 0);
+
+            // Finally run the new program
             execv(argv[0], argv);
-            exit(125);      /* only if execv failed */
+
+            // If execv failed, we're just going to quit
+            exit(1);
         }
         else {
-            // Parent
+            // We are the parent, so let's wait for the kid to finish up
+            // Children can only run in the fg here
             waitpid(child, 0, 0);
         }
     }
@@ -137,12 +153,15 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+    // First get the beginning of the input and save to string (char array)
     char* cmd = argv[0];
     if (strcmp(cmd, "quit") == 0) {
+        // Quit was called, exit the program
         printf("QUIT WAS CALLED\n");
         exit(0);
     }
-    return 0;     /* not a builtin command */
+    // Line did not match any of our built in commands, so pass back to eval
+    return 0;
 }
 
 
