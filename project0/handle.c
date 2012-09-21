@@ -36,13 +36,19 @@ int main(int argc, char **argv)
     Signal(SIGUSR1, sigusr_handler);
 
     // Required for nanosleep
-    struct timespec req;
-    req.tv_sec = 1;
+    struct timespec req, rem;
 
     // Until someone sends us a SIGUSR1 or kill -9's us, just keep printing
     // out still here like a good little Troll >:O
     while(1) {
-        nanosleep(&req, NULL);
+        req.tv_sec = 1;
+        req.tv_nsec = 0;
+        int sleepdone = -1;
+        // Until we finish our entire second, don't quit on signals
+        while(sleepdone == -1) {
+          sleepdone = nanosleep(&req, &rem);
+          req = rem;
+        }
         printf("%s", "Still here\n");
     }
 
