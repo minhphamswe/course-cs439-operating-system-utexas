@@ -1,0 +1,59 @@
+1. Most round-robin schedulers use a fixed size quantum. Give an argument in favor of and against a small quantum.
+
+2. Given the following segment of code that uses three memory segments, code segment, data segnment, and stack segment:
+
+	char a[100];
+
+	thread_func(int r, char ** g)
+	{
+	   int d;
+	   static double b;
+	   char * s = "boo";
+	   char * p;
+
+	   p = malloc(300);
+	   return 0;
+	}
+
+Identify the segment in which each variable resides and indicate if the variable is private to a thread or shared amongst threads.
+
+3. Given the following piece of code:
+
+	main(int argc, char**argv)
+	{
+	   int child=fork();
+	   int c=5;
+	   
+	   if(child==0)
+	   {
+	      c+=5;
+	   }
+	   else
+	   {
+	      child=fork();
+	      c+=10;
+	      if(child)
+		 c+=5;
+	   }
+
+How many different copies of the variable c are there? What are their values?
+
+4. True/False: Starvation implies deadlock.
+Explain.
+
+5. Consider a system with three smoker processes and one agent process. Each smoker continuously rolls a cigarette and then smokes it. But to roll and smoke a cigarette, the smoker needs three ingredients: tobacco, paper, and matches. One of the smoker processes has paper, another has tobacco, and the third has matches. The agent has an infinite supply of all three materials.
+
+The agent places two of the ingredients on the table. The smoker who has the remaining ingredient then makes and smokes a cigarette, signaling the agent on completion. The agent then puts out another two of the three ingredients, and the cycle repeats.
+
+Assume the agent calls the procedure:
+
+	void chooseIngredients(int *paper, int *tobacco, int *match);
+
+to randomly select 2 of the 3 ingredients. The routine randomly sets 2 of the values to "1" and one of the values to "0". You don't have to write this routine.
+
+Write a program to synchronize the agent and smokers.
+
+	1. What synchronization and state variables will you use in this problem? (For each variable, indicate the variable's type, the variable's name, its initial value (if any), and a short comment describing the variable's purpose.
+	Variable Name	Variable Type	Initial Value	Description
+
+	2. Write the routines Agent() and matchSmoker() (the routine for the smoker that has lots of matches.) You don't have to write the routines paperSmoker() or tobaccoSmoker(), but your solution should be general enough so that those routines would be simple variations of matchSmoker().
