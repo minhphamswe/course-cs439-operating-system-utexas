@@ -5,9 +5,29 @@ CS login: minhpham
 Email address: minh.pham@utexas.edu
 Unique Number: 52996
 
-1.
+1. The fairness and (up to a point) responsiveness of a system that uses
+a round-robin scheduler is inversely proportional to the quantum size.
+Therefore, having a smaller quantum is better.
+   On the other hand, the number of context switches that occur in such
+a system is also inversely proportional to the quantum size. Each context
+switch carries some overhead, so the overhead of the system is inversely
+proportional to the quantum size. Put it another way, the smaller the
+quantum, the less CPU utilization is achieved (more CPU time is spent on
+the overhead of context switching). Therefore, having a larger quantum
+is better.
+   In a real system that does round-robin scheduling, it's all about
+striking a decent compromise.
 
-2.
+2. We can divide the variables mentioned in the code fragment as follow:
+
+Shared variables
+* a is a global variable and goes into the data segment
+* p is allocated on the heap, and goes into the data segment
+* s is assigned in the code, and is not a global variable; it also goes into the data segment
+
+Private variables:
+* r and g are passed through the stack, so they are in the stack segment
+* the 0 that the function returns is also in the stack segment
 
 3. There are 3 copies of the variable c:
 
@@ -32,14 +52,14 @@ first job that comes in.
 
 5.
 
-    Variable Name   Variable Type	Initial Value	Description
-    num_paper       int
-    num_tobacco     int
-    num_match       int
-    Paper           Condition
-    Tobacco         Condition
-    Match           Condition
-    Empty           Condition
+    Variable Name   Variable Type       Initial Value   Description
+    num_paper       int                 0               Number of units of paper on the table
+    num_tobacco     int                 0               Number of units of tobacco on the table
+    num_match       int                 0               Number of units of match on the table
+    Paper           Condition           ?               There is some paper on the table
+    Tobacco         Condition           ?               There is some tobacco on the table
+    Match           Condition           ?               There is some match on the table
+    Empty           Condition           ?               There is nothing on the table -> time to refill
 
 Agent() {
     lock->Acquire()
