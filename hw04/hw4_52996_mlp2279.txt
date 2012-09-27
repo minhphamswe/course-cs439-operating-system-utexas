@@ -1,0 +1,79 @@
+1.
+
+2.
+
+3. There are 3 copies of the variable c:
+
+* The first child adds 5 to its c (which is 5), so that c == 10;
+* The second child adds 10 to its c (which is 5), so that c == 15;
+* The parent adds 10 to its c (which is 5) after the second fork(), so at this
+  point its c == 15
+* The parent then adds 5 to its c (which is 15, from the step above), so its
+  c is now 20
+
+To recap, there are 3 copies of c:
+* first child: 10 = 5 + 5
+* scond child: 15 = 5 + 10
+* parent: 20 = 5 + 10 + 5
+
+4. False. Deadlock, by definition, only occurs when some threads are waiting for
+some events that can only be generated when these same threads runs. In cases
+where a process waits indefinitely for some other processes to STOP running,
+starvation occurs, but not deadlock. This situation may happen, for example,
+when a LIFO scheduler (bad design) continuously push new jobs in front of the
+first job that comes in.
+
+5.
+
+    Variable Name   Variable Type	Initial Value	Description
+    num_paper       int
+    num_tobacco     int
+    num_match       int
+    Paper           Condition
+    Tobacco         Condition
+    Match           Condition
+    Empty           Condition
+
+Agent() {
+    lock->Acquire()
+
+    // Lazy agent wait until we run out of stuffs
+    while ((num_paper | num_tobacco | num_match) > 0) {
+        Empty->Wait(lock);
+    }
+    
+    // Randomly choose a Resource
+    chooseIngredients(&num_paper, &num_tobacco, &num_match);
+    
+    // Signal the appropriate threads
+    if (num_paper)
+        Paper->Signal(lock);
+    if (num_tobacco)
+        Tobacco->Signal(lock);
+    if (num_match)
+        Match->Signal(lock);
+    
+    lock->Release()
+}
+
+matchSmoker() {
+    lock->Acquire()
+    
+    // leq instead of eq for safety
+    while (num_paper <= 0) {
+        Paper->Wait(lock);
+        while (num_tobacco <= 0) {
+            Tobacco->Wait(lock);
+        }
+    }
+    
+    // SMOKE! BOO YAH!
+    
+    num_paper--;
+    num_tobacco--;
+
+    // Out of stuff: signal for refill
+    Empty->Signal(lock);
+    
+    lock->Release()
+}
