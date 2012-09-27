@@ -1,0 +1,142 @@
+################
+YOUR INFO
+################
+Name2: Minh Pham
+EID2: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+
+Slip days used: 0
+
+################
+GROUP MATE
+################
+Name1: Easchner
+EID1: easchner
+CS login: easchner
+Email: eric_aschner@hotmail.com
+Unique Number: 52996
+
+****EACH student submits a (unique) design document.****
+
+################
+Preliminaries
+################
+(1) If you have any preliminary comments on your submission, notes for
+  the TAs, or extra credit, please give them here.
+
+(2) Please cite any offline or online sources you consulted while
+  preparing your submission, other than the Linux documentation,
+  course text, and lecture notes.
+  
+  http://stackoverflow.com/questions/1902901/show-current-instruction-in-gdb
+  http://www.int80h.org/
+
+
+################
+Questions regarding Part 0
+################
+(1) How many child processes are created when doFib() begins with
+  an input of 5?  Show the return value for each child process, numbering
+  the processes beginning with 0 (the original process) and incrementing for
+  each child process.
+
+Below is the forking tree of when ./fib is called with an input of 5.
+The textbook draw the fork above the horizontal line, but I'm drawing under it,
+because of the character set limitation.
+
+Legends:
+* First number before the dot (.) is the process numbering
+* Second number inside the parentheses ( () ) is the input to doFib()
+* Third number inside the curly brackets ({}) is the exit/return value
+  (process 0 exit with code 0 but outputs 5)
+
+---0.fib(5){5}---1.fib(4){3}---3.fib(3){2}---7.fib(2){1}---13.fib(1){1}
+               |             |             |             |
+               |             |             |             `-14.fib(0){0}
+               |             |             |
+               |             |             `-8.fib(1){1}http://stackoverflow.com/questions/1902901/show-current-instruction-in-gdb
+               |             |
+               |             `-4.fib(2){1}---9.fib(1){1}
+               |                           |
+               |                           `-10.fib(0){0}
+               |                 
+               `-2.fib(3){2}---5.fib(2){1}---11.fib(1){1}
+                             |             |
+                             |             `-12.fib(0){0}
+                             |        
+                             `-6.fib(1){1}
+
+A total of 14 child processes are created (not counting 0, which is the parent process)
+
+
+(2) Which flavor of exec did you choose to use?  Why?
+
+We used execv because:
+* execv takes 2 arguments: a char* to the path of executable and an
+argument vector
+* We receive the path of the executable through the command we
+receive (a path is guaranteed, otherwise the program wouldn't run)
+* We also receive the arguments to the program, kindly parsed by
+parseline.
+
+So, basically, we ended up choosing execv because it takes the
+least amount of processing on our part.
+
+################
+Questions regarding Part 1
+################
+(1) In the provided utility function Signal(), what does the call to
+  sigaction() do?  Why was sigaction() used instead of signal()?
+  
+  In Signal(), the call to sigaction() is used to change the signal
+  handler for a signum from the an O/S-provided default to a user-defined
+  handler.
+  man 2 signal mention that the behavior of signal() varies among Unix
+  variances, and among different versions of the same variant. For
+  portability, we use sigaction() instead of signal().
+
+(2) What is the last assembly language instruction executed by the
+  signal handler function that you write?
+  
+  For the purpose of this and the next 2 questions, I'll be discussing
+  the sigint_handler function in handle.c 
+  The very last assembly language instruction executed by the signal
+  handler function is "ret".
+
+(3) After the instruction just identified executes, what is the next
+  assembly language instruction executed?
+  
+  The instruction executed right after the ret executes is in the 
+  __kernel_sigreturn. The assembly language instruction is pop %eax. 
+
+(4) When the signal handler finishes running, it must restore all of
+  the registers from the interrupted thread to exactly their values
+  before the signal occurred. How is this done?
+  
+  After the sigint_handler exits and pc is passed back to the previous
+  stack frame, the next instruction that executes is in int 80. This is
+  apparently an interrupt calls, and leads to another interrupt handler
+  which presumably executes the magic of restoring values to threads. 
+
+
+################
+Questions regarding Part 2
+################
+(1) In msh.c, we use three separate signal handlers to catch our signals. 
+  You can also use a single signal handler to catch all three signals.  Is
+  there a design advantage of one over the other?  Explain your answer.
+  
+  We can put all the signal handling code into one function, which would
+  then dispatch the actual work to other functions. This changes interrupt
+  handling from the kernel to the user space. 
+  Putting code all in one handler can reduce code duplication by taking advantage
+  of the interrelation of signals to one another.
+  For example, in msh, we want to notify the user by printing a notice whenever
+  a child process is interrupted. sigint_handler, when it passes the signal
+  along to the child process, can do this. Also, when a child is killed by an
+  external process, the signal goes to sigchld_handler (the way we got it set up)
+  so this code needs to also print the notice. We can reduce some code duplication
+  by putting all the notice code into sigchld_handler (which would be called anyway
+  after sigint is sent).
