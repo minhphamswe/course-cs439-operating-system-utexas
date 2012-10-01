@@ -21,3 +21,6 @@ psh
 
 # IDE-generated files
 *.kdev4
+
+# Pintos build folder
+pintos/src/threads/build
