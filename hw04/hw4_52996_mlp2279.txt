@@ -1,0 +1,106 @@
+Homework #: 04
+Student Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email address: minh.pham@utexas.edu
+Unique Number: 52996
+
+1. The fairness and (up to a point) responsiveness of a system that uses
+a round-robin scheduler is inversely proportional to the quantum size.
+Therefore, having a smaller quantum is better.
+   On the other hand, the number of context switches that occur in such
+a system is also inversely proportional to the quantum size. Each context
+switch carries some overhead, so the overhead of the system is inversely
+proportional to the quantum size. Put it another way, the smaller the
+quantum, the less CPU utilization is achieved (more CPU time is spent on
+the overhead of context switching). Therefore, having a larger quantum
+is better.
+   In a real system that does round-robin scheduling, it's all about
+striking a decent compromise.
+
+2. We can divide the variables mentioned in the code fragment as follow:
+
+Shared variables
+* a is a global variable and goes into the data segment
+* p is allocated on the heap, and goes into the data segment
+* s is assigned in the code, and is not a global variable; it also goes into the data segment
+
+Private variables:
+* r and g are passed through the stack, so they are in the stack segment
+* the 0 that the function returns is also in the stack segment
+
+3. There are 3 copies of the variable c:
+
+* The first child adds 5 to its c (which is 5), so that c == 10;
+* The second child adds 10 to its c (which is 5), so that c == 15;
+* The parent adds 10 to its c (which is 5) after the second fork(), so at this
+  point its c == 15
+* The parent then adds 5 to its c (which is 15, from the step above), so its
+  c is now 20
+
+To recap, there are 3 copies of c:
+* first child: 10 = 5 + 5
+* scond child: 15 = 5 + 10
+* parent: 20 = 5 + 10 + 5
+
+4. False. Deadlock, by definition, only occurs when some threads are waiting for
+some events that can only be generated when these same threads runs. In cases
+where a process waits indefinitely for some other processes to STOP running,
+starvation occurs, but not deadlock. This situation may happen, for example,
+when a LIFO scheduler (bad design) continuously push new jobs in front of the
+first job that comes in.
+
+5.
+
+    Variable Name   Variable Type       Initial Value   Description
+    num_paper       int                 0               Number of units of paper on the table
+    num_tobacco     int                 0               Number of units of tobacco on the table
+    num_match       int                 0               Number of units of match on the table
+    Paper           Condition           ?               There is some paper on the table
+    Tobacco         Condition           ?               There is some tobacco on the table
+    Match           Condition           ?               There is some match on the table
+    Empty           Condition           ?               There is nothing on the table -> time to refill
+
+Agent() {
+    lock->Acquire()
+
+    // Lazy agent wait until we run out of stuffs
+    while ((num_paper | num_tobacco | num_match) > 0) {
+        Empty->Wait(lock);
+    }
+    
+    // Randomly choose a Resource
+    chooseIngredients(&num_paper, &num_tobacco, &num_match);
+    
+    // Signal the appropriate threads
+    if (num_paper)
+        Paper->Signal(lock);
+    if (num_tobacco)
+        Tobacco->Signal(lock);
+    if (num_match)
+        Match->Signal(lock);
+    
+    lock->Release()
+}
+
+matchSmoker() {
+    lock->Acquire()
+    
+    // leq instead of eq for safety
+    while (num_paper <= 0) {
+        Paper->Wait(lock);
+        while (num_tobacco <= 0) {
+            Tobacco->Wait(lock);
+        }
+    }
+    
+    // SMOKE! BOO YAH!
+    
+    num_paper--;
+    num_tobacco--;
+
+    // Out of stuff: signal for refill
+    Empty->Signal(lock);
+    
+    lock->Release()
+}
