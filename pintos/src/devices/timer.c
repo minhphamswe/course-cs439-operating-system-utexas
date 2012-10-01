@@ -3,11 +3,13 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include <kernel/list.h>
 #include "devices/pit.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+#include "threads/malloc.h"
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -29,12 +31,14 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+static struct list sleep_queue;
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
+  list_init(&sleep_queue);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -89,11 +93,68 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  int64_t now = timer_ticks();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  // Declare new element to add into double linked list, initialize
+  struct sleep_elem* newSleep = malloc(sizeof(struct sleep_elem));
+  newSleep->wakeTicks = now + ticks;
+  newSleep->currentThread = thread_current();
+  newSleep->removeFlag = 0;
+
+  // Iterate through each part of the linked list.
+  struct list_elem *e;
+  for (e = list_begin(&sleep_queue); e != list_end(&sleep_queue); e = list_next(e)) {
+    struct sleep_elem *s = list_entry (e, struct sleep_elem, elem);
+    // If this item was already unblocked, remove it.
+    // Must run free outside of timer_wake since it can't be in interrupt
+    // Already running through that section of the list here, so good place to do it
+    if (s->removeFlag != 0) {
+      intr_disable();
+      e = list_prev(list_remove(e));
+      intr_enable();
+      free(s);
+    }
+    // If the next node's wait time is longer than ours, put ourselves in before it
+    else if (s->wakeTicks > newSleep->wakeTicks) {
+      intr_disable();
+      list_insert(e, &(newSleep->elem));
+      thread_block();
+      intr_enable();
+      break;
+    }
+  }
+
+  // If we get to the end of the list, put ourselves at the end
+  if (e == list_end(&sleep_queue)) {
+    intr_disable();
+    list_insert(e, &(newSleep->elem));
+    thread_block();
+    intr_enable();
+  }
+}
+
+void
+timer_wake ()
+{
+  int64_t now = timer_ticks();
+
+  // Go through the list until we hit the end or an item with a time greater than now
+  struct list_elem *e;
+  for(e = list_begin(&sleep_queue); e != list_end(&sleep_queue); e = list_next(e)) {
+    struct sleep_elem *s = list_entry (e, struct sleep_elem, elem);
+    // As long as the first item is due before now, wake it and keep going
+    if(s->wakeTicks < now) {
+      if(s->removeFlag == 0) {
+        s->removeFlag = 1;
+        thread_unblock(s->currentThread);
+      }
+    }
+    // Once we hit something that is still waiting, the rest of the queue will
+    // also wait since it's sorted.  So... break.
+    else {
+      break;
+    }
+  }
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

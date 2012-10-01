@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include <devices/timer.h>
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -133,6 +134,8 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  timer_wake();
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
