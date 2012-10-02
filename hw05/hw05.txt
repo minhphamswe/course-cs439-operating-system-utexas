@@ -1,0 +1,39 @@
+Homework 5
+
+Due: 7:45a Thursday, October 4, 2012
+
+1. In a 32-bit machine we subdivide the virtual address into 4 segments
+as follows: 
+
+    10-bit  8-bit   6-bit   8 bit
+
+We use a 3-level page table, such that the first 10-bit are for the
+first level and so on.
+    1. What is the page size in such a system?
+    2. What is the size of a page table for a process that has 256K of
+    memory starting at address 0?
+
+2. Pages have (at least) the following three bits associated with them:
+the resident bit, the clock/reference bit, and the dirty bit. Describe
+each bit and its use.
+
+3. In class, we discussed that paging and segmented paging may increase
+internal fragmentation. What is internal fragmentation? What steps could
+you take to reduce it?
+
+4. Belady's anomaly: Intuitively, it seems that the more frames the
+memory has, the fewer page faults a program will get. Surprisingly
+enough, this is not always true. Belady (1969) discovered an example in
+which FIFO page replacement causes more faults with four page frames
+than with three. This strange situation has become known as Belady's
+anomaly. To illustrate, a program with five virtual pages numbered from
+0 to 4 references its pages in the order: 
+
+    0 1 2 3 0 1 4 0 1 2 3 4
+
+    1. Using FIFO replacement, compute the number of page faults with 3
+    frames. Repeat for 4 frames.
+    2. Compute the number of page faults under LRU, the clock algorithm,
+    and the optimal algorithm. What do you notice?
+
+5. Question 9.19, page 852, B&O.

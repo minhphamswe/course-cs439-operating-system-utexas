@@ -1,0 +1,53 @@
+Homework #: 05
+Student Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email address: minh.pham@utexas.edu
+Unique Number: 52996
+
+2. Book-keeping bits in a page:
+
+* Residence bit: Since page frames can be swapped out of main memory to
+secondary storage, this bit is needed to inform the operating system
+about whether the page frame corresponding to this page in main memory.
+* Clock/reference bit:
+* Dirty bit: If a page frame is loaded into main memory, written to,
+and then swapped out to secondary storage, the content of the page on
+disk needs to be updated as well. This bit is used to determine whether
+the content of the page frame on disk needs to be written. If it's not
+set, the operating system can skip writing to disk.
+
+3. To reduce or eliminate external fragmentation, operating systems
+assign memory to processes in fixed-size blocks (the page size, usually
+a power of 2). However, processes may not use all of these assigned
+memory blocks; these blocks can also not be used by other processes.
+When this happens, internal fragmentation occurs.
+   To reduce internal fragmentation, the operating system can reduce
+the page size, at the cost of a larger page table.
+
+4. Part 1: Compare page faults using FIFO replacement between 3 and 4
+frames. Note: Page faults are in parentheses ().
+Three Frames - FIFO:
+Page Frame |  0   1   2   3   0   1   4   0   1   2   3   4
+------------------------------------------------------------
+0          | (0)  0   0  (3)  3   3  (4)  4   4   4   4   4
+1          |  -  (1)  1   1  (0)  0   0   0   0  (2)  2   2
+2          |  -   -  (2)  2   2  (1)  1   1   1   1  (3)  3
+------------------------------------------------------------
+Page Faults: 9
+
+Four Frames - FIFO:
+Page Frame |  0   1   2   3   0   1   4   0   1   2   3   4
+------------------------------------------------------------
+0          | (0)  0   0   0   0   0  (4)  4   4   4  (3)  3
+1          |  -  (1)  1   1   1   1   1  (0)  0   0   0  (4)
+2          |  -   -  (2)  2   2   2   2   2  (1)  1   1   1
+3          |  -   -   -  (3)  3   3   3   3   3  (2)  2   2
+------------------------------------------------------------
+Page Faults: 10
+
+=> Four pages lead to more page faults than 3 pages (weird!)
+
+   Part 2: Compute the number of page faults under LRU, the clock
+algorithm, and the optimal algorithm. What do you notice?
+
