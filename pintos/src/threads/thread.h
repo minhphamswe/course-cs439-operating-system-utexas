@@ -23,6 +23,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define PRI_DEPTH 8                     /* Number of possible donations per thread */
 
 /* A kernel thread or user process.
 
@@ -69,6 +70,7 @@ typedef int tid_t;
          dynamic allocation with malloc() or palloc_get_page()
          instead.
 
+
    The first symptom of either of these problems will probably be
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
@@ -80,6 +82,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -87,7 +90,12 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
+    int nativePriority;                 /* Native (lowest) priority */
+    int priority;                       /* Active Priority including donation. */
+
+    struct thread* donors[PRI_DEPTH];   /* List of donors */
+    int numDonors;
+
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -132,6 +140,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void updateActivePriority(struct thread *thread);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

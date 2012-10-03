@@ -29,6 +29,7 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
+#include <kernel/list.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -113,11 +114,32 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+
+  int highestPriority = PRI_MIN - 1;        /* Highest priority of waiting threads */
+
+  if (!list_empty (&sema->waiters)) {
+    // Search for the highest priority thread in the waiting list and wake it up
+    struct thread *highestThread;
+    struct list_elem *e;
+
+    for (e = list_begin(&(sema->waiters)); e != list_end(&(sema->waiters)); e = list_next(e)) {
+      struct thread *waiter = list_entry (e, struct thread, elem);
+      if (waiter->priority > highestPriority) {
+        highestThread = waiter;
+        highestPriority = highestThread->priority;
+      }
+    }
+
+    list_remove(&(highestThread->elem));
+    
+    thread_unblock(highestThread);
+  }
+
   sema->value++;
   intr_set_level (old_level);
+
+  if(highestPriority > thread_current()->priority)
+    thread_yield();
 }
 
 static void sema_test_helper (void *sema_);
@@ -196,6 +218,14 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  if (lock->holder != NULL) {
+    if(lock->holder->priority < thread_current()->priority)
+      if(lock->holder->numDonors < PRI_DEPTH) {
+        lock->holder->donors[lock->holder->numDonors] = thread_current();
+        lock->holder->numDonors++;
+        updateActivePriority(lock->holder);
+      }
+  }
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -233,6 +263,17 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  if(lock->lastSignaledPriority > thread_current()->priority)
+  {
+    lock->lastSignaledPriority = 0;
+    thread_yield();
+  }
+  if(thread_current()->priority > thread_current()->nativePriority)
+  {
+    thread_current()->numDonors = 0;
+    updateActivePriority(thread_current());
+    thread_yield();
+  }
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -249,6 +290,7 @@ lock_held_by_current_thread (const struct lock *lock)
 /* One semaphore in a list. */
 struct semaphore_elem 
   {
+    struct thread *threadPtr;           /* Pointer back to holding thread */
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
   };
@@ -288,12 +330,13 @@ void
 cond_wait (struct condition *cond, struct lock *lock) 
 {
   struct semaphore_elem waiter;
+  waiter.threadPtr = thread_current();
 
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-  
+
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
@@ -309,16 +352,32 @@ cond_wait (struct condition *cond, struct lock *lock)
    make sense to try to signal a condition variable within an
    interrupt handler. */
 void
-cond_signal (struct condition *cond, struct lock *lock UNUSED) 
+cond_signal (struct condition *cond, struct lock *lock /*UNUSED*/)
 {
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  int highestPriority = PRI_MIN - 1;
+  struct thread *highestThread;
+  struct semaphore_elem *highestSema;
+
+  if (!list_empty (&cond->waiters)) {
+    // Search for the highest priority thread in the waiting list and wake it up
+    struct list_elem *e;
+    for (e = list_begin(&(cond->waiters)); e != list_end(&(cond->waiters)); e = list_next(e)) {
+      struct semaphore_elem *waiter = list_entry (e, struct semaphore_elem, elem);
+      if (waiter->threadPtr->priority > highestPriority) {
+        highestSema = waiter;
+        highestThread = waiter->threadPtr;
+        highestPriority = highestThread->priority;
+        lock->lastSignaledPriority = highestPriority;
+      }
+    }
+    list_remove(&(highestSema->elem));
+    sema_up (&(highestSema->semaphore));
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

@@ -143,7 +143,7 @@ timer_wake ()
   for(e = list_begin(&sleep_queue); e != list_end(&sleep_queue); e = list_next(e)) {
     struct sleep_elem *s = list_entry (e, struct sleep_elem, elem);
     // As long as the first item is due before now, wake it and keep going
-    if(s->wakeTicks < now) {
+    if(s->wakeTicks <= now) {
       if(s->removeFlag == 0) {
         s->removeFlag = 1;
         thread_unblock(s->currentThread);

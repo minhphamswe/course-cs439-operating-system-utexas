@@ -30,8 +30,15 @@ if [ ! -d $KERNELDIR ]; then
     make -C $THREADDIR
 fi
 
-# Run all tests
-for file in $(find $TESTDIR -name "*.ck"); do
+# Run all alarm tests
+for file in $(find $TESTDIR -name "alarm*.ck"); do
+    make -C $THREADDIR
+    cd $KERNELDIR &&
+    $PINTOS run $(basename $file .ck)
+done
+
+# Run all priority tests
+for file in $(find $TESTDIR -name "priority*.ck"); do
     make -C $THREADDIR
     cd $KERNELDIR &&
     $PINTOS run $(basename $file .ck)
