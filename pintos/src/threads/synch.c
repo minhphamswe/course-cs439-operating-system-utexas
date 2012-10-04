@@ -131,7 +131,7 @@ sema_up (struct semaphore *sema)
     }
 
     list_remove(&(highestThread->elem));
-    
+
     thread_unblock(highestThread);
   }
 
@@ -219,12 +219,19 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   if (lock->holder != NULL) {
-    if(lock->holder->priority < thread_current()->priority)
-      if(lock->holder->numDonors < PRI_DEPTH) {
-        lock->holder->donors[lock->holder->numDonors] = thread_current();
-        lock->holder->numDonors++;
-        updateActivePriority(lock->holder);
+    struct thread *t = lock->holder;
+    //intr_disable();
+    //printf("Updating donor for thread #%d\n", lock->holder->tid);
+    if(t->nativePriority < thread_current()->priority)
+      if(t->numDonors < PRI_DEPTH) {
+        //printf("Updating donor for thread #%d at location %d\n", lock->holder->tid, lock->holder->numDonors);
+        t->donors[t->numDonors].donor = thread_current();
+        t->donors[t->numDonors].lock = lock;
+        t->numDonors++;
+        updateActivePriority(t);
+        //printf("After update numDonors for thread #%d is: %d\n", lock->holder->tid, lock->holder->numDonors);
       }
+    //intr_enable();
   }
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
@@ -263,16 +270,39 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
   if(lock->lastSignaledPriority > thread_current()->priority)
   {
+    // We signaled someone with higher priority
     lock->lastSignaledPriority = 0;
-    thread_yield();
+    //thread_yield();
   }
   if(thread_current()->priority > thread_current()->nativePriority)
   {
-    thread_current()->numDonors = 0;
+    //printf("\nThread #%d calling lock_release.\n", thread_current()->tid);
+    // We have someone with higher priority waiting on us: remove waiting
+    // thread from donor list
+    int i;
+
+    struct priority_lock tempDonors[PRI_DEPTH];
+    int numTempDonors = 0;
+    int numSameLockDonor = 0;
+    
+    for (i = 0; i < thread_current()->numDonors; i++) {
+      if (thread_current()->donors[i].lock != lock)
+        {
+          tempDonors[numTempDonors] = thread_current()->donors[i];
+          numTempDonors++;
+        }
+      else {
+        numSameLockDonor++;
+      }
+    }
+    memcpy(&(thread_current()->donors), &tempDonors, PRI_DEPTH*sizeof(priority_lock));
+    thread_current()->numDonors = numTempDonors;
     updateActivePriority(thread_current());
-    thread_yield();
+    if (numSameLockDonor)
+      thread_yield();
   }
 }
 

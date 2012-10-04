@@ -518,7 +518,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   int i;
   for (i = 0; i < PRI_DEPTH; i++) {
-    t->donors[i] = NULL;
+    t->donors[i].donor = NULL;
+    t->donors[i].lock = NULL;
   }
   t->numDonors = 0;
 
@@ -639,13 +640,24 @@ allocate_tid (void)
 void
 updateActivePriority(struct thread *thread)
 {
+  ASSERT(is_thread(thread));
   int highestDonated = PRI_MIN;       /* Highest donated priority */
   int i;
-  for (i = 0; i < thread->numDonors; i++)
-    if (is_thread(thread->donors[i]))
-      if (highestDonated < thread->donors[i]->priority)
-        highestDonated = thread->donors[i]->priority;
+  //thread->numDonors++;
+  //printf("Thread #%d has %d donors\n", thread->tid, thread->numDonors);
+  for (i = 0; i < thread->numDonors; i++) {
+    //printf("A %d\n", i);
+    if (is_thread(thread->donors[i].donor)) {
+      //printf("B %d\n", i);
+      if (highestDonated < thread->donors[i].donor->priority) {
+        //thread->primaryDonor = thread->donors[i].donor->tid;
+        highestDonated = thread->donors[i].donor->priority;
+      }
+    }
+  }
   thread->priority = (highestDonated > thread->nativePriority) ? highestDonated : thread->nativePriority;
+  //printf("setting donation to: %d\n", highestDonated);
+  
 }
 
 /* Offset of `stack' member within `struct thread'.

@@ -83,6 +83,11 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
+typedef struct priority_lock {
+  struct lock* lock;
+  struct thread* donor;                 /* Whose donation we are using */
+} priority_lock;
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -93,8 +98,9 @@ struct thread
     int nativePriority;                 /* Native (lowest) priority */
     int priority;                       /* Active Priority including donation. */
 
-    struct thread* donors[PRI_DEPTH];   /* List of donors */
-    int numDonors;
+    /* Keep track of who is donating to us */
+    struct priority_lock donors[PRI_DEPTH];
+    int numDonors;                      /* Number of donors waiting */
 
     struct list_elem allelem;           /* List element for all threads list. */
 
@@ -108,6 +114,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    //tid_t primaryDonor;
   };
 
 /* If false (default), use round-robin scheduler.
