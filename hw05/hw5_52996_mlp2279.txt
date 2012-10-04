@@ -5,12 +5,18 @@ CS login: minhpham
 Email address: minh.pham@utexas.edu
 Unique Number: 52996
 
+1. Part 1: The system requires 8 bits for page offsets. So we have
+2^8 = 256 page offset addresses. Each address points to 32 bits = 4 bytes
+of memory, so that's 256 * 4 = 1024 bytes = 1KB page size.
+   Part 2: A process that has 256K memory uses 256 = 2^8 pages (with 1K pages)
+so the size of the page table is 8 bits.
+
 2. Book-keeping bits in a page:
 
 * Residence bit: Since page frames can be swapped out of main memory to
 secondary storage, this bit is needed to inform the operating system
 about whether the page frame corresponding to this page in main memory.
-* Clock/reference bit:
+* Clock/reference bit: I'm not sure.
 * Dirty bit: If a page frame is loaded into main memory, written to,
 and then swapped out to secondary storage, the content of the page on
 disk needs to be updated as well. This bit is used to determine whether
@@ -51,3 +57,6 @@ Page Faults: 10
    Part 2: Compute the number of page faults under LRU, the clock
 algorithm, and the optimal algorithm. What do you notice?
 
+5. Part 1: (a)
+   Part 2: (d)
+   Part 3: (b)
