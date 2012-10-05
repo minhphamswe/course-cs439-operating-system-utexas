@@ -98,6 +98,7 @@ struct thread
   int nativePriority;                 /* Native (lowest) priority */
   int priority;                       /* Active Priority including donation. */
   int numDonors;                      /* Number of donors waiting */
+  int nice;                           /* Niceness value of the thread */
 
   /* Keep track of who donated to us */
   struct priority_lock donors[PRI_DEPTH];

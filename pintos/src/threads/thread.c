@@ -213,6 +213,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  // If the child has higher priority than the current thread, yield to it
   if(t->priority > thread_current()->priority)
     thread_yield();
 
@@ -398,19 +399,29 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
+/*
+ * Sets the current thread's nice value to NICE and recalculate priority.
+ * If the running thread no longer has the highest priority, yield.
+ */
 void
 thread_set_nice (int nice UNUSED)
 {
-  /* Not yet implemented. */
+  // Miniumum nice is -20
+  if (nice < -20) {
+    nice = -20;
+  }
+  // Recalculate priority
+  int priority = thread_get_priority();
+
+  // Set priority. This also yield if the thread no longer has the highest priority
+  thread_set_priority(priority);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -524,6 +535,8 @@ init_thread (struct thread *t, const char *name, int priority)
   }
   t->donees.thread = NULL;
   t->donees.lock = NULL;
+
+  t->nice = 0;
 
   list_push_back(&all_list, &(t->allelem));
 }
