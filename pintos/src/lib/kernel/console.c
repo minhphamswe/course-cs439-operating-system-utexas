@@ -186,8 +186,6 @@ putchar_have_lock (uint8_t c)
 {
   ASSERT (console_locked_by_current_thread ());
   write_cnt++;
-  #ifndef DISABLE_CONSOLE_TO_SERIAL_PORT
   serial_putc (c);
-  #endif
   vga_putc (c);
 }

@@ -22,21 +22,19 @@ cat $PINTOSDIR/src/misc/bochs-2.2.6-solaris-tty.patch | patch -p1
 cat $PINTOSDIR/src/misc/bochs-2.2.6-page-fault-segv.patch | patch -p1
 cat $PINTOSDIR/src/misc/bochs-2.2.6-paranoia.patch | patch -p1
 cat $PINTOSDIR/src/misc/bochs-2.2.6-gdbstub-ENN.patch | patch -p1
-cat $PINTOSDIR/src/misc/bochs-2.2.6-g++.patch | patch -p1
 if test "`uname -s`" = "SunOS"; then
     cat $PINTOSDIR/src/misc/bochs-2.2.6-solaris-link.patch | patch -p1
 fi
-CFGOPTS="--with-x --with-x11 --with-term --with-nogui -enable-cpu-level=6 --prefix=$DSTDIR"
+CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR"
 mkdir plain &&
         cd plain && 
         ../configure $CFGOPTS --enable-gdb-stub && 
         make && 
         make install &&
-        mv $DSTDIR/bin/bochs $DSTDIR/bin/bochs-pintos &&
         cd ..
 mkdir with-dbg &&
         cd with-dbg &&
         ../configure --enable-debugger $CFGOPTS &&
         make &&
-        cp bochs $DSTDIR/bin/bochs-pintos-dbg &&
+        cp bochs $DSTDIR/bin/bochs-dbg &&
         cd ..
