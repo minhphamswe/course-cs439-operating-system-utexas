@@ -49,8 +49,8 @@ sub common_checks {
       if !grep (/Boot complete/, @output);
     fail "\u$run didn't shut down properly: no \"Timer: # ticks\" message\n"
       if !grep (/Timer: \d+ ticks/, @output);
-    #fail "\u$run didn't shut down properly: no \"Powering off\" message\n"
-    #  if !grep (/Powering off/, @output);
+    fail "\u$run didn't shut down properly: no \"Powering off\" message\n"
+      if !grep (/Powering off/, @output);
 }
 
 sub check_for_panic {
