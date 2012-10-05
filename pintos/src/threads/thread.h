@@ -85,7 +85,7 @@ typedef int tid_t;
 
 typedef struct priority_lock {
   struct lock* lock;
-  struct thread* donor;                 /* Whose donation we are using */
+  struct thread* thread;                 /* Whose donation we are using */
 } priority_lock;
 
 struct thread
@@ -98,9 +98,13 @@ struct thread
     int nativePriority;                 /* Native (lowest) priority */
     int priority;                       /* Active Priority including donation. */
 
+    int numDonors;                      /* Number of donors waiting */
+
     /* Keep track of who is donating to us */
     struct priority_lock donors[PRI_DEPTH];
-    int numDonors;                      /* Number of donors waiting */
+
+    /* Keep track of who we donated to */
+    struct priority_lock donees;
 
     struct list_elem allelem;           /* List element for all threads list. */
 

@@ -517,11 +517,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nativePriority = priority;
   t->magic = THREAD_MAGIC;
   int i;
+  t->numDonors = 0;
   for (i = 0; i < PRI_DEPTH; i++) {
-    t->donors[i].donor = NULL;
+    t->donors[i].thread = NULL;
     t->donors[i].lock = NULL;
   }
-  t->numDonors = 0;
+  t->donees.thread = NULL;
+  t->donees.lock = NULL;
 
   list_push_back(&all_list, &(t->allelem));
 }
@@ -645,19 +647,17 @@ updateActivePriority(struct thread *thread)
   int i;
   //thread->numDonors++;
   //printf("Thread #%d has %d donors\n", thread->tid, thread->numDonors);
-  for (i = 0; i < thread->numDonors; i++) {
-    //printf("A %d\n", i);
-    if (is_thread(thread->donors[i].donor)) {
-      //printf("B %d\n", i);
-      if (highestDonated < thread->donors[i].donor->priority) {
-        //thread->primaryDonor = thread->donors[i].donor->tid;
-        highestDonated = thread->donors[i].donor->priority;
-      }
-    }
-  }
+  for (i = 0; i < thread->numDonors; i++)
+    if (is_thread(thread->donors[i].thread))
+      if (highestDonated < thread->donors[i].thread->priority)
+        highestDonated = thread->donors[i].thread->priority;
+
   thread->priority = (highestDonated > thread->nativePriority) ? highestDonated : thread->nativePriority;
   //printf("setting donation to: %d\n", highestDonated);
-  
+
+  //  if(thread->status == THREAD_BLOCKED)
+  if(is_thread(thread->donees.thread))
+    updateActivePriority(thread->donees.thread);
 }
 
 /* Offset of `stack' member within `struct thread'.

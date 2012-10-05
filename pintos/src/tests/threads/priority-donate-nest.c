@@ -15,7 +15,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 
-struct locks 
+struct locks
   {
     struct lock *a;
     struct lock *b;

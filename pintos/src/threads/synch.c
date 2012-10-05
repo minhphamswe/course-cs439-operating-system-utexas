@@ -225,16 +225,22 @@ lock_acquire (struct lock *lock)
     if(t->nativePriority < thread_current()->priority)
       if(t->numDonors < PRI_DEPTH) {
         //printf("Updating donor for thread #%d at location %d\n", lock->holder->tid, lock->holder->numDonors);
-        t->donors[t->numDonors].donor = thread_current();
+        t->donors[t->numDonors].thread = thread_current();
         t->donors[t->numDonors].lock = lock;
         t->numDonors++;
+        thread_current()->donees.thread = t;
+        thread_current()->donees.lock = lock;
         updateActivePriority(t);
         //printf("After update numDonors for thread #%d is: %d\n", lock->holder->tid, lock->holder->numDonors);
       }
     //intr_enable();
   }
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  lock->holder = thread_current ();   // Successfully acquire the lock
+
+  // Release donee
+  thread_current()->donees.thread = NULL;
+  thread_current()->donees.lock = NULL;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
