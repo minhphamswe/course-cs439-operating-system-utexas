@@ -382,11 +382,10 @@ thread_set_priority (int new_priority)
   thread_current()->nativePriority = new_priority;
   updateActivePriority(thread_current());
 
-  // If the current thread is no longer highest priority, yield
-  struct thread *head = list_entry(list_begin(&ready_list), struct thread, elem);
-
   intr_enable();
 
+  // If the current thread is no longer highest priority, yield
+  struct thread *head = list_entry(list_begin(&ready_list), struct thread, elem);
   if(thread_current()->priority < head->priority) {
     thread_yield();
   }
@@ -516,8 +515,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->nativePriority = priority;
   t->magic = THREAD_MAGIC;
-  int i;
   t->numDonors = 0;
+
+  int i;
   for (i = 0; i < PRI_DEPTH; i++) {
     t->donors[i].thread = NULL;
     t->donors[i].lock = NULL;
@@ -645,17 +645,17 @@ updateActivePriority(struct thread *thread)
   ASSERT(is_thread(thread));
   int highestDonated = PRI_MIN;       /* Highest donated priority */
   int i;
-  //thread->numDonors++;
-  //printf("Thread #%d has %d donors\n", thread->tid, thread->numDonors);
+
+  // Find the highest priority donated to us from the list of donors
   for (i = 0; i < thread->numDonors; i++)
     if (is_thread(thread->donors[i].thread))
       if (highestDonated < thread->donors[i].thread->priority)
         highestDonated = thread->donors[i].thread->priority;
 
+  // Our new effective priority is that highest priority
   thread->priority = (highestDonated > thread->nativePriority) ? highestDonated : thread->nativePriority;
-  //printf("setting donation to: %d\n", highestDonated);
 
-  //  if(thread->status == THREAD_BLOCKED)
+  // Also update the priority of any thread we're waiting on
   if(is_thread(thread->donees.thread))
     updateActivePriority(thread->donees.thread);
 }

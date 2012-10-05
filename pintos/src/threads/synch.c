@@ -118,26 +118,27 @@ sema_up (struct semaphore *sema)
   int highestPriority = PRI_MIN - 1;        /* Highest priority of waiting threads */
 
   if (!list_empty (&sema->waiters)) {
-    // Search for the highest priority thread in the waiting list and wake it up
     struct thread *highestThread;
     struct list_elem *e;
 
+    // Search for the highest priority thread in the waiting list
     for (e = list_begin(&(sema->waiters)); e != list_end(&(sema->waiters)); e = list_next(e)) {
-      struct thread *waiter = list_entry (e, struct thread, elem);
+      struct thread *waiter = list_entry(e, struct thread, elem);
       if (waiter->priority > highestPriority) {
         highestThread = waiter;
         highestPriority = highestThread->priority;
       }
     }
 
+    // Remove the highest priority thread from the waiting list and wake it up
     list_remove(&(highestThread->elem));
-
     thread_unblock(highestThread);
   }
 
   sema->value++;
   intr_set_level (old_level);
 
+  // Yield if we woke up a higher priority thread
   if(highestPriority > thread_current()->priority)
     thread_yield();
 }
@@ -220,25 +221,31 @@ lock_acquire (struct lock *lock)
 
   if (lock->holder != NULL) {
     struct thread *t = lock->holder;
-    //intr_disable();
-    //printf("Updating donor for thread #%d\n", lock->holder->tid);
+    // If the lock holder has less native (not effective) priority than us,
+    // donate to it. Native priority is used so that if other donors withdraw
+    // their priority, that thread will still have ours.
     if(t->nativePriority < thread_current()->priority)
+
+      // Quick check that the thread can still accept donation
       if(t->numDonors < PRI_DEPTH) {
-        //printf("Updating donor for thread #%d at location %d\n", lock->holder->tid, lock->holder->numDonors);
+
+        // Register ourself in the lock holder's list of donors
         t->donors[t->numDonors].thread = thread_current();
         t->donors[t->numDonors].lock = lock;
         t->numDonors++;
+
+        // Register the lock holder as the thread we donated to
         thread_current()->donees.thread = t;
         thread_current()->donees.lock = lock;
+
+        // Update the lock holder's effective priority
         updateActivePriority(t);
-        //printf("After update numDonors for thread #%d is: %d\n", lock->holder->tid, lock->holder->numDonors);
       }
-    //intr_enable();
   }
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();   // Successfully acquire the lock
 
-  // Release donee
+  // Recall priority donation
   thread_current()->donees.thread = NULL;
   thread_current()->donees.lock = NULL;
 }
@@ -274,42 +281,48 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  int hasWaiter = 0;
+
+  // If we have donor: release all donors with the same lock
+  if(thread_current()->priority > thread_current()->nativePriority) {
+    int i = 0, j = thread_current()->numDonors - 1;
+
+    while (i <= j) {
+      // Found a donor with same lock -> replace with a different-lock donor
+      if (thread_current()->donors[i].lock == lock) {
+        // Look for a donor with a different-lock from the end of the list
+        while (thread_current()->donors[j].lock == lock && j > i) {
+          j--;
+        }
+        // A donor with a different lock found: replace our same-lock donor
+        // with that guy
+        if (thread_current()->donors[j].lock != lock) {
+          thread_current()->donors[i] = thread_current()->donors[j];
+        }
+      }
+      // If no donor with a different lock is found, we are done and only
+      // need to trim the list, else move on to check the next donor
+      if (thread_current()->donors[i].lock == lock)
+        break;
+      else
+        i++;
+    }
+
+    // If we have donors with the same locks, update our and our donee's
+    // priority. Otherwise, skip this, since nothing has changed priority-wise
+    if (i < thread_current()->numDonors) {
+      hasWaiter = 1;
+      thread_current()->numDonors = i;
+      updateActivePriority(thread_current());
+    }
+  }
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 
-  if(lock->lastSignaledPriority > thread_current()->priority)
-  {
-    // We signaled someone with higher priority
-    lock->lastSignaledPriority = 0;
-    //thread_yield();
-  }
-  if(thread_current()->priority > thread_current()->nativePriority)
-  {
-    //printf("\nThread #%d calling lock_release.\n", thread_current()->tid);
-    // We have someone with higher priority waiting on us: remove waiting
-    // thread from donor list
-    int i;
-
-    struct priority_lock tempDonors[PRI_DEPTH];
-    int numTempDonors = 0;
-    int numSameLockDonor = 0;
-    
-    for (i = 0; i < thread_current()->numDonors; i++) {
-      if (thread_current()->donors[i].lock != lock)
-        {
-          tempDonors[numTempDonors] = thread_current()->donors[i];
-          numTempDonors++;
-        }
-      else {
-        numSameLockDonor++;
-      }
-    }
-    memcpy(&(thread_current()->donors), &tempDonors, PRI_DEPTH*sizeof(priority_lock));
-    thread_current()->numDonors = numTempDonors;
-    updateActivePriority(thread_current());
-    if (numSameLockDonor)
-      thread_yield();
-  }
+  // Yield if we had threads waiting on us
+  if (hasWaiter)
+    thread_yield();
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -400,17 +413,19 @@ cond_signal (struct condition *cond, struct lock *lock /*UNUSED*/)
   struct semaphore_elem *highestSema;
 
   if (!list_empty (&cond->waiters)) {
-    // Search for the highest priority thread in the waiting list and wake it up
     struct list_elem *e;
+
+    // Search for the highest priority thread in the waiting list
     for (e = list_begin(&(cond->waiters)); e != list_end(&(cond->waiters)); e = list_next(e)) {
       struct semaphore_elem *waiter = list_entry (e, struct semaphore_elem, elem);
       if (waiter->threadPtr->priority > highestPriority) {
         highestSema = waiter;
         highestThread = waiter->threadPtr;
         highestPriority = highestThread->priority;
-        lock->lastSignaledPriority = highestPriority;
       }
     }
+
+    // Remove the highest priority thread from the waiting list and wake it up
     list_remove(&(highestSema->elem));
     sema_up (&(highestSema->semaphore));
   }
