@@ -148,17 +148,11 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  timer_wake();
-
   // Do this if only we are using mlfqs
   if (thread_mlfqs) {
     struct list_elem *e;
     struct thread *tp;
     int64_t tick = timer_ticks();
-
-    // Update Recent CPU time for the running thread
-    if (t != idle_thread)
-      t->recent_cpu++;
 
     if (tick % TIMER_FREQ == 0) {
       // Every second, update system-wide load average
@@ -167,28 +161,30 @@ thread_tick (void)
       else
         load_avg = AddF(MulF(frac59, load_avg), MulI(frac01, ready_threads + 1));
 
-      //printf("Timer tick: %d\n", tick);
-//       printf("Load average: %d\n", load_avg);
-//       printf("Load average factor 1: %d\n", MulF(frac59, load_avg));
-//       printf("Load average factor 2: %d\n", MulI(frac01, ready_threads));
-//       printf("Ready threads: %d\n", ready_threads);
-
       // Every second, recalculate Recent CPU time for all threads
       for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
         tp = list_entry (e, struct thread, allelem);
-        tp->recent_cpu = Round(MulI(DivF(MulI(load_avg, 2),
+        tp->recent_cpu = AddI(MulF(DivF(MulI(load_avg, 2),
                                          AddI(MulI(load_avg, 2), 1)),
-                                    tp->recent_cpu)) + t->nice;
+                                    tp->recent_cpu), tp->nice);
       }
     }
+    
+    // Update Recent CPU time for the running thread
+    if (t != idle_thread)
+      t->recent_cpu = AddI(t->recent_cpu, 1);
 
     // Every fourth clock tick, update priority for all threads
     if (tick % 4 == 0) {
       for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
         tp = list_entry (e, struct thread, allelem);
         tp->nativePriority = Round(SubF(Float(PRI_MAX),
-                                   AddF(DivI(Float(tp->recent_cpu), 4),
+                                   AddF(DivI(tp->recent_cpu, 4),
                                         MulI(Float(tp->nice), 2))));
+	if(tp->nativePriority < PRI_MIN)
+	  tp->nativePriority = PRI_MIN;
+	else if (tp->nativePriority > PRI_MAX)
+	  tp->nativePriority = PRI_MAX;
         updateActivePriority(tp);
       }
     }
@@ -197,6 +193,8 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  
+  timer_wake();
 }
 
 /* Prints thread statistics. */
@@ -226,6 +224,8 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux)
 {
+  if(thread_mlfqs)
+    priority = PRI_DEFAULT;
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -264,9 +264,20 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  // Child inherits parent's niceness and CPU
-  t->nice = thread_current()->nice;
-  t->recent_cpu = thread_current()->recent_cpu;
+  if(thread_mlfqs) {
+    // Child inherits parent's niceness and CPU
+    t->nice = thread_current()->nice;
+    t->recent_cpu = thread_current()->recent_cpu;
+    
+    // Calculate the new priority based off the inherited values
+    t->nativePriority = Round(SubF(Float(PRI_MAX),
+				    AddF(DivI(t->recent_cpu, 4),
+					  MulI(Float(t->nice), 2))));
+    if(t->nativePriority < PRI_MIN)
+      t->nativePriority = PRI_MIN;
+    else if (t->nativePriority > PRI_MAX)
+      t->nativePriority = PRI_MAX;
+  }
 
   intr_set_level (old_level);
 
@@ -438,14 +449,19 @@ void
 thread_set_priority (int new_priority)
 {
   intr_disable();
-  thread_current()->nativePriority = new_priority;
-  updateActivePriority(thread_current());
+  struct thread *t = thread_current();
+  t->nativePriority = new_priority;
+  if(t->nativePriority < PRI_MIN)
+    t->nativePriority = PRI_MIN;
+  else if (t->nativePriority > PRI_MAX)
+    t->nativePriority = PRI_MAX;
+  updateActivePriority(t);
 
   intr_enable();
 
   // If the current thread is no longer highest priority, yield
   struct thread *head = list_entry(list_begin(&ready_list), struct thread, elem);
-  if(thread_current()->priority < head->priority) {
+  if(t->priority < head->priority) {
     thread_yield();
   }
 }
@@ -475,7 +491,7 @@ thread_set_nice (int nice UNUSED)
 
   // Recalculate priority
   int priority = Round(SubF(Float(PRI_MAX),
-                            AddF(DivI(Float(thread_current()->recent_cpu), 4),
+                            AddF(DivI(thread_current()->recent_cpu, 4),
                                  MulI(Float(thread_current()->nice), 2))));
 
   // Set priority. This also yield if the thread no longer has the highest priority
@@ -493,15 +509,14 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  return Round(MulI(load_avg, 100));
+  return Round0(MulI(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void)
 {
-  /* Not yet implemented. */
-  return Round(MulI(Float(thread_current()->recent_cpu), 100));
+  return Round0(MulI(thread_current()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
