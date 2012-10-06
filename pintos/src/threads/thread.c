@@ -12,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixedpoint.h"
 #include <devices/timer.h>
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -61,6 +62,12 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+static int load_avg;            /* System-wide load average (float) */
+static int ready_threads;       /* Number of ready threads */
+
+static int frac59;
+static int frac01;
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -100,6 +107,11 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  load_avg = Float(0);         // Initialize load average to 0
+  ready_threads = list_size(&ready_list);
+  frac59 = DivI(Float(59), 60);
+  frac01 = DivI(Float(1), 60);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -137,6 +149,50 @@ thread_tick (void)
     kernel_ticks++;
 
   timer_wake();
+
+  // Do this if only we are using mlfqs
+  if (thread_mlfqs) {
+    struct list_elem *e;
+    struct thread *tp;
+    int64_t tick = timer_ticks();
+
+    // Update Recent CPU time for the running thread
+    if (t != idle_thread)
+      t->recent_cpu++;
+
+    if (tick % TIMER_FREQ == 0) {
+      // Every second, update system-wide load average
+      if (t == idle_thread)
+        load_avg = AddF(MulF(frac59, load_avg), MulI(frac01, ready_threads));
+      else
+        load_avg = AddF(MulF(frac59, load_avg), MulI(frac01, ready_threads + 1));
+
+      //printf("Timer tick: %d\n", tick);
+//       printf("Load average: %d\n", load_avg);
+//       printf("Load average factor 1: %d\n", MulF(frac59, load_avg));
+//       printf("Load average factor 2: %d\n", MulI(frac01, ready_threads));
+//       printf("Ready threads: %d\n", ready_threads);
+
+      // Every second, recalculate Recent CPU time for all threads
+      for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+        tp = list_entry (e, struct thread, allelem);
+        tp->recent_cpu = Round(MulI(DivF(MulI(load_avg, 2),
+                                         AddI(MulI(load_avg, 2), 1)),
+                                    tp->recent_cpu)) + t->nice;
+      }
+    }
+
+    // Every fourth clock tick, update priority for all threads
+    if (tick % 4 == 0) {
+      for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+        tp = list_entry (e, struct thread, allelem);
+        tp->nativePriority = Round(SubF(Float(PRI_MAX),
+                                   AddF(DivI(Float(tp->recent_cpu), 4),
+                                        MulI(Float(tp->nice), 2))));
+        updateActivePriority(tp);
+      }
+    }
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -208,6 +264,10 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  // Child inherits parent's niceness and CPU
+  t->nice = thread_current()->nice;
+  t->recent_cpu = thread_current()->recent_cpu;
+
   intr_set_level (old_level);
 
   /* Add to run queue. */
@@ -256,19 +316,16 @@ thread_unblock (struct thread *t)
 
   // Push the thread onto the ready list sorted by priority
   struct list_elem *e;
-  for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)) {
+  for (e = list_begin(&ready_list); e != NULL; e = list_next(e)) {
     struct thread *tp = list_entry (e, struct thread, elem);
-    if (tp->priority < t->priority) {
+    if (tp->priority <= t->priority || e == list_end(&ready_list)) {
       list_insert(e, &(t->elem));
+      ready_threads++;
       break;
     }
   }
 
-  if (e == list_end(&ready_list)) {
-    list_push_back(&ready_list, &(t->elem));
-  }
   t->status = THREAD_READY;
-
   intr_set_level (old_level);
 }
 
@@ -344,12 +401,13 @@ thread_yield (void)
       struct thread *tp = list_entry (e, struct thread, elem);
       if (cur->priority > tp->priority) {
         list_insert(e, &(cur->elem));
+        ready_threads++;
         break;
       }
     }
-
     if (e == list_end(&ready_list)) {
       list_push_back(&ready_list, &(cur->elem));
+      ready_threads++;
     }
   }
 
@@ -406,12 +464,19 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED)
 {
-  // Miniumum nice is -20
+  // Clamp nice to minimum of -20 and maximum of 20
   if (nice < -20) {
     nice = -20;
   }
+  else if (nice > 20) {
+    nice = 20;
+  }
+  thread_current()->nice = nice;
+
   // Recalculate priority
-  int priority = thread_get_priority();
+  int priority = Round(SubF(Float(PRI_MAX),
+                            AddF(DivI(Float(thread_current()->recent_cpu), 4),
+                                 MulI(Float(thread_current()->nice), 2))));
 
   // Set priority. This also yield if the thread no longer has the highest priority
   thread_set_priority(priority);
@@ -428,8 +493,7 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return Round(MulI(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -437,7 +501,7 @@ int
 thread_get_recent_cpu (void)
 {
   /* Not yet implemented. */
-  return 0;
+  return Round(MulI(Float(thread_current()->recent_cpu), 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -537,6 +601,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donees.lock = NULL;
 
   t->nice = 0;
+  t->recent_cpu = 0;
 
   list_push_back(&all_list, &(t->allelem));
 }
@@ -562,10 +627,13 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
-  if (list_empty (&ready_list))
+  if (list_empty (&ready_list)) {
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
+  else {
+    ready_threads--;
+    return list_entry(list_pop_front(&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
