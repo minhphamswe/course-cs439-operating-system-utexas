@@ -197,6 +197,8 @@ priority, allowing the higher priority thread to proceed.
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+A race in thread_set_priority can happen when like this: 
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
@@ -219,6 +221,34 @@ this interference.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+We added extra fields to thread to keep track of the niceness and
+recent cpu usage statistics that are necessary to implement dynamic
+priority adjustments for each thread.
+
+struct thread
+{
+    int nice;                           /* Niceness value of the thread */
+    int recent_cpu;                     /* Recently-used CPU time (float) */
+}
+
+We added also a few variables to the thread system implementation.
+load_avg keeps track of the system average load, necessary for the
+advanced scheduling algorithm. The other three variables only hold
+precomputed values to reduce the work the system needs to do in the
+timer interrupt handler.
+
+static int load_avg;            /* System-wide load average (float) */
+static int ready_threads;       /* Number of ready threads */
+static int frac59;
+static int frac01;
+
+A #define and 2 enums were added to a fixed point implementation to
+hold pre-computed values and reduce the cost of calculations.
+
+#define Q 12          // Number of bits after the floating point
+enum {  F = (1 << Q) };   // Conversion factor
+enum { HF = F/2 };       // Half of F (used for rounding)
+
 ---- ALGORITHMS ----
 
 >> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
@@ -229,23 +259,35 @@ this interference.
 timer  recent_cpu    priority   thread
 ticks   A   B   C   A   B   C   to run
 -----  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+ 0      0   0   0   63  61  59      A   
+ 4      4   0   0   62  61  59      A
+ 8      8   0   0   61  61  59      B
+12      8   4   0   61  60  59      A
+16      12  4   0   60  60  59      B
+20      12  8   0   60  59  59      A
+24      16  8   0   59  59  59      C
+28      16  8   4   59  59  58      B
+32      16  12  4   59  58  58      A
+36      20  12  4   58  58  58      C
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
 
+Sometimes the priorities of the thread may be equal. In this case, the
+scheduler follows an implicit FIFO model. This is a result of the
+insertion rule that takes place whenever a thread is pushed onto the
+ready list: it's put after all other threads that are of equal or
+higher priority. This is what our scheduler does, and what I would
+consider fair myself.
+
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
+
+We try to minimize the cost of scheduling inside of interrupt context.
+This implies that the system may run slower on average - since it has
+to do more book-keeping as it goes along, but the response time would
+be improved.
 
 ---- RATIONALE ----
 
@@ -254,12 +296,39 @@ ticks   A   B   C   A   B   C   to run
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
 
+We went for utter simplicity in this project. The code is experimental
+and correct-first, with less thought on efficiency (although the thought
+is there). Interrupts were disabled probably more that in should be,
+mainly because we aren't confident in the reliability of any other
+synchronization method.
+If we had more time I would do the following:
+    - Write more tests, especially for crucial parts of the system.
+    - Consolidate some code fragments into (inline) functions. I'm not
+      totally satisfied with how the priority donation ended up as
+      just commented code blocks. I did try to break it into functions,
+      but that ended up breaking everything, plus debugging was near
+      impossible, so I reverted the change, stat.
+    - Change as many interrupt disabling calls as possible to locks or
+      monitors.     
+
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
 >> decide to implement it the way you did?  If you created an
 >> abstraction layer for fixed-point math, that is, an abstract data
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
+
+We did think of having a separate class for fixed point numbers. The
+advantage is we get compile-time type checking. The downside is (maybe)
+slower code and (maybe) having to declare a new struct every time we
+wanted to do any arithmetic. Struct initialization in C isn't as
+friendly as C++ object initialization is.
+If we had more time, we might go here and change this up so fewer
+people would get tripped up. We certainly did. Compile-time checking
+is absolutely crucial for a larger system.
+We ended up with a set of inline arithmetic functions, with names that
+identify the assumed type of the second operand (which we need to keep
+in our heads all the time).
 
 			   SURVEY QUESTIONS
 			   ================
