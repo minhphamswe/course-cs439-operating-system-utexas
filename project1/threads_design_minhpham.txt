@@ -1,0 +1,286 @@
+			+--------------------+
+			|        CS 439      |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+---- Name ----
+
+>> Fill your name, UT EID, CS login, email address, and unique number:
+
+Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+				   
+---- GROUP ----
+
+>> Fill the names, UT EIDs, CS logins, email addresses, and unique numbers
+>> of your group members.
+
+Name1: Easchner
+EID1: easchner
+CS login: easchner
+Email: eric_aschner@hotmail.com
+Unique Number: 52996
+
+Name2: Minh Pham
+EID2: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+
+
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+On some machines mlfqs-load-1 fails before it goes to sleep for 10 seconds.
+On the UNIX machine, mlfqs-load-avg timeout, though it runs fine on my
+laptop (probably a race condition with multiple CPU)
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+University of Chicago pintos building guide.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+sleep_elem is a new struct. It keeps additional information necessary to
+implement a sleeping queue.
+
+struct sleep_elem {
+  struct list_elem elem;
+  int64_t wakeTicks;    // time to wake (in ticks since kernel starts)
+  struct thread* currentThread; // ID of the thread being put to sleep
+  int removeFlag;       // True if process restarted, can remove, else False
+};
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+The timer interrupt handler increment tick count and calls the timer function
+in the thread system.
+
+timer_sleep(), when called, creates a new node with the time to wake up, and
+insert it into a queue of such nodes. It takes care to insert in the right position
+to keep the queue sorted by absolute time to wake up (in increasing order). As it
+iterate through the queue, it also removes all those nodes whose time has expired,
+and has already been called.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+We don't modify the already-minima timer interrupt handler. We believe the
+best way to minimize the amount of time spent in this method is not to
+complexify it.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+We disable interrupts whenever we modify the sleep queue, so only
+one thread is able to modify the elements at a time.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+There is a condition in timer_sleep where the function may get
+interrupted just before it modifies the queue. This could lead to the
+node being installed in the wrong position. Clearly, I haven't thought
+this through too much.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+We considered an array of absolutely sleep time. However, since threads
+will be sleeping and unsleeping frequently, we wanted a data structure that
+allows fast insertion and removal at arbitrary locations.
+For an array insertion and removal are worst-case O(n) operations, so
+the linked list design (O(1) for both operations) is clearly superior in speed.
+
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+We added a priority_lock data structure called priority_lock to store
+together a thread and the lock it's waiting on.
+
+typedef struct priority_lock {
+  struct lock* lock;
+  struct thread* thread;                 /* Whose donation we are using */
+} priority_lock;
+
+We sepearted a thread's priortity into native and effective priority, which is
+the combined effect of native and donated priority. Donated priority is
+implicitly calculated from the list of donors. We also keep track of who
+a thread donated to using donees (it was originally a list of donees).
+
+struct thread
+{
+  int nativePriority;                 /* Native (lowest) priority */
+  int numDonors;                      /* Number of donors waiting */
+
+  /* Keep track of who donated to us */
+  struct priority_lock donors[PRI_DEPTH];
+  struct priority_lock donees;        /* Keep track of who we donated to */
+}
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+    |-----> Thread L (has lock A)
+    |       + donors[0].lock ---------------------------> Lock A
+    |   --- + donors[0].thread                              ^ 
+    |   |                                                   |
+|-- |-- --> Thread M (acquire lock B, wait on lock A)       |
+|   |       + donee.lock       -----------------------------|
+|   ------- + donee.thread
+|           + donors[0].lock   -------------------------> Lock B
+|   ------- + donors[0].thread                              ^
+|   |                                                       |
+|   |-----> Thread H (waits on lock B)                      |
+|           + donee.lock       -----------------------------|
+|---------- + donee.thread
+    
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+sema_up will search its waiting list and wake up th thread with the
+highest priority. Locks and Monitors are implemented using semaphores,
+so this will work in all cases.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+If a lock_acquire is blocked because someone is holding the lock, that
+lock holder receives a donation from the calling thread. Upon successful
+acquisition of the lock, this donation is recalled.
+When the donation is received, the thread that receives the donation has
+its priority and its donee's priority recalculated. This ensure priority
+donation propagates up the chain.
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+When lock_release is called, the thread also return all the donations it
+has received from other threads waiting on the same lock. It then 
+recalculate its and its donee's priority. The will lower its effective
+priority, allowing the higher priority thread to proceed.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+At first we did not attach the lock information to the donors, since it
+seemed unncessary. This worked fine until we have multiple donors each
+waiting on a different lock: they interfered with each other's priority.
+So this design works only for a single lock per process.
+Our new design interlaced locks with the waiting thread, and resolves
+this interference.
+
+
+		  ADVANCED SCHEDULER (Extra Credit)
+		  =================================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0
+ 4
+ 8
+12
+16
+20
+24
+28
+32
+36
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+>> C6: The assignment explains arithmetic for fixed-point math in
+>> detail, but it leaves it open to you to implement it.  Why did you
+>> decide to implement it the way you did?  If you created an
+>> abstraction layer for fixed-point math, that is, an abstract data
+>> type and/or a set of functions or macros to manipulate fixed-point
+>> numbers, why did you do so?  If not, why not?
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future semesters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the semester.
+
+>> In your opinion, was this assignment, or any one of the two problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future semesters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future semesters or the remaining projects?
+
+>> Any other comments?
