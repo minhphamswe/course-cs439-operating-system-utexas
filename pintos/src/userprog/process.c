@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -37,6 +38,86 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  /* Parse arguments into tokens */
+  char *save_ptr;
+  char *token;
+  char *argv[128];
+  int argc = 0;
+  for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argv[argc] = token;
+    argc++;
+  }
+
+  printf("Argc is: %d", argc);
+
+  /* Push tokens onto the stack */
+  char ** token_addr[argc];
+  int i;
+  int totalWords = 0;
+  void* top = PHYS_BASE;
+  for (i = 0; i < argc; i++) {
+    // get the token
+    token = argv[i];
+
+    // calculate token length
+    int length = strlen(token);
+
+    // calculate copy-to address
+    top -= length + 1;
+
+    // save copy-to address
+    token_addr[i] = (char**) &top;
+
+    // copy token
+    char * addr = *token_addr[i];
+    addr = palloc_get_page(PAL_ASSERT);
+    if (addr == NULL)
+      return TID_ERROR;
+    strlcpy(addr, token, length);
+    totalWords += length;
+  }
+
+  // align stack by word size (4)
+  for(i = 0; i < totalWords % 4; i++) {
+    top -= sizeof(uint8_t);
+    top = palloc_get_page(PAL_ASSERT);
+    *((uint8_t*) top) = (uint8_t) 0;
+  }
+
+  // push null pointer at end of argument list
+  top -= sizeof(char*);
+  top = palloc_get_page(PAL_ASSERT);
+  *((char**) top) = (char*) 0;
+
+  // push addresses (order from right to left)
+  for (i = argc - 1; i >= 0; i++) {
+    top -= sizeof(char**);
+//     if (top == NULL)
+//       return TID_ERROR;
+//     *((char***) top) = token_addr[i];
+    asm volatile ("pushl %0;"
+      : /* no output operand */
+      : "o" (token_addr[i])
+      : "memory"
+    );
+//     memmove(top, token_addr[i], sizeof(char**));
+  }
+
+  // push token count
+  top -= sizeof(int);
+  top = palloc_get_page(PAL_ZERO);
+  *((int*) top) = argc;
+
+  // push "return address" to end the "function call" on the stack
+  top -= sizeof(char *);
+  top = palloc_get_page(PAL_ZERO);
+  *((char**) top) = (char*) 0;
+
+//   char * test;
+//   strlcpy(test, (char*) top, (int) (PHYS_BASE - top));
+//   printf("%x", (unsigned int) test);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
