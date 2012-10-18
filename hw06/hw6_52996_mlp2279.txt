@@ -18,6 +18,7 @@ When the CPU receives an interrupt, the OS does the following:
     process
 
 2.
+LOOK: at first go to the end that requires the fewest tracks to seek to.
          +-----------------------+-----------------------+----------------------
          |          FIFO         |          SSTF         |          LOOK
 ---------+-----------+-----------+-----------+-----------+-----------+----------
