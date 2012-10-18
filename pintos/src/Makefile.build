@@ -94,6 +94,20 @@ loader.bin: threads/loader.o
 os.dsk: kernel.bin
 	cat $^ > $@
 
+PROGS = cat cmp cp echo halt hex-dump ls mcat mcp mkdir pwd rm shell \
+	bubsort insult lineup matmult recursor
+FS = ./filesys.dsk
+
+.PHONY: disk
+
+disk: all
+	rm -f $(FS)
+	pintos-mkdisk $(FS) --filesys-size=2
+	pintos -v -f -q
+	for prog in $(PROGS); do \
+		pintos -v -p ../examples/$$prog -a $$prog -- -q; \
+	done
+
 clean::
 	rm -f $(OBJECTS) $(DEPENDS) 
 	rm -f threads/loader.o threads/kernel.lds.s threads/loader.d

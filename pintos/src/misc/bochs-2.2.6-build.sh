@@ -28,13 +28,13 @@ fi
 CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR"
 mkdir plain &&
         cd plain && 
-        ../configure $CFGOPTS --enable-gdb-stub && 
+        ../configure --enable-cpu-level=6 $CFGOPTS --enable-gdb-stub && 
         make && 
         make install &&
         cd ..
-mkdir with-dbg &&
-        cd with-dbg &&
-        ../configure --enable-debugger $CFGOPTS &&
-        make &&
-        cp bochs $DSTDIR/bin/bochs-dbg &&
-        cd ..
+# mkdir with-dbg &&
+#         cd with-dbg &&
+#         ../configure --enable-debugger $CFGOPTS &&
+#         make &&
+#         cp bochs $DSTDIR/bin/bochs-dbg &&
+#         cd ..
