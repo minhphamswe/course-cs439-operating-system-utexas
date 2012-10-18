@@ -1,0 +1,89 @@
+Homework #: Exam 01 Q7 Redo
+Student Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email address: minh.pham@utexas.edu
+Unique Number: 52996
+
+Code starts below this line
+/*============================================================================*/
+Condition G, S, R, A;
+
+int guitar = 0;     // Number of guitars available
+int stage = 1;      // 1 if stage is empty, 0 otherwise
+int ready = 0;      // Number of ready bands
+int announced = 0;  // Number of announced bands that hasn't started playing
+
+// function executed by bands that acquires (and releases!) the appropriate
+// resources. It should also notify the announcer when the band is ready to be
+// announced.
+void band() {
+    lock->acquire();
+
+    // acquire guitars
+    while (guitar < 2)
+        G->wait(lock);
+    guitar -= 2;
+
+    // go on stage
+    while (stage < 1)
+        S->wait(lock);
+    stage--;
+
+    <setup_instruments>
+
+    // notify announcer that band is ready
+    ready++;
+    R->signal();
+
+    // wait for announcement
+    while (announced < 1)
+        A->wait(lock);
+    announced--;
+
+    <perform>
+
+    // exit the stage
+    <exit>
+    stage++;
+    S->signal();
+
+    // return guitars
+    guitar += 2;
+    G->signal();
+
+    lock->release();
+}
+
+// function executed by announcers, which will sleep until the band is ready to
+// be announced, and then notify the band when the announcement is finished
+void announcer() {
+    lock->acquire();
+
+    // wait for bands to be ready
+    while (ready < 1)
+        R->wait(lock);
+
+    // Announce band
+    ready--;
+    <announce>
+    announced++;
+
+    lock->release();
+}
+
+// function that collects guitars and then notifies bands when one arrives
+void collect_guitars() {
+    lock->acquire();
+
+    // collect guitars
+    <collect_guitars>
+    guitar++;
+
+    // notify bands
+    G->signal();
+
+    lock->release();
+}
+
+
