@@ -1,0 +1,38 @@
+Homework 6
+
+Due: 7:45a Thursday, October 18, 2012
+
+1. Explain the steps that an operating system goes through when the CPU
+receives an interrupt.
+
+2. Disk requests come into the disk driver for tracks 10, 22, 20, 2, 40, 6, and
+38, in that order. A seek takes 6 msec per track moved. How much seek time is
+needed for the following scheduling algorithms?
+
+a) FIFO 
+b) SSTF 
+c) LOOK (SCAN, but doesn't move to the end)
+
+In all cases, the arm is initially at track 20.
+
+Adapted from Tannenbaum Chapter 5 Number 24.
+
+3. In some operating systems, IO from/to disk is done directly to/from a buffer
+in the user program's memory. The user program does a system call specifying
+the address and length of the buffer (the length must be a multiple of the disk
+record size).
+
+The disk controller needs a physical memory address, not a virtual address.
+Ben Bitdiddle proposes that when the user does a write system call, the
+operating system should check that the user's virtual address is valid,
+translate it into a physical address, and pass that address and the length
+(also checked for validity) to the disk hardware.
+
+This won't quite work. In no more than two sentences, what did Ben forget?
+
+4. The MegaGiga hard disk rotates at 5400 rpm with an arm seek time given by
+= 4 + 0.05t msec, where t is the number of tracks the arm seeks. Assume a block
+size of 512 bytes, and 1024 tracks with 512 sector/track. The disk controller
+and DMA read or write data from/to disk at a rate of 4MB/sec.
+
+What is the storage capacity of the disk?

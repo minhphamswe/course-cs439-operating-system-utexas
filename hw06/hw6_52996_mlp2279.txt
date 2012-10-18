@@ -1,0 +1,50 @@
+1. When the CPU receives an interrupt, it takes the following steps:
+  - Determine what device caused that interrupt
+  - Read the device status.
+    + If the status indicate an error has occured, signal the error condition
+    + If the last command was a request for read (for an I/O device), and the
+      status is Ready, then read the word from the device, then write the data
+      just read into main memory
+  - Set up the next operation for the device, repeating until done
+    
+
+When the CPU receives an interrupt, the OS does the following:
+  - Saves the program counter and load a new program counter from the interrupt
+    vector where interrupt handler addresses are stored.
+  - Saves the registers
+  - Set up a new stack for the interrupt handler routine
+  - Run the interrupt handler routine
+  - When it's done, schedule a new process, and return control to the user
+    process
+
+2.
+         +-----------------------+-----------------------+----------------------
+         |          FIFO         |          SSTF         |          LOOK
+---------+-----------+-----------+-----------+-----------+-----------+----------
+Track    |  Track    |  # of     |  Track    |  # of     |  Track    |  # of
+Request  |  Service  |  Tracks   |  Service  |  Tracks   |  Service  |  Tracks
+Order    |  Order    |  to Seek  |  Order    |  to Seek  |  Order    |  to Seek    
+---------+-----------+-----------+-----------+-----------+-----------+----------
+10       |  10       |  10       |  20       |   0       |   2       |  18
+22       |  22       |  12       |  22       |   2       |   6       |   4
+20       |  20       |   2       |  10       |  12       |  10       |   4    
+ 2       |   2       |  18       |   6       |   4       |  20       |  10
+40       |  40       |  38       |   2       |   4       |  22       |   2
+ 6       |   6       |  34       |  38       |  36       |  38       |  16
+38       |  38       |  32       |  40       |   4       |  40       |   2
+---------+-----------+-----------+-----------+-----------+-----------+----------
+TOTAL    |             146 tracks|              62 tracks|              56 tracks
+         |             876 msecs |             372 msecs |             336 msecs
+---------+-----------------------+-----------------------+----------------------
+
+3.
+Contiguous blocks of virtual memory is paged and stored in main memory as
+potentially discontiguous page frames. Simply doing an address translation
+disregards paging, and may corrupt data.
+
+4. The relevant facts in this problem are:
+  - The disk has 1024 = 2^10 tracks
+  - Each track has 512 sectors = 2^9 sectors/tracks
+    => The disk has 2^19 sectors
+  - 512 bytes to a block, i.e. sector = 2^9 bytes/sector
+    => The disk has a capacity of 2^28 bytes = 256MB
