@@ -122,8 +122,18 @@ process_execute (const char *file_name)
 
   printf("Argc is: %d\n", argc);
 
+  /* Activate page directory for the process */
+  struct thread *t = thread_current ();
+  t->pagedir = pagedir_create ();
+  if (t->pagedir == NULL)
+    printf("Something bad happened.");
+  process_activate ();
+
   /* Allocate space for stack */
-  void **top = palloc_get_page(PAL_USER | PAL_ZERO);
+  bool success;
+//   void **top = palloc_get_page(PAL_USER | PAL_ZERO);
+  void *top = NULL;
+  success = setup_stack(&top);
   void **btop = top;
   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
@@ -137,7 +147,7 @@ process_execute (const char *file_name)
     // push token into the stack character-by-character
     for (j = strlen(token) - 1; j >= 0; j--) {
         top = (char*) top - 1;
-        *top = token[j];
+        *(char*)top = token[j];
         printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
     }
 
@@ -151,33 +161,30 @@ process_execute (const char *file_name)
 
   // push null pointer at end of argument list
   top = (char**) top - 1;
-  *top = (char*) 0;
+  *(char**)top = (char*) 0;
   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push addresses (order from right to left)
   for (i = argc - 1; i > 0; i++) {
     top = (char***) top - 1;
-    *top = token_addr[i];
+    *(char***)top = token_addr[i];
     printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
   }
 
   // push token count
   top = (int*) top - 1;
-  *top = argc;
+  *(int*)top = argc;
   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push "return address" to end the "function call" on the stack
   top = (char *) top - 1;
-  *top = (char*) 0;
+  *(char *)top = (char*) 0;
   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
-  struct thread *t = thread_current ();
-  t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL)
-    printf("Something bad happened.");
-  process_activate ();
-
-  setup_stack(top);
+//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
+  if (success)
+//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
+    hex_dump(0, top, ((unsigned int) btop - (unsigned int) top), true);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -504,7 +511,7 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      hex_dump(0, ((uint8_t *) PHYS_BASE) - PGSIZE, PGSIZE, true);
+//       hex_dump(0, ((uint8_t *) PHYS_BASE) - PGSIZE, PGSIZE, true);
       if (success)
         *esp = PHYS_BASE;
       else
