@@ -22,6 +22,78 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+/* load() helpers. */
+static bool install_page (void *upage, void *kpage, bool writable);
+
+/* We load ELF binaries.  The following definitions are taken
+   from the ELF specification, [ELF1], more-or-less verbatim.  */
+
+/* ELF types.  See [ELF1] 1-2. */
+typedef uint32_t Elf32_Word, Elf32_Addr, Elf32_Off;
+typedef uint16_t Elf32_Half;
+
+/* For use with ELF types in printf(). */
+#define PE32Wx PRIx32   /* Print Elf32_Word in hexadecimal. */
+#define PE32Ax PRIx32   /* Print Elf32_Addr in hexadecimal. */
+#define PE32Ox PRIx32   /* Print Elf32_Off in hexadecimal. */
+#define PE32Hx PRIx16   /* Print Elf32_Half in hexadecimal. */
+
+/* Executable header.  See [ELF1] 1-4 to 1-8.
+   This appears at the very beginning of an ELF binary. */
+struct Elf32_Ehdr
+  {
+    unsigned char e_ident[16];
+    Elf32_Half    e_type;
+    Elf32_Half    e_machine;
+    Elf32_Word    e_version;
+    Elf32_Addr    e_entry;
+    Elf32_Off     e_phoff;
+    Elf32_Off     e_shoff;
+    Elf32_Word    e_flags;
+    Elf32_Half    e_ehsize;
+    Elf32_Half    e_phentsize;
+    Elf32_Half    e_phnum;
+    Elf32_Half    e_shentsize;
+    Elf32_Half    e_shnum;
+    Elf32_Half    e_shstrndx;
+  };
+
+/* Program header.  See [ELF1] 2-2 to 2-4.
+   There are e_phnum of these, starting at file offset e_phoff
+   (see [ELF1] 1-6). */
+struct Elf32_Phdr
+  {
+    Elf32_Word p_type;
+    Elf32_Off  p_offset;
+    Elf32_Addr p_vaddr;
+    Elf32_Addr p_paddr;
+    Elf32_Word p_filesz;
+    Elf32_Word p_memsz;
+    Elf32_Word p_flags;
+    Elf32_Word p_align;
+  };
+
+/* Values for p_type.  See [ELF1] 2-3. */
+#define PT_NULL    0            /* Ignore. */
+#define PT_LOAD    1            /* Loadable segment. */
+#define PT_DYNAMIC 2            /* Dynamic linking info. */
+#define PT_INTERP  3            /* Name of dynamic loader. */
+#define PT_NOTE    4            /* Auxiliary info. */
+#define PT_SHLIB   5            /* Reserved. */
+#define PT_PHDR    6            /* Program header table. */
+#define PT_STACK   0x6474e551   /* Stack segment. */
+
+/* Flags for p_flags.  See [ELF3] 2-3 and 2-4. */
+#define PF_X 1          /* Executable. */
+#define PF_W 2          /* Writable. */
+#define PF_R 4          /* Readable. */
+
+static bool setup_stack (void **esp);
+static bool validate_segment (const struct Elf32_Phdr *, struct file *);
+static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+                          uint32_t read_bytes, uint32_t zero_bytes,
+                          bool writable);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -40,9 +112,7 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Parse arguments into tokens */
-  char *save_ptr;
-  char *token;
-  char *argv[128];
+  char *save_ptr, *token, *argv[128];
   int argc = 0;
   for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
@@ -52,72 +122,49 @@ process_execute (const char *file_name)
 
   printf("Argc is: %d", argc);
 
-  /* Push tokens onto the stack */
+  /* Allocate space for stack */
+  void **top;
+  setup_stack(top);
+
+  /* Put tokens onto the stack */
   char ** token_addr[argc];
-  int i;
-  int totalWords = 0;
-  void* top = PHYS_BASE;
+  int i, j;
   for (i = 0; i < argc; i++) {
     // get the token
     token = argv[i];
 
-    // calculate token length
-    int length = strlen(token);
-
-    // calculate copy-to address
-    top -= length + 1;
+    // push token into the stack character-by-character
+    for (j = strlen(token) - 1; j >= 0; j--) {
+        top -= sizeof(char*);
+        *((char*) top) = (char) token[j];
+    }
 
     // save copy-to address
-    token_addr[i] = (char**) &top;
-
-    // copy token
-    char * addr = *token_addr[i];
-    addr = palloc_get_page(PAL_ASSERT);
-    if (addr == NULL)
-      return TID_ERROR;
-    strlcpy(addr, token, length);
-    totalWords += length;
+    token_addr[i] = (char**) top;
   }
 
   // align stack by word size (4)
-  for(i = 0; i < totalWords % 4; i++) {
-    top -= sizeof(uint8_t);
-    top = palloc_get_page(PAL_ASSERT);
-    *((uint8_t*) top) = (uint8_t) 0;
-  }
+  top -= sizeof(char*) * (4 - (((int) top) % 4));
 
   // push null pointer at end of argument list
   top -= sizeof(char*);
-  top = palloc_get_page(PAL_ASSERT);
   *((char**) top) = (char*) 0;
 
   // push addresses (order from right to left)
   for (i = argc - 1; i >= 0; i++) {
     top -= sizeof(char**);
-//     if (top == NULL)
-//       return TID_ERROR;
-//     *((char***) top) = token_addr[i];
-    asm volatile ("pushl %0;"
-      : /* no output operand */
-      : "o" (token_addr[i])
-      : "memory"
-    );
-//     memmove(top, token_addr[i], sizeof(char**));
+    *((char***) top) = token_addr[i];
   }
 
   // push token count
   top -= sizeof(int);
-  top = palloc_get_page(PAL_ZERO);
   *((int*) top) = argc;
 
   // push "return address" to end the "function call" on the stack
   top -= sizeof(char *);
-  top = palloc_get_page(PAL_ZERO);
   *((char**) top) = (char*) 0;
 
-//   char * test;
-//   strlcpy(test, (char*) top, (int) (PHYS_BASE - top));
-//   printf("%x", (unsigned int) test);
+  hex_dump(0, *top, PHYS_BASE - *top, true);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -212,75 +259,6 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
-/* We load ELF binaries.  The following definitions are taken
-   from the ELF specification, [ELF1], more-or-less verbatim.  */
-
-/* ELF types.  See [ELF1] 1-2. */
-typedef uint32_t Elf32_Word, Elf32_Addr, Elf32_Off;
-typedef uint16_t Elf32_Half;
-
-/* For use with ELF types in printf(). */
-#define PE32Wx PRIx32   /* Print Elf32_Word in hexadecimal. */
-#define PE32Ax PRIx32   /* Print Elf32_Addr in hexadecimal. */
-#define PE32Ox PRIx32   /* Print Elf32_Off in hexadecimal. */
-#define PE32Hx PRIx16   /* Print Elf32_Half in hexadecimal. */
-
-/* Executable header.  See [ELF1] 1-4 to 1-8.
-   This appears at the very beginning of an ELF binary. */
-struct Elf32_Ehdr
-  {
-    unsigned char e_ident[16];
-    Elf32_Half    e_type;
-    Elf32_Half    e_machine;
-    Elf32_Word    e_version;
-    Elf32_Addr    e_entry;
-    Elf32_Off     e_phoff;
-    Elf32_Off     e_shoff;
-    Elf32_Word    e_flags;
-    Elf32_Half    e_ehsize;
-    Elf32_Half    e_phentsize;
-    Elf32_Half    e_phnum;
-    Elf32_Half    e_shentsize;
-    Elf32_Half    e_shnum;
-    Elf32_Half    e_shstrndx;
-  };
-
-/* Program header.  See [ELF1] 2-2 to 2-4.
-   There are e_phnum of these, starting at file offset e_phoff
-   (see [ELF1] 1-6). */
-struct Elf32_Phdr
-  {
-    Elf32_Word p_type;
-    Elf32_Off  p_offset;
-    Elf32_Addr p_vaddr;
-    Elf32_Addr p_paddr;
-    Elf32_Word p_filesz;
-    Elf32_Word p_memsz;
-    Elf32_Word p_flags;
-    Elf32_Word p_align;
-  };
-
-/* Values for p_type.  See [ELF1] 2-3. */
-#define PT_NULL    0            /* Ignore. */
-#define PT_LOAD    1            /* Loadable segment. */
-#define PT_DYNAMIC 2            /* Dynamic linking info. */
-#define PT_INTERP  3            /* Name of dynamic loader. */
-#define PT_NOTE    4            /* Auxiliary info. */
-#define PT_SHLIB   5            /* Reserved. */
-#define PT_PHDR    6            /* Program header table. */
-#define PT_STACK   0x6474e551   /* Stack segment. */
-
-/* Flags for p_flags.  See [ELF3] 2-3 and 2-4. */
-#define PF_X 1          /* Executable. */
-#define PF_W 2          /* Writable. */
-#define PF_R 4          /* Readable. */
-
-static bool setup_stack (void **esp);
-static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
-                          uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -396,10 +374,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
-/* load() helpers. */
-
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
