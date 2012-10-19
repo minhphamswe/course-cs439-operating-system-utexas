@@ -120,11 +120,12 @@ process_execute (const char *file_name)
     argc++;
   }
 
-  printf("Argc is: %d", argc);
+  printf("Argc is: %d\n", argc);
 
   /* Allocate space for stack */
-  void **top;
-  setup_stack(top);
+  void **top = palloc_get_page(PAL_USER | PAL_ZERO);
+  void **btop = top;
+  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   /* Put tokens onto the stack */
   char ** token_addr[argc];
@@ -135,8 +136,9 @@ process_execute (const char *file_name)
 
     // push token into the stack character-by-character
     for (j = strlen(token) - 1; j >= 0; j--) {
-        top -= sizeof(char*);
-        *((char*) top) = (char) token[j];
+        top = (char*) top - 1;
+        *top = token[j];
+        printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
     }
 
     // save copy-to address
@@ -144,27 +146,38 @@ process_execute (const char *file_name)
   }
 
   // align stack by word size (4)
-  top -= sizeof(char*) * (4 - (((int) top) % 4));
+//   top -= sizeof(char*) * (4 - (((int) top) % 4));
+  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push null pointer at end of argument list
-  top -= sizeof(char*);
-  *((char**) top) = (char*) 0;
+  top = (char**) top - 1;
+  *top = (char*) 0;
+  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push addresses (order from right to left)
-  for (i = argc - 1; i >= 0; i++) {
-    top -= sizeof(char**);
-    *((char***) top) = token_addr[i];
+  for (i = argc - 1; i > 0; i++) {
+    top = (char***) top - 1;
+    *top = token_addr[i];
+    printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
   }
 
   // push token count
-  top -= sizeof(int);
-  *((int*) top) = argc;
+  top = (int*) top - 1;
+  *top = argc;
+  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push "return address" to end the "function call" on the stack
-  top -= sizeof(char *);
-  *((char**) top) = (char*) 0;
+  top = (char *) top - 1;
+  *top = (char*) 0;
+  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
-  hex_dump(0, *top, PHYS_BASE - *top, true);
+  struct thread *t = thread_current ();
+  t->pagedir = pagedir_create ();
+  if (t->pagedir == NULL)
+    printf("Something bad happened.");
+  process_activate ();
+
+  setup_stack(top);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -491,6 +504,7 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      hex_dump(0, ((uint8_t *) PHYS_BASE) - PGSIZE, PGSIZE, true);
       if (success)
         *esp = PHYS_BASE;
       else
