@@ -111,81 +111,6 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /* Parse arguments into tokens */
-  char *save_ptr, *token, *argv[128];
-  int argc = 0;
-  for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr)) {
-    argv[argc] = token;
-    argc++;
-  }
-
-  printf("Argc is: %d\n", argc);
-
-  /* Activate page directory for the process */
-  struct thread *t = thread_current ();
-  t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL)
-    printf("Something bad happened.");
-  process_activate ();
-
-  /* Allocate space for stack */
-  bool success;
-//   void **top = palloc_get_page(PAL_USER | PAL_ZERO);
-  void *top = NULL;
-  success = setup_stack(&top);
-  void **btop = top;
-  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-
-  /* Put tokens onto the stack */
-  char ** token_addr[argc];
-  int i, j;
-  for (i = 0; i < argc; i++) {
-    // get the token
-    token = argv[i];
-
-    // push token into the stack character-by-character
-    for (j = strlen(token) - 1; j >= 0; j--) {
-        top = (char*) top - 1;
-        *(char*)top = token[j];
-        printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-    }
-
-    // save copy-to address
-    token_addr[i] = (char**) top;
-  }
-
-  // align stack by word size (4)
-//   top -= sizeof(char*) * (4 - (((int) top) % 4));
-  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-
-  // push null pointer at end of argument list
-  top = (char**) top - 1;
-  *(char**)top = (char*) 0;
-  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-
-  // push addresses (order from right to left)
-  for (i = argc - 1; i > 0; i++) {
-    top = (char***) top - 1;
-    *(char***)top = token_addr[i];
-    printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-  }
-
-  // push token count
-  top = (int*) top - 1;
-  *(int*)top = argc;
-  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-
-  // push "return address" to end the "function call" on the stack
-  top = (char *) top - 1;
-  *(char *)top = (char*) 0;
-  printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
-
-//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
-  if (success)
-//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
-    hex_dump(0, top, ((unsigned int) btop - (unsigned int) top), true);
-
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -236,6 +161,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while (1) {}
   return -1;
 }
 
@@ -292,7 +218,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  int i;
+  int i, argc;
+  void *btop;
+  char *save_ptr, *token, *argv[128];
+  char ** token_addr[argc];
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -300,11 +229,29 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+/* Copy commandline to avoid modification by strtok_r */
+  char* fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  /* Parse arguments into tokens */
+  argc = 0;
+//   printf("file_name is %s\n", file_name);
+//   printf("fn_copy is %s\n", fn_copy);
+  for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argv[argc] = token;
+    argc++;
+  }
+
+//   printf("Argc is: %d\n", argc);
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+//       printf ("load: %s: open failed\n", argv[0]);
       goto done; 
     }
 
@@ -317,7 +264,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+//       printf ("load: %s: error loading executable\n", argv[0]);
       goto done; 
     }
 
@@ -383,6 +330,65 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+
+  /* Allocate space for stack */
+  btop = *esp;
+//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
+
+  /* Put tokens onto the stack */
+  for (i = argc-1; i >= 0; i--) {
+    // get the token
+    token = argv[i];
+
+    // move the stack pointer and copy token onto the stack
+    *esp = (char*) *esp - (strlen(token) + 1);
+    strlcpy(*esp, token, strlen(token) + 1);
+//     printf("Token is: %s\n", token);
+//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
+
+    // save copy-to address
+    token_addr[i] = (char**) *esp;
+  }
+
+  // align stack by word size (4)
+//   printf("Byte-aligning stack\n");
+  while (((unsigned int) *esp % 4) != 0) {
+    *esp = (uint8_t*) *esp - 1;
+    *(uint8_t*) *esp = 0;
+//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
+  }
+
+  // push null pointer at end of argument list
+//   printf("Pushing argv[argc]\n");
+  *esp = (char**) *esp - 1;
+  *(char**)*esp = (char*) 0;
+//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
+
+  // push addresses (order from right to left)
+  for (i = argc - 1; i >= 0; i--) {
+    *esp = (char***) *esp - 1;
+    *(char***)*esp = token_addr[i];
+//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
+  }
+
+  // push address of argument vector
+  *esp = (char***) *esp - 1;
+  *(char***) *esp = (char***) *esp + 1;
+
+  // push token count
+  *esp = (int*) *esp - 1;
+  *(int*)*esp = argc;
+//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
+
+  // push "return address" to end the "function call" on the stack
+  *esp = (void(**)()) *esp - 1;
+  *(void(**)()) *esp = 0;
+//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
+
+//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
+  if (success)
+//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
+    hex_dump(0, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -504,6 +510,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
+//   printf("Calling setup_stack\n");
   uint8_t *kpage;
   bool success = false;
 

@@ -94,18 +94,20 @@ loader.bin: threads/loader.o
 os.dsk: kernel.bin
 	cat $^ > $@
 
+PROGDIR = ../../examples
 PROGS = cat cmp cp echo halt hex-dump ls mcat mcp mkdir pwd rm shell \
-	bubsort insult lineup matmult recursor
-FS = ./filesys.dsk
+	bubsort insult matmult recursor exit_test
+FS = filesys.dsk
 
 .PHONY: disk
 
 disk: all
+	make -C $(PROGDIR) all
 	rm -f $(FS)
-	pintos-mkdisk $(FS) --filesys-size=2
-	pintos -v -f -q
+	pintos-mkdisk $(FS) --filesys-size=4
+	pintos -f -q
 	for prog in $(PROGS); do \
-		pintos -v -p ../examples/$$prog -a $$prog -- -q; \
+		pintos -v -p $(PROGDIR)/$$prog -a $$prog -- -q; \
 	done
 
 clean::
