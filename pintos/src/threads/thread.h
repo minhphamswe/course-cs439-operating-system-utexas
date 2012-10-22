@@ -100,6 +100,7 @@ struct thread
   int numDonors;                      /* Number of donors waiting */
   int nice;                           /* Niceness value of the thread */
   int recent_cpu;                     /* Recently-used CPU time (float) */
+	int retVal;													/* The return value when exiting */
 
   /* Keep track of who donated to us */
   struct priority_lock donors[PRI_DEPTH];

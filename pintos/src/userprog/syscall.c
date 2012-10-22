@@ -48,9 +48,9 @@ syscall_handler (struct intr_frame *f)
   printf("ss: %d\n", f->ss);
   
   printf("Value at esp: %x\n", *((int *) f->esp));
-*/
-  hex_dump(0, f->esp, 4 * sizeof(int), false);
 
+  hex_dump(0, f->esp, 4 * sizeof(int), false);
+*/
 
   switch (*((int *) f->esp)) {
     case SYS_HALT:
@@ -120,9 +120,9 @@ void syshalt_handler(struct intr_frame *f)
 // Thread calls exit()
 void sysexit_handler(struct intr_frame *f)
 {
-  // Get the exit return value.  We will eventually need to do something with this
+  // Get the exit return value and set it.
   int exitValue = *((int *) f->esp + 1);
-  printf("Exit Value is: %d\n", exitValue);
+	thread_current()->retVal = exitValue;
   
   // End the currently running thread
   thread_exit();
@@ -136,8 +136,11 @@ void sysexec_handler(struct intr_frame *f)
 // Thread calls syswait
 void syswait_handler(struct intr_frame *f)
 {
+	// Get PID from stack
+	tid_t child = *((uint32_t *) f->esp + 1);
   int status;
-  status = process_wait(1);
+  status = process_wait(child);
+	printf("TID status: %d\n", status);
 }
 
 // Thread calls syscreate
@@ -180,7 +183,7 @@ void syswrite_handler(struct intr_frame *f)
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
     putbuf((char *) buffer, bufferSize);
-	hex_dump(0, f->esp, 4 * sizeof(int), false);  
+//	hex_dump(0, f->esp, 8 * sizeof(int), false);  
    }
   else {
     // Write to file.  NEED TO IMPLEMENT

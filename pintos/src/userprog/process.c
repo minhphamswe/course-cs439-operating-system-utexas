@@ -159,10 +159,28 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while (1) {}
-  return -1;
+  struct list_elem *e;
+	struct thread *tp;
+
+	// Disable interrupts before going through the thread list
+	enum intr_level old_level;
+	old_level = intr_disable ();
+
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+  	tp = list_entry (e, struct thread, allelem);
+		if(tp->tid == child_tid) break;
+  }
+	// Turn interrupts back on
+	intr_set_level (old_level);
+
+	if(tp->tid == child_tid) {
+		while(tp->status != THREAD_DYING) {}
+		return tp->retVal;
+	}
+	else
+  	return -1;		// Did not find, return an error
 }
 
 /* Free the current process's resources. */
