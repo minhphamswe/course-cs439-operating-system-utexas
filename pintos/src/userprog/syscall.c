@@ -48,9 +48,9 @@ syscall_handler (struct intr_frame *f)
   printf("ss: %d\n", f->ss);
   
   printf("Value at esp: %x\n", *((int *) f->esp));
-
-  hex_dump(0, f->esp, 4 * sizeof(int), false);
 */
+  hex_dump(0, f->esp, 4 * sizeof(int), false);
+
 
   switch (*((int *) f->esp)) {
     case SYS_HALT:
@@ -180,6 +180,7 @@ void syswrite_handler(struct intr_frame *f)
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
     putbuf((char *) buffer, bufferSize);
+	hex_dump(0, f->esp, 4 * sizeof(int), false);  
    }
   else {
     // Write to file.  NEED TO IMPLEMENT
