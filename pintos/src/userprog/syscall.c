@@ -29,9 +29,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  printf ("system call!\n");
-
-/*  printf("edi: %d\n", f->edi);
+ /*  printf("edi: %d\n", f->edi);
   printf("esi: %d\n", f->esi);
   printf("ebp: %d\n", f->ebp);
   printf("ebx: %d\n", f->ebx);
@@ -92,8 +90,7 @@ syscall_handler (struct intr_frame *f)
       sysread_handler(f);
       return;
     case SYS_WRITE:
-      printf("SYS_WRITE Called\n");
-      syswrite_handler(f);
+       syswrite_handler(f);
       return;
     case SYS_SEEK:
       printf("SYS_SEEK Called\n");
@@ -139,8 +136,8 @@ void sysexec_handler(struct intr_frame *f)
 // Thread calls syswait
 void syswait_handler(struct intr_frame *f)
 {
-  // Temporary solution to keep system from crashing with waits
-  while(1) {}
+  int status;
+  status = process_wait(1);
 }
 
 // Thread calls syscreate
@@ -171,6 +168,22 @@ void sysread_handler(struct intr_frame *f)
 // Thread calls syswrite
 void syswrite_handler(struct intr_frame *f)
 {
+  // Get the number of the file descriptor to write buffer to
+  uint32_t fdnum = *((uint32_t *) f->esp + 1);
+
+  // Get the address in UVAS of the buffer to write
+  uint32_t buffer = *((uint32_t *) f->esp + 2);
+
+  // Lastly, get the size of the buffer to write
+  uint32_t bufferSize = *((uint32_t *) f->esp + 3);
+
+  // Check to see if it's a console out, and print if yes
+  if(fdnum == 1) {
+    putbuf((char *) buffer, bufferSize);
+   }
+  else {
+    // Write to file.  NEED TO IMPLEMENT
+  }
 }
 
 // Thread calls sysseek
