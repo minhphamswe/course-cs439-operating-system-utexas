@@ -6,6 +6,20 @@
 
 static void syscall_handler (struct intr_frame *);
 
+void syshalt_handler(struct intr_frame *f);
+void sysexit_handler(struct intr_frame *f);
+void sysexec_handler(struct intr_frame *f);
+void syswait_handler(struct intr_frame *f);
+void syscreate_handler(struct intr_frame *f);
+void sysremove_handler(struct intr_frame *f);
+void sysopen_handler(struct intr_frame *f);
+void sysfilesize_handler(struct intr_frame *f);
+void sysread_handler(struct intr_frame *f);
+void syswrite_handler(struct intr_frame *f);
+void sysseek_handler(struct intr_frame *f);
+void systell_handler(struct intr_frame *f);
+void sysclose_handler(struct intr_frame *f);
+
 void
 syscall_init (void) 
 {
@@ -17,7 +31,7 @@ syscall_handler (struct intr_frame *f)
 {
   printf ("system call!\n");
 
-  printf("edi: %d\n", f->edi);
+/*  printf("edi: %d\n", f->edi);
   printf("esi: %d\n", f->esi);
   printf("ebp: %d\n", f->ebp);
   printf("ebx: %d\n", f->ebx);
@@ -32,16 +46,147 @@ syscall_handler (struct intr_frame *f)
   printf("vec_no: %d\n", f->vec_no);
   printf("error_code: %d\n", f->error_code);
   printf("frame ptr: %x\n", (uint32_t) f->frame_pointer);
-  printf("esp: %x\n", (uint32_t)f->esp);
+  printf("esp: %x\n", (uint32_t) f->esp);
   printf("ss: %d\n", f->ss);
+  
+  printf("Value at esp: %x\n", *((int *) f->esp));
 
   hex_dump(0, f->esp, 4 * sizeof(int), false);
-  
+*/
+
+  switch (*((int *) f->esp)) {
+    case SYS_HALT:
+      printf("SYS_HALT Called\n");
+      syshalt_handler(f);
+      return;
+    case SYS_EXIT:
+      printf("SYS_EXIT Called\n");
+      sysexit_handler(f);
+      return;
+    case SYS_EXEC:
+      printf("SYS_EXEC Called\n");
+      sysexec_handler(f);
+      return;
+    case SYS_WAIT:
+      printf("SYS_WAIT Called\n");
+      syswait_handler(f);
+      return;
+    case SYS_CREATE:
+      printf("SYS_CREATE Called\n");
+      syscreate_handler(f);
+      return;
+    case SYS_REMOVE:
+      printf("SYS_REMOVE Called\n");
+      sysremove_handler(f);
+      return;
+    case SYS_OPEN:
+      printf("SYS_OPEN Called\n");
+      sysopen_handler(f);
+      return;
+    case SYS_FILESIZE:
+      printf("SYS_FILESIZE Called\n");
+      sysfilesize_handler(f);
+      return;
+    case SYS_READ:
+      printf("SYS_READ Called\n");
+      sysread_handler(f);
+      return;
+    case SYS_WRITE:
+      printf("SYS_WRITE Called\n");
+      syswrite_handler(f);
+      return;
+    case SYS_SEEK:
+      printf("SYS_SEEK Called\n");
+      sysseek_handler(f);
+      return;
+    case SYS_TELL:
+      printf("SYS_TELL Called\n");
+      systell_handler(f);
+      return;
+    case SYS_CLOSE:
+      printf("SYS_ClOSE Called\n");
+      sysclose_handler(f);
+      return;
+  }
   // Examine user memory to find out which system call gets called
   thread_exit ();
 }
 
 
+// Thread turns off system
+void syshalt_handler(struct intr_frame *f)
+{
+  // Turn off pintos
+  shutdown_power_off();
+}
+
+// Thread calls exit()
+void sysexit_handler(struct intr_frame *f)
+{
+  // Get the exit return value.  We will eventually need to do something with this
+  int exitValue = *((int *) f->esp + 1);
+  printf("Exit Value is: %d\n", exitValue);
+  
+  // End the currently running thread
+  thread_exit();
+}
+
+// Thread calls sysexec
+void sysexec_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls syswait
+void syswait_handler(struct intr_frame *f)
+{
+  // Temporary solution to keep system from crashing with waits
+  while(1) {}
+}
+
+// Thread calls syscreate
+void syscreate_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls sysremove
+void sysremove_handler(struct intr_frame *f)
+{
+}
+
+// Threa calls sysopen
+void sysopen_handler(struct intr_frame *f)
+{
+}
+
+// Thread call sysfilesize
+void sysfilesize_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls sysread
+void sysread_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls syswrite
+void syswrite_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls sysseek
+void sysseek_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls systell
+void systell_handler(struct intr_frame *f)
+{
+}
+
+// Thread calls sysclose
+void sysclose_handler(struct intr_frame *f)
+{
+}
 
 /* Read a byte at the user virtual address UADDR
  * UADDR must be below PHYS_BASE

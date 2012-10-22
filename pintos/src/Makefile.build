@@ -96,7 +96,7 @@ os.dsk: kernel.bin
 
 PROGDIR = ../../examples
 PROGS = cat cmp cp echo halt hex-dump ls mcat mcp mkdir pwd rm shell \
-	bubsort insult matmult recursor exit_test
+	bubsort insult exit_test recursor matmult
 FS = filesys.dsk
 
 .PHONY: disk
@@ -104,7 +104,7 @@ FS = filesys.dsk
 disk: all
 	make -C $(PROGDIR) all
 	rm -f $(FS)
-	pintos-mkdisk $(FS) --filesys-size=4
+	pintos-mkdisk $(FS) --filesys-size=8
 	pintos -f -q
 	for prog in $(PROGS); do \
 		pintos -v -p $(PROGDIR)/$$prog -a $$prog -- -q; \
