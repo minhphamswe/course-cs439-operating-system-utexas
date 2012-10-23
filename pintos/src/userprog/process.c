@@ -18,6 +18,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -161,26 +162,19 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
-  struct list_elem *e;
-	struct thread *tp;
+  struct thread* tp = thread_by_tid(child_tid);
 
-	// Disable interrupts before going through the thread list
-	enum intr_level old_level;
-	old_level = intr_disable ();
+  if ((tp != NULL) && (tp->status != THREAD_DYING)) {
+    // running thread found, wait to return exit status
+    sema_down(&(tp->waiter_sema));
 
-  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
-  	tp = list_entry (e, struct thread, allelem);
-		if(tp->tid == child_tid) break;
+    // when sema is release, thread should have exited, so return exit status
+    return tp->retVal;
   }
-	// Turn interrupts back on
-	intr_set_level (old_level);
-
-	if(tp->tid == child_tid) {
-		while(tp->status != THREAD_DYING) {}
-		return tp->retVal;
-	}
-	else
-  	return -1;		// Did not find, return an error
+  else {
+    // no thread found: immediately return
+    return -1;
+  }
 }
 
 /* Free the current process's resources. */

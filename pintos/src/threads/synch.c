@@ -67,11 +67,12 @@ sema_down (struct semaphore *sema)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  while (sema->value == 0) 
-    {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+  if (sema->value <= 0)
+    // push only once
+    list_push_back (&sema->waiters, &thread_current ()->elem);
+
+  while (sema->value <= 0)
       thread_block ();
-    }
   sema->value--;
   intr_set_level (old_level);
 }
@@ -115,14 +116,16 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
 
-  int highestPriority = PRI_MIN - 1;        /* Highest priority of waiting threads */
+  /* Highest priority of waiting threads */
+  int highestPriority = PRI_MIN - 1;
 
   if (!list_empty (&sema->waiters)) {
-    struct thread *highestThread;
+    struct thread *highestThread = NULL;
     struct list_elem *e;
 
     // Search for the highest priority thread in the waiting list
-    for (e = list_begin(&(sema->waiters)); e != list_end(&(sema->waiters)); e = list_next(e)) {
+    for (e = list_begin(&sema->waiters); e != list_end(&sema->waiters);
+         e = list_next(e)) {
       struct thread *waiter = list_entry(e, struct thread, elem);
       if (waiter->priority > highestPriority) {
         highestThread = waiter;
@@ -409,8 +412,8 @@ cond_signal (struct condition *cond, struct lock *lock /*UNUSED*/)
   ASSERT (lock_held_by_current_thread (lock));
 
   int highestPriority = PRI_MIN - 1;
-  struct thread *highestThread;
-  struct semaphore_elem *highestSema;
+  struct thread *highestThread = NULL;
+  struct semaphore_elem *highestSema = NULL;
 
   if (!list_empty (&cond->waiters)) {
     struct list_elem *e;

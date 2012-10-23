@@ -13,6 +13,8 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/fixedpoint.h"
+#include "threads/malloc.h"
+#include "threads/synch.h"
 #include <devices/timer.h>
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -193,7 +195,7 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-  
+
   timer_wake();
 }
 
@@ -268,11 +270,11 @@ thread_create (const char *name, int priority,
     // Child inherits parent's niceness and CPU
     t->nice = thread_current()->nice;
     t->recent_cpu = thread_current()->recent_cpu;
-    
+
     // Calculate the new priority based off the inherited values
     t->nativePriority = Round(SubF(Float(PRI_MAX),
-				    AddF(DivI(t->recent_cpu, 4),
-					  MulI(Float(t->nice), 2))));
+            AddF(DivI(t->recent_cpu, 4),
+            MulI(Float(t->nice), 2))));
     if(t->nativePriority < PRI_MIN)
       t->nativePriority = PRI_MIN;
     else if (t->nativePriority > PRI_MAX)
@@ -388,8 +390,9 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem);
-  thread_current ()->status = THREAD_DYING;
+  list_remove (&thread_current()->allelem);   // disappear before dying
+  sema_up(&thread_current()->waiter_sema);     // signal before dying
+  thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();
 }
@@ -519,6 +522,33 @@ thread_get_recent_cpu (void)
   return Round0(MulI(thread_current()->recent_cpu, 100));
 }
 
+/* Given a tid, return a pointer to the thread with that tid, or null if there
+ * is no such thread */
+struct thread*
+thread_by_tid(tid_t tid)
+{
+  struct list_elem *e;
+  struct thread *tp;
+
+  // Disable interrupts before going through the thread list
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+  {
+    tp = list_entry (e, struct thread, allelem);
+    if (tp->tid == tid) break;
+  }
+  // Turn interrupts back on
+  intr_set_level (old_level);
+
+  if(tp->tid == tid)
+    return tp;
+  else 
+    return NULL;    // Did not find, return null
+}
+
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -617,6 +647,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->nice = 0;
   t->recent_cpu = 0;
+  sema_init(&t->waiter_sema, 0);
 
   list_push_back(&all_list, &(t->allelem));
 }
