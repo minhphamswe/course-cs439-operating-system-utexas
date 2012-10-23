@@ -59,6 +59,16 @@ put_user (uint8_t *udst, uint8_t byte) {
   return error_code != -1;
 }
 
+/* Given an interrupt frame pointer, return the value pointed to by f->esp,
+ * and increment f->esp.
+ */
+uint32_t pop_stack(struct intr_frame *f) {
+  uint32_t ret = *(uint32_t *)f->esp;
+  f->esp = (uint32_t *) f->esp + 1;
+  printf("f->esp is: %x\n", (unsigned int)f->esp);
+  return ret;
+}
+
 void
 syscall_init (void) 
 {
@@ -94,62 +104,70 @@ syscall_handler (struct intr_frame *f)
   hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
 
   // Examine user memory to find out which system call gets called
-  switch (*((int *) f->esp)) {
+  int syscall_number = pop_stack(f);
+  printf("Syscal Number is: %d\n", syscall_number);
+  switch (syscall_number) {
     case SYS_HALT:
       printf("SYS_HALT Called\n");
       syshalt_handler(f);
-      return;
+      break;
     case SYS_EXIT:
       printf("SYS_EXIT Called\n");
       sysexit_handler(f);
-      return;
+      break;
     case SYS_EXEC:
       printf("SYS_EXEC Called\n");
       sysexec_handler(f);
-      return;
+      break;
     case SYS_WAIT:
       printf("SYS_WAIT Called\n");
       syswait_handler(f);
-      return;
+      break;
     case SYS_CREATE:
       printf("SYS_CREATE Called\n");
       syscreate_handler(f);
-      return;
+      break;
     case SYS_REMOVE:
       printf("SYS_REMOVE Called\n");
       sysremove_handler(f);
-      return;
+      break;
     case SYS_OPEN:
       printf("SYS_OPEN Called\n");
       sysopen_handler(f);
-      return;
+      break;
     case SYS_FILESIZE:
       printf("SYS_FILESIZE Called\n");
       sysfilesize_handler(f);
-      return;
+      break;
     case SYS_READ:
       printf("SYS_READ Called\n");
       sysread_handler(f);
-      return;
+      break;
     case SYS_WRITE:
       printf("SYS_WRITE Called\n");
       syswrite_handler(f);
-      return;
+      break;
     case SYS_SEEK:
       printf("SYS_SEEK Called\n");
       sysseek_handler(f);
-      return;
+      break;
     case SYS_TELL:
       printf("SYS_TELL Called\n");
       systell_handler(f);
-      return;
+      break;
     case SYS_CLOSE:
       printf("SYS_ClOSE Called\n");
       sysclose_handler(f);
-      return;
+      break;
   }
 
-  thread_exit ();
+  printf("Preparing to jump...\n");
+  printf("f->eip is: %x\n", (unsigned int) f->eip);
+  hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
+//   f->eip = f->esp;
+//   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (f) : "memory");
+//   NOT_REACHED ();
+//   thread_exit ();
 }
 
 
@@ -164,7 +182,7 @@ void syshalt_handler(struct intr_frame *f)
 void sysexit_handler(struct intr_frame *f)
 {
   // Get the exit return value and set it.
-  int exitValue = *((int *) f->esp + 1);
+  int exitValue = pop_stack(f);
 	thread_current()->retVal = exitValue;
   
   // End the currently running thread
@@ -180,7 +198,7 @@ void sysexec_handler(struct intr_frame *f)
 void syswait_handler(struct intr_frame *f)
 {
 	// Get PID from stack
-	tid_t child = *((uint32_t *) f->esp + 1);
+	tid_t child = pop_stack(f);
   int status;
   status = process_wait(child);
 	printf("TID status: %d\n", status);
@@ -215,20 +233,13 @@ void sysread_handler(struct intr_frame *f)
 void syswrite_handler(struct intr_frame *f)
 {
   // Get the number of the file descriptor to write buffer to
-  f->esp = (uint32_t *) f->esp + 1;
-  printf("f->esp is: %x\n", (unsigned int)f->esp);
-//   uint32_t fdnum = get_user((uint32_t *)f->esp);
-  uint32_t fdnum = *(uint32_t *)f->esp;
+  uint32_t fdnum = pop_stack(f);
 
   // Get the address in UVAS of the buffer to write
-  f->esp = (uint32_t *) f->esp + 1;
-  printf("f->esp is: %x\n", (unsigned int)f->esp);
-  uint32_t buffer = get_user((uint32_t *)f->esp);
+  uint32_t buffer = pop_stack(f);
 
   // Lastly, get the size of the buffer to write
-  f->esp = (uint32_t *) f->esp + 1;
-  printf("f->esp is: %x\n", (unsigned int)f->esp);
-  uint32_t bufferSize = get_user((uint32_t *)f->esp);
+  uint32_t bufferSize = pop_stack(f);
 
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
