@@ -48,9 +48,8 @@ syscall_handler (struct intr_frame *f)
   printf("ss: %d\n", f->ss);
   
   printf("Value at esp: %x\n", *((int *) f->esp));
-
-  hex_dump(0, f->esp, 4 * sizeof(int), false);
 */
+  hex_dump(f->esp, f->esp, 4 * sizeof(int), false);
 
   switch (*((int *) f->esp)) {
     case SYS_HALT:
@@ -90,7 +89,8 @@ syscall_handler (struct intr_frame *f)
       sysread_handler(f);
       return;
     case SYS_WRITE:
-       syswrite_handler(f);
+      printf("SYS_WRITE Called\n");
+      syswrite_handler(f);
       return;
     case SYS_SEEK:
       printf("SYS_SEEK Called\n");

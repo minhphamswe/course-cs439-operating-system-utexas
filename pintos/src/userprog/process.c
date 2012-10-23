@@ -166,9 +166,9 @@ process_wait (tid_t child_tid)
 
   if ((tp != NULL) && (tp->status != THREAD_DYING)) {
     // running thread found, wait to return exit status
-    sema_down(&(tp->waiter_sema));
+    sema_down(&tp->waiter_sema);
 
-    // when sema is release, thread should have exited, so return exit status
+    // when sema is released, thread should have exited, so return exit status
     return tp->retVal;
   }
   else {
@@ -225,6 +225,7 @@ process_activate (void)
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
+  printf("Loading ELF executable\n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -233,7 +234,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int i, argc;
   void *btop;
   char *save_ptr, *token, *argv[128];
-  char ** token_addr[argc];
+  char **token_addr[128];
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -241,7 +242,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-/* Copy commandline to avoid modification by strtok_r */
+  /* Copy commandline to avoid modification by strtok_r */
   char* fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
@@ -253,6 +254,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 //   printf("fn_copy is %s\n", fn_copy);
   for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
+//     printf("Token is: %s\n", token);
     argv[argc] = token;
     argc++;
   }
@@ -263,7 +265,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file = filesys_open (argv[0]);
   if (file == NULL) 
     {
-//       printf ("load: %s: open failed\n", argv[0]);
+      printf ("load: %s: open failed\n", argv[0]);
       goto done; 
     }
 
@@ -276,7 +278,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-//       printf ("load: %s: error loading executable\n", argv[0]);
+      printf ("load: %s: error loading executable\n", argv[0]);
       goto done; 
     }
 
@@ -290,8 +292,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
         goto done;
       file_seek (file, file_ofs);
 
-      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
+        printf("Reading file did not complete.\n");
         goto done;
+      }
       file_ofs += sizeof phdr;
       switch (phdr.p_type) 
         {
@@ -330,18 +334,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
               if (!load_segment (file, file_page, (void *) mem_page,
-                                 read_bytes, zero_bytes, writable))
+                                 read_bytes, zero_bytes, writable)) {
+                printf("failed to load segment\n");
                 goto done;
+              }
             }
-          else
+          else {
+            printf("segment is invalid\n"); 
             goto done;
+          }
           break;
         }
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp)) {
+    printf("Setting up of the stack failed.\n");
     goto done;
+  }
 
   /* Allocate space for stack */
   btop = *esp;
@@ -355,7 +365,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     // move the stack pointer and copy token onto the stack
     *esp = (char*) *esp - (strlen(token) + 1);
     strlcpy(*esp, token, strlen(token) + 1);
-//     printf("Token is: %s\n", token);
+    printf("Token is: %s\n", token);
 //     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
 
     // save copy-to address
@@ -367,7 +377,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   while (((unsigned int) *esp % 4) != 0) {
     *esp = (uint8_t*) *esp - 1;
     *(uint8_t*) *esp = 0;
-//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
   }
 
   // push null pointer at end of argument list
@@ -385,7 +394,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   // push address of argument vector
   *esp = (char***) *esp - 1;
-  *(char***) *esp = (char***) *esp + 1;
+  *(char***) *esp = (char**) *esp + 1;
 
   // push token count
   *esp = (int*) *esp - 1;
@@ -393,19 +402,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
 //   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push "return address" to end the "function call" on the stack
-  *esp = (void(**)()) *esp - 1;
-  *(void(**)()) *esp = 0;
+  typedef void (*void_fn_ptr)(void);  // declare type pointer to void function
+//   *eip = (void_fn_ptr) ehdr.e_entry;
+  *esp = (void_fn_ptr*) *esp - 1;
+  *(void_fn_ptr*)*esp = 0;
 //   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
-//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
-  if (success)
-//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
-    hex_dump(0, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
-
   /* Start address. */
-  *eip = (void (*) (void)) ehdr.e_entry;
+  *eip = (void_fn_ptr*) ehdr.e_entry;
+  hex_dump(*esp, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
 
   success = true;
+//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
+//   if (success)
+//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
+//   printf("Address of btop is: %x\n", (unsigned int) btop);
+//   printf("Address of *esp is: %x\n", (unsigned int) *esp);
+//   hex_dump(0, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
+//   hex_dump(0, *eip, 4 * sizeof(int*), true);
 
  done:
   /* We arrive here whether the load is successful or not. */
@@ -419,41 +433,58 @@ static bool
 validate_segment (const struct Elf32_Phdr *phdr, struct file *file) 
 {
   /* p_offset and p_vaddr must have the same page offset. */
-  if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK)) 
-    return false; 
+  if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK)) {
+    printf("Test failed: p_offset and p_vaddr must have the same page offset\n");
+    return false;
+  }
 
   /* p_offset must point within FILE. */
-  if (phdr->p_offset > (Elf32_Off) file_length (file)) 
+  if (phdr->p_offset > (Elf32_Off) file_length (file)) {
+    printf("Test failed: p_offset must point within FILE.\n");
     return false;
+  }
 
   /* p_memsz must be at least as big as p_filesz. */
-  if (phdr->p_memsz < phdr->p_filesz) 
-    return false; 
+  if (phdr->p_memsz < phdr->p_filesz) {
+    printf("Test failed: p_memsz must be at least as big as p_filesz.\n");
+    return false;
+  }
 
   /* The segment must not be empty. */
-  if (phdr->p_memsz == 0)
+  if (phdr->p_memsz == 0) {
+    printf("Test failed: The segment must not be empty.\n");
     return false;
-  
+  }
+
   /* The virtual memory region must both start and end within the
      user address space range. */
-  if (!is_user_vaddr ((void *) phdr->p_vaddr))
+  if (!is_user_vaddr ((void *) phdr->p_vaddr)) {
+    printf("Test failed: The virtual memory region must start within the user address space range.\n");
     return false;
-  if (!is_user_vaddr ((void *) (phdr->p_vaddr + phdr->p_memsz)))
+  }
+  if (!is_user_vaddr ((void *) (phdr->p_vaddr + phdr->p_memsz))) {
+    printf("Test failed: The virtual memory region must end within the user address space range.\n");
     return false;
+  }
 
   /* The region cannot "wrap around" across the kernel virtual
      address space. */
-  if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
+  if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr) {
+    printf("Test failed: The region cannot wrap around across the kernel virtual address space.\n");
     return false;
+  }
 
   /* Disallow mapping page 0.
      Not only is it a bad idea to map page 0, but if we allowed
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
-  if (phdr->p_vaddr < PGSIZE)
+  if (phdr->p_vaddr < PGSIZE) {
+    printf("Test failed: Disallow mapping page 0.\n");
     return false;
+  }
 
+  printf("All tests succeeded.\n");
   /* It's okay. */
   return true;
 }
@@ -522,7 +553,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-//   printf("Calling setup_stack\n");
+  printf("Calling setup_stack\n");
   uint8_t *kpage;
   bool success = false;
 
