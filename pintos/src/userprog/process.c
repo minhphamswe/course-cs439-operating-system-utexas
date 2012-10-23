@@ -140,6 +140,9 @@ start_process (void *file_name_)
   if (!success) 
     thread_exit ();
 
+  printf("esp is at: %x\n", (unsigned int) if_.esp);
+  printf("eip is at: %x\n", (unsigned int) if_.eip);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -259,7 +262,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     argc++;
   }
 
-//   printf("Argc is: %d\n", argc);
+  printf("Argc is: %d\n", argc);
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
@@ -372,15 +375,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
     token_addr[i] = (char**) *esp;
   }
 
-  // align stack by word size (4)
-//   printf("Byte-aligning stack\n");
+  /* align stack by word size (4) */
+  printf("Byte-aligning stack\n");
   while (((unsigned int) *esp % 4) != 0) {
     *esp = (uint8_t*) *esp - 1;
     *(uint8_t*) *esp = 0;
   }
 
   // push null pointer at end of argument list
-//   printf("Pushing argv[argc]\n");
+  printf("Pushing argv[argc]\n");
   *esp = (char**) *esp - 1;
   *(char**)*esp = (char*) 0;
 //   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);

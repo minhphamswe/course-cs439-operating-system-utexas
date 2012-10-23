@@ -20,6 +20,45 @@ void sysseek_handler(struct intr_frame *f);
 void systell_handler(struct intr_frame *f);
 void sysclose_handler(struct intr_frame *f);
 
+/* Read a byte at the user virtual address UADDR
+ * UADDR must be below PHYS_BASE
+ * Returns the byte value if successful, -1 if a segfault occurred.
+ */
+static int
+get_user_byte (const uint8_t *uaddr) {
+  int result;
+  asm ( "movl $1f, %0; movzbl %1, %0; 1:"
+        : "=&a" (result)
+        : "m" (*uaddr));
+  return result;
+}
+
+/* Read 4 bytes at the user virtual address UADDR
+ * UADDR must be below PHYS_BASE
+ * Returns the byte value if successful, -1 if a segfault occurred.
+ */
+static int
+get_user (const uint32_t *uaddr) {
+  int result;
+  asm ( "movl $1f, %0; movzbl %1, %0; 1:"
+        : "=&a" (result)
+        : "m" (*uaddr));
+  return result;
+}
+
+/* Writes BYTE to user address UDST.
+ * UDST must be below PHYS_BASE
+ * Returns true if successful, false if a segfault occurred.
+ */
+static bool
+put_user (uint8_t *udst, uint8_t byte) {
+  int error_code;
+  asm ( "movl $1f, %0; movb %b2, %1; 1:"
+        : "=&a" (error_code), "=m" (*udst)
+        : "q" (byte));
+  return error_code != -1;
+}
+
 void
 syscall_init (void) 
 {
@@ -49,8 +88,12 @@ syscall_handler (struct intr_frame *f)
   
   printf("Value at esp: %x\n", *((int *) f->esp));
 */
-  hex_dump(f->esp, f->esp, 4 * sizeof(int), false);
+//   hex_dump(f->esp, f->esp, 16 * sizeof(int), false);
+  printf("Eflags is: %d\n", f->eflags);
+  printf("Address of f is: %x\n", (unsigned int)f);
+  hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
 
+  // Examine user memory to find out which system call gets called
   switch (*((int *) f->esp)) {
     case SYS_HALT:
       printf("SYS_HALT Called\n");
@@ -105,7 +148,7 @@ syscall_handler (struct intr_frame *f)
       sysclose_handler(f);
       return;
   }
-  // Examine user memory to find out which system call gets called
+
   thread_exit ();
 }
 
@@ -172,22 +215,32 @@ void sysread_handler(struct intr_frame *f)
 void syswrite_handler(struct intr_frame *f)
 {
   // Get the number of the file descriptor to write buffer to
-  uint32_t fdnum = *((uint32_t *) f->esp + 1);
+  f->esp = (uint32_t *) f->esp + 1;
+  printf("f->esp is: %x\n", (unsigned int)f->esp);
+//   uint32_t fdnum = get_user((uint32_t *)f->esp);
+  uint32_t fdnum = *(uint32_t *)f->esp;
 
   // Get the address in UVAS of the buffer to write
-  uint32_t buffer = *((uint32_t *) f->esp + 2);
+  f->esp = (uint32_t *) f->esp + 1;
+  printf("f->esp is: %x\n", (unsigned int)f->esp);
+  uint32_t buffer = get_user((uint32_t *)f->esp);
 
   // Lastly, get the size of the buffer to write
-  uint32_t bufferSize = *((uint32_t *) f->esp + 3);
+  f->esp = (uint32_t *) f->esp + 1;
+  printf("f->esp is: %x\n", (unsigned int)f->esp);
+  uint32_t bufferSize = get_user((uint32_t *)f->esp);
 
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
-    putbuf((char *) buffer, bufferSize);
+    printf("Printing to console\n");
+//     putbuf((char *) buffer, bufferSize);
 //	hex_dump(0, f->esp, 8 * sizeof(int), false);  
    }
   else {
+    printf("Printing to file\n");
     // Write to file.  NEED TO IMPLEMENT
   }
+  printf("Exiting Syswrite Handler\n");
 }
 
 // Thread calls sysseek
@@ -203,30 +256,4 @@ void systell_handler(struct intr_frame *f)
 // Thread calls sysclose
 void sysclose_handler(struct intr_frame *f)
 {
-}
-
-/* Read a byte at the user virtual address UADDR
- * UADDR must be below PHYS_BASE
- * Returns the byte value if successful, -1 if a segfault occurred.
- */
-static int
-get_user (const uint8_t *uaddr) {
-  int result;
-  asm ( "movl $1f, %0; movzbl %1, %0, 1:"
-        : "=&a" (result)
-        : "m" (*uaddr));
-  return result;
-}
-
-/* Writes BYTE to user address UDST.
- * UDST must be below PHYS_BASE
- * Returns true if successful, false if a segfault occurred.
- */
-static bool
-put_user (uint8_t *udst, uint8_t byte) {
-  int error_code;
-  asm ( "movl $1f, %0; movb %b2, %1; 1:"
-        : "=&a" (error_code), "=m" (*udst)
-        : "q" (byte));
-  return error_code != -1;
 }
