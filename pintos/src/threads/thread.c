@@ -648,6 +648,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;
   t->recent_cpu = 0;
   sema_init(&t->waiter_sema, 0);
+  t->retVal = 0;
+
+  // List and index for open files
+  t->nextFD = 2;
+  list_init(&t->handles);
 
   list_push_back(&all_list, &(t->allelem));
 }

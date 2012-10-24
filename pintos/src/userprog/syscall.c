@@ -3,22 +3,26 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
 
-void syshalt_handler(struct intr_frame *f);
-void sysexit_handler(struct intr_frame *f);
-void sysexec_handler(struct intr_frame *f);
-void syswait_handler(struct intr_frame *f);
-void syscreate_handler(struct intr_frame *f);
-void sysremove_handler(struct intr_frame *f);
-void sysopen_handler(struct intr_frame *f);
-void sysfilesize_handler(struct intr_frame *f);
-void sysread_handler(struct intr_frame *f);
-void syswrite_handler(struct intr_frame *f);
-void sysseek_handler(struct intr_frame *f);
-void systell_handler(struct intr_frame *f);
-void sysclose_handler(struct intr_frame *f);
+void syshalt_handler (struct intr_frame *f);
+void sysexit_handler (struct intr_frame *f);
+void sysexec_handler (struct intr_frame *f);
+void syswait_handler (struct intr_frame *f);
+void syscreate_handler (struct intr_frame *f);
+void sysremove_handler (struct intr_frame *f);
+void sysopen_handler (struct intr_frame *f);
+void sysfilesize_handler (struct intr_frame *f);
+void sysread_handler (struct intr_frame *f);
+void syswrite_handler (struct intr_frame *f);
+void sysseek_handler (struct intr_frame *f);
+void systell_handler (struct intr_frame *f);
+void sysclose_handler (struct intr_frame *f);
+
+struct fileHandle* get_handle (int fd);
+void terminate_thread();
 
 /* Read a byte at the user virtual address UADDR
  * UADDR must be below PHYS_BASE
@@ -62,11 +66,20 @@ put_user (uint8_t *udst, uint8_t byte) {
 /* Given an interrupt frame pointer, return the value pointed to by f->esp,
  * and increment f->esp.
  */
-uint32_t pop_stack(struct intr_frame *f) {
-  uint32_t ret = *(uint32_t *)f->esp;
-  f->esp = (uint32_t *) f->esp + 1;
-  //printf("f->esp is: %x\n", (unsigned int)f->esp);
-  return ret;
+uint32_t pop_stack(struct intr_frame *f)
+{
+  // Check if the address is below PHYS_BASE
+  if (((uint32_t) f->esp < (uint32_t) PHYS_BASE) && f->esp != NULL) {
+    uint32_t ret = *(uint32_t *)f->esp;
+    f->esp = (uint32_t *) f->esp + 1;
+    //printf("f->esp is: %x\n", (unsigned int)f->esp);
+    return ret;
+  }
+  // Otherwise, bad access.  Terminate gracefully
+  else {
+    terminate_thread();
+    return 0;
+  }
 }
 
 void
@@ -110,7 +123,7 @@ syscall_handler (struct intr_frame *f)
   //printf("Syscal Number is: %d\n", syscall_number);
   switch (syscall_number) {
     case SYS_HALT:
-      printf("SYS_HALT Called\n");
+      //printf("SYS_HALT Called\n");
       syshalt_handler(f);
       break;
     case SYS_EXIT:
@@ -126,23 +139,23 @@ syscall_handler (struct intr_frame *f)
       syswait_handler(f);
       break;
     case SYS_CREATE:
-      printf("SYS_CREATE Called\n");
+      //printf("SYS_CREATE Called\n");
       syscreate_handler(f);
       break;
     case SYS_REMOVE:
-      printf("SYS_REMOVE Called\n");
+      //printf("SYS_REMOVE Called\n");
       sysremove_handler(f);
       break;
     case SYS_OPEN:
-      printf("SYS_OPEN Called\n");
+      //printf("SYS_OPEN Called\n");
       sysopen_handler(f);
       break;
     case SYS_FILESIZE:
-      printf("SYS_FILESIZE Called\n");
+      //printf("SYS_FILESIZE Called\n");
       sysfilesize_handler(f);
       break;
     case SYS_READ:
-      printf("SYS_READ Called\n");
+      //printf("SYS_READ Called\n");
       sysread_handler(f);
       break;
     case SYS_WRITE:
@@ -150,15 +163,15 @@ syscall_handler (struct intr_frame *f)
       syswrite_handler(f);
       break;
     case SYS_SEEK:
-      printf("SYS_SEEK Called\n");
+      //printf("SYS_SEEK Called\n");
       sysseek_handler(f);
       break;
     case SYS_TELL:
-      printf("SYS_TELL Called\n");
+      //printf("SYS_TELL Called\n");
       systell_handler(f);
       break;
     case SYS_CLOSE:
-      printf("SYS_ClOSE Called\n");
+      //printf("SYS_ClOSE Called\n");
       sysclose_handler(f);
       break;
   }
@@ -185,7 +198,7 @@ void syshalt_handler(struct intr_frame *f)
 void sysexit_handler(struct intr_frame *f)
 {
   // Get the exit return value and set it.
-  int exitValue = pop_stack(f);
+  int exitValue = (int) pop_stack(f);
 	thread_current()->retVal = exitValue;
   
   // End the currently running thread
@@ -199,8 +212,19 @@ void sysexec_handler(struct intr_frame *f)
   tid_t newtid;
   //printf("Command line: %s\n", cmdline);
   //printf("(%s) run\n", cmdline);
-  newtid = process_execute(cmdline);
-  f->eax = newtid;
+  
+  char *save_ptr;
+  char *filename = strtok_r (*cmdline, " ", &save_ptr);
+  
+  struct file *tempfile = filesys_open(filename);
+  if(tempfile != NULL) {
+    newtid = process_execute(cmdline);
+    f->eax = newtid;
+  }
+  else {
+    f->eax = -1;
+  }
+  file_close(&tempfile);
 }
 
 // Thread calls syswait
@@ -216,26 +240,130 @@ void syswait_handler(struct intr_frame *f)
 // Thread calls syscreate
 void syscreate_handler(struct intr_frame *f)
 {
+  // Get file name and size from stack
+  char *filename = pop_stack(f);
+  uint32_t filesize = pop_stack(f);
+  
+  if (filename == NULL || filesize < 0)
+    terminate_thread();
+  
+  int status = 0; 
+  status = filesys_create(filename, filesize);
+  
+  // Return status
+  f->eax = status;
 }
 
 // Thread calls sysremove
 void sysremove_handler(struct intr_frame *f)
 {
+  // Get file name from stack
+  char *filename = pop_stack(f);
+  
+  int status = 0;  
+  status = filesys_remove(filename);
+  
+  // Return status
+  f->eax = status;
 }
 
-// Threa calls sysopen
+// Thread calls sysopen
 void sysopen_handler(struct intr_frame *f)
 {
+  // Get file name
+  char *file_name = pop_stack(f);
+
+  if(file_name == NULL) {
+    terminate_thread();
+  }
+
+  // Open file
+  struct file *file = filesys_open(file_name);
+  
+  // File cannot be opened: return -1
+  if (file == NULL) {
+    f->eax = -1;
+  }
+  // File is opened: put it on the list of open file handles
+  else {
+    struct thread *t = thread_current();
+  
+    struct fileHandle *newFile = (struct fileHandle*) malloc(sizeof(struct fileHandle));
+    newFile->file = file;
+    //newFile->node = file->inode;
+    newFile->fd = t->nextFD++;
+    
+    list_push_back(&t->handles, &newFile->fileElem);
+    
+    // return the file descriptor
+    f->eax = newFile->fd;
+  }
 }
 
 // Thread call sysfilesize
 void sysfilesize_handler(struct intr_frame *f)
 {
+  // Get fd from stack
+  int fd = (int) pop_stack(f);
+  
+  struct thread *tp = thread_current();
+  struct list_elem *e;
+  
+  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+       e = list_next(e)) {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+    if (fhp->fd == fd) {
+      f->eax = file_length(fhp->file);
+      return;
+    }
+  }
+
+  f->eax -1;
 }
 
 // Thread calls sysread
 void sysread_handler(struct intr_frame *f)
 {
+  // Get arguments from the stack
+  int fd = (int) pop_stack(f);
+  void *buffer = (void*) pop_stack(f);
+  off_t size = pop_stack(f);
+  
+  // Number of characters read
+  int ret = 0;
+  
+  // fd is 0: Read from stdin
+  if (fd == 0) {
+    *(char*) buffer = input_getc();
+    f->eax = 1;
+    return;
+  }
+  else if (fd == 1 || size < 0) {
+    f->eax = -1;
+    return;
+  }
+  else if (size == 0) {
+    f->eax = 0;
+    return;
+  }
+  else {
+  
+    struct thread *tp = thread_current();
+    struct list_elem *e;
+  
+    // Search for file descriptor in the thread open-file handles
+    for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+         e = list_next(e)) {
+      struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+      // File descriptor found: read file
+      if (fhp->fd == fd) {
+        f->eax = file_read(fhp->file, &buffer, size);
+        return;
+      }
+    }
+    // File descriptor not found: return -1
+    f->eax = -1;
+  }
 }
 
 // Thread calls syswrite
@@ -252,13 +380,19 @@ void syswrite_handler(struct intr_frame *f)
 
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
-    //printf("Printing to console\n");
      putbuf((char *) buffer, bufferSize);
-//	hex_dump(0, f->esp, 8 * sizeof(int), false);  
-   }
+     f->eax = bufferSize;
+  }
+  // Not to console, so print to file
+  else if(fdnum > 1){
+    struct fileHandle *fhp = get_handle(fdnum);
+    if (fhp != NULL)
+      f->eax = file_write(fhp->file, buffer, bufferSize);
+    else
+      f->eax = -1;
+  }
   else {
-    printf("Printing to file\n");
-    // Write to file.  NEED TO IMPLEMENT
+    f->eax = -1;
   }
   //printf("Exiting Syswrite Handler\n");
 }
@@ -266,14 +400,96 @@ void syswrite_handler(struct intr_frame *f)
 // Thread calls sysseek
 void sysseek_handler(struct intr_frame *f)
 {
+  // Get arguments from the stack
+  int fd = pop_stack(f);
+  off_t newpos = pop_stack(f);
+  
+  struct thread *tp = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+       e = list_next(e)) {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+    // File descriptor found: read file
+    if (fhp->fd == fd) {
+      file_seek(fhp->file, newpos);
+      return;
+    }
+  }
 }
 
 // Thread calls systell
 void systell_handler(struct intr_frame *f)
 {
+  // Get the file descriptor from the stack
+  int fd = pop_stack(f);
+  
+  struct thread *tp = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+       e = list_next(e)) {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+    // File descriptor found: read file
+    if (fhp->fd == fd) {
+      f->eax = (uint32_t) file_tell(fhp->file);
+      return;
+    }
+  }
+  f->eax = -1;
 }
 
 // Thread calls sysclose
 void sysclose_handler(struct intr_frame *f)
 {
+  // Get the file descriptor from the stack
+  int fd = pop_stack(f);
+  
+  struct thread *tp = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+       e = list_next(e)) {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+    // File descriptor found: read file
+    if (fhp->fd == fd) {
+      file_close(fhp->file);
+      list_remove(e);
+      return;
+    }
+  }
+}
+
+/* Given a file descriptor, search the current thread's open-file handler list
+ * and return a file handler corresponding to the file descriptor. If no such
+ * handler exists, return NULL.
+ */
+struct fileHandle* get_handle(int fd)
+{
+  struct thread *tp = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
+       e = list_next(e)) {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+    // File descriptor found: return file handle
+    if (fhp->fd == fd) {
+      return fhp;
+    }
+  }
+  
+  // File descriptor not found: return null
+  return NULL;
+}
+
+
+// Fails gracefully whenever a program does something bad
+void terminate_thread()
+{
+	thread_current()->retVal = -1;
+  thread_exit();
 }
