@@ -116,7 +116,18 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  return tid;
+  
+  struct thread *child = thread_by_tid(tid);
+  sema_down(&child->exec_sema);
+  printf("CHild status: %d\n", child->status);
+  if (child == NULL || child->exec_value == false) {
+    printf("process failed.\n");
+    return -1;
+  }
+  else {
+    printf("process loaded: %s\n", child->name);
+    return tid;
+  }
 }
 
 /* A thread function that loads a user process and starts it
@@ -169,7 +180,7 @@ process_wait (tid_t child_tid)
 
   if ((tp != NULL) && (tp->status != THREAD_DYING)) {
     // running thread found, wait to return exit status
-    sema_down(&tp->waiter_sema);
+    sema_down(&tp->wait_sema);
 
     // when sema is released, thread should have exited, so return exit status
     return tp->retVal;
@@ -434,6 +445,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  t->exec_value = success;
+  sema_up(&t->exec_sema);
   return success;
 }
 

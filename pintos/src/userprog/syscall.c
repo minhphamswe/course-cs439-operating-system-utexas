@@ -213,18 +213,8 @@ void sysexec_handler(struct intr_frame *f)
   //printf("Command line: %s\n", cmdline);
   //printf("(%s) run\n", cmdline);
   
-  char *save_ptr;
-  char *filename = strtok_r (*cmdline, " ", &save_ptr);
-  
-  struct file *tempfile = filesys_open(filename);
-  if(tempfile != NULL) {
-    newtid = process_execute(cmdline);
-    f->eax = newtid;
-  }
-  else {
-    f->eax = -1;
-  }
-  file_close(&tempfile);
+  newtid = process_execute(cmdline);
+  f->eax = newtid;
 }
 
 // Thread calls syswait

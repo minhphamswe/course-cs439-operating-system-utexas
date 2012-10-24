@@ -113,7 +113,10 @@ struct thread
   int nice;                       /* Niceness value of the thread */
   int recent_cpu;                 /* Recently-used CPU time (float) */
   int retVal;                     /* The return value when exiting */
-  struct semaphore waiter_sema;   /* Semaphore to signify the process waiter*/
+
+  struct semaphore wait_sema;     /* Semaphore to signify the process waiter*/
+  struct semaphore exec_sema;     /* Semaphore to signify the process executer*/
+  bool exec_value;                /* Whether or not we could successfully execute */
 
   /* Keep track of who donated to us */
   struct priority_lock donors[PRI_DEPTH];
