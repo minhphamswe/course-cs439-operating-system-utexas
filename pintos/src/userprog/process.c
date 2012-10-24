@@ -140,8 +140,8 @@ start_process (void *file_name_)
   if (!success) 
     thread_exit ();
 
-  printf("esp is at: %x\n", (unsigned int) if_.esp);
-  printf("eip is at: %x\n", (unsigned int) if_.eip);
+  //printf("esp is at: %x\n", (unsigned int) if_.esp);
+  //printf("eip is at: %x\n", (unsigned int) if_.eip);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -187,6 +187,11 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  // Not used, but can't pass NULL to strtok_r
+  char *saveptr;
+
+  printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &saveptr), cur->retVal);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -228,7 +233,7 @@ process_activate (void)
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
-  printf("Loading ELF executable\n");
+  //printf("Loading ELF executable\n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -262,7 +267,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     argc++;
   }
 
-  printf("Argc is: %d\n", argc);
+  //printf("Argc is: %d\n", argc);
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
@@ -368,7 +373,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     // move the stack pointer and copy token onto the stack
     *esp = (char*) *esp - (strlen(token) + 1);
     strlcpy(*esp, token, strlen(token) + 1);
-    printf("Token is: %s\n", token);
+    //printf("Token is: %s\n", token);
 //     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
 
     // save copy-to address
@@ -376,14 +381,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
 
   /* align stack by word size (4) */
-  printf("Byte-aligning stack\n");
+  //printf("Byte-aligning stack\n");
   while (((unsigned int) *esp % 4) != 0) {
     *esp = (uint8_t*) *esp - 1;
     *(uint8_t*) *esp = 0;
   }
 
   // push null pointer at end of argument list
-  printf("Pushing argv[argc]\n");
+  //printf("Pushing argv[argc]\n");
   *esp = (char**) *esp - 1;
   *(char**)*esp = (char*) 0;
 //   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
@@ -413,7 +418,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void_fn_ptr*) ehdr.e_entry;
-  hex_dump(*esp, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
+  //hex_dump(*esp, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
 
   success = true;
 //   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
@@ -487,7 +492,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
     return false;
   }
 
-  printf("All tests succeeded.\n");
+  //printf("All tests succeeded.\n");
   /* It's okay. */
   return true;
 }
@@ -556,7 +561,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  printf("Calling setup_stack\n");
+  //printf("Calling setup_stack\n");
   uint8_t *kpage;
   bool success = false;
 

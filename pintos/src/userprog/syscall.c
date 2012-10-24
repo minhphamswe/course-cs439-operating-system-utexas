@@ -65,7 +65,7 @@ put_user (uint8_t *udst, uint8_t byte) {
 uint32_t pop_stack(struct intr_frame *f) {
   uint32_t ret = *(uint32_t *)f->esp;
   f->esp = (uint32_t *) f->esp + 1;
-  printf("f->esp is: %x\n", (unsigned int)f->esp);
+  //printf("f->esp is: %x\n", (unsigned int)f->esp);
   return ret;
 }
 
@@ -99,28 +99,30 @@ syscall_handler (struct intr_frame *f)
   printf("Value at esp: %x\n", *((int *) f->esp));
 */
 //   hex_dump(f->esp, f->esp, 16 * sizeof(int), false);
-  printf("Eflags is: %d\n", f->eflags);
-  printf("Address of f is: %x\n", (unsigned int)f);
-  hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
+
+  uint32_t tmpesp = f->esp;
+  //printf("Eflags is: %d\n", f->eflags);
+  //printf("Address of f is: %x\n", (unsigned int)f);
+  //hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
 
   // Examine user memory to find out which system call gets called
   int syscall_number = pop_stack(f);
-  printf("Syscal Number is: %d\n", syscall_number);
+  //printf("Syscal Number is: %d\n", syscall_number);
   switch (syscall_number) {
     case SYS_HALT:
       printf("SYS_HALT Called\n");
       syshalt_handler(f);
       break;
     case SYS_EXIT:
-      printf("SYS_EXIT Called\n");
+      //printf("SYS_EXIT Called\n");
       sysexit_handler(f);
       break;
     case SYS_EXEC:
-      printf("SYS_EXEC Called\n");
+      //printf("SYS_EXEC Called\n");
       sysexec_handler(f);
       break;
     case SYS_WAIT:
-      printf("SYS_WAIT Called\n");
+      //printf("SYS_WAIT Called\n");
       syswait_handler(f);
       break;
     case SYS_CREATE:
@@ -144,7 +146,7 @@ syscall_handler (struct intr_frame *f)
       sysread_handler(f);
       break;
     case SYS_WRITE:
-      printf("SYS_WRITE Called\n");
+      //printf("SYS_WRITE Called\n");
       syswrite_handler(f);
       break;
     case SYS_SEEK:
@@ -161,9 +163,10 @@ syscall_handler (struct intr_frame *f)
       break;
   }
 
-  printf("Preparing to jump...\n");
-  printf("f->eip is: %x\n", (unsigned int) f->eip);
-  hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
+  //printf("Preparing to jump...\n");
+  //printf("f->eip is: %x\n", (unsigned int) f->eip);
+  //hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
+  f->esp = tmpesp;
 //   f->eip = f->esp;
 //   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (f) : "memory");
 //   NOT_REACHED ();
@@ -192,6 +195,12 @@ void sysexit_handler(struct intr_frame *f)
 // Thread calls sysexec
 void sysexec_handler(struct intr_frame *f)
 {
+  char *cmdline = pop_stack(f);
+  tid_t newtid;
+  //printf("Command line: %s\n", cmdline);
+  //printf("(%s) run\n", cmdline);
+  newtid = process_execute(cmdline);
+  f->eax = newtid;
 }
 
 // Thread calls syswait
@@ -201,7 +210,7 @@ void syswait_handler(struct intr_frame *f)
 	tid_t child = pop_stack(f);
   int status;
   status = process_wait(child);
-	printf("TID status: %d\n", status);
+	//printf("TID status: %d\n", status);
 }
 
 // Thread calls syscreate
@@ -243,15 +252,15 @@ void syswrite_handler(struct intr_frame *f)
 
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
-    printf("Printing to console\n");
-//     putbuf((char *) buffer, bufferSize);
+    //printf("Printing to console\n");
+     putbuf((char *) buffer, bufferSize);
 //	hex_dump(0, f->esp, 8 * sizeof(int), false);  
    }
   else {
     printf("Printing to file\n");
     // Write to file.  NEED TO IMPLEMENT
   }
-  printf("Exiting Syswrite Handler\n");
+  //printf("Exiting Syswrite Handler\n");
 }
 
 // Thread calls sysseek
