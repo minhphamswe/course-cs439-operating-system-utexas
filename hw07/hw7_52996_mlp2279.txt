@@ -1,0 +1,48 @@
+Student: Minh Pham
+EID: mlp2279
+CSID: minhpham
+
+1. Let SIZE be the size of a single disk block.
+In the FFS multilevel indexing scheme, the inode is organized as follow:
+  *) 10 data blocks => +10*SIZE                       ~ 2^3 *SIZE
+  *) 1 1-level indirect block => +1024*SIZE           = 2^10*SIZE
+  *) 1 2-level indirect block => +1024*1024*SIZE      = 2^20*SIZE
+  *) 1 3-level indirect block => +1024*1024*1024*SIZE = 2^30*SIZE
+Maximum disk size is about 2^30*SIZE ~ 1 billion times SIZE
+
+Answer is:
+a) ~1 billion x 1kB = ~1TB
+b) ~1 billion x 4kB = ~4TB
+c) ~1 billion x 8kB = ~8TB
+
+2. We need 2 disk accesses per directory: 1 to get to read the inode of the
+directory, another to read the first data block of the directory to search for
+subdirectories and files.
+Once we have a directory's first data block, getting to the inode of the file
+to begin reading it does not require a further disk access (is free, in that
+sense)
+
+Here we have 4 levels of directories, so it requires 2x4 = 8 disk accesses
+  
+3. To write to file with DMA, the operating system:
+  1. Issue the write() system call, supplying the location of the file in,
+  memory, the location to write to on disk, and the size of the file, to the
+  DMA.
+  2. Go do something else.
+  3. When receiving an interrupt from the DMA, checks if the writing operation
+  completed successfully. If it did, done, else issue a warning.
+  
+
+4. To write to file with DMA, the DMA controller:
+  1. Receive a request from the O/S with the location of the file in memory, the
+  destination address on disk, and the file size.
+  2. Fetch the memory from memory, copying it through the system bus onto disk.
+  3. When all the bytes have transferred, or if an error occurred, change the
+  device status, and interrupt the O/S.
+
+5. This will result in severe external fragmentation, and will make creating new
+files on the disk impossible before too long. Also, files would still be reachable
+if their pointers are stored somewhere.
+This will happen if the disk memory allocation uses bump pointer allocation,
+without a circularly linked free list. Since the pointers only move forward and
+never back over allocated memory, the memory might as well still be used.
