@@ -391,7 +391,6 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);   // disappear before dying
-  sema_up(&thread_current()->wait_sema);      // signal before dying
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();

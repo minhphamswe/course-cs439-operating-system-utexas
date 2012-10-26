@@ -222,8 +222,7 @@ void syswait_handler(struct intr_frame *f)
 {
 	// Get PID from stack
 	tid_t child = pop_stack(f);
-  int status;
-  status = process_wait(child);
+  f->eax = process_wait(child);
 	//printf("TID status: %d\n", status);
 }
 

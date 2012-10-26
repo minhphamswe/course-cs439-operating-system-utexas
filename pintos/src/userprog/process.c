@@ -197,7 +197,11 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  
+
+  // Signal any waiting thread
+  sema_up(&cur->wait_sema);      // signal before dying
+
+  // Close open files
   file_close(cur->ownfile);
 
   // Not used, but can't pass NULL to strtok_r
