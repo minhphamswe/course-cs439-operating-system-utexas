@@ -4,8 +4,14 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "lib/kernel/list.h"
+#include "threads/synch.h"
 
+#include "lib/kernel/list.h"
+#include "devices/shutdown.h"
+#include "userprog/process.h"
+#include "filesys/filesys.h"
+
+// Forward declarations of functions
 static void syscall_handler (struct intr_frame *);
 
 void syshalt_handler (struct intr_frame *f);
@@ -24,6 +30,8 @@ void sysclose_handler (struct intr_frame *f);
 
 struct fileHandle* get_handle (int fd);
 void terminate_thread();
+
+static struct semaphore filesys_sema;
 
 /* Read 4 bytes at the user virtual address UADDR
 * UADDR must be below PHYS_BASE
@@ -74,6 +82,10 @@ uint32_t pop_stack(struct intr_frame *f)
 void
 syscall_init (void)
 {
+  // Initialize semaphore(s)
+  sema_init(&filesys_sema, 1);
+
+  // Register handler
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -102,7 +114,7 @@ syscall_handler (struct intr_frame *f)
 */
 //   hex_dump(f->esp, f->esp, 16 * sizeof(int), false);
 
-  uint32_t tmpesp = f->esp;
+  void *tmpesp = f->esp;
   //printf("Eflags is: %d\n", f->eflags);
   //printf("Address of f is: %x\n", (unsigned int)f);
   //hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
@@ -221,12 +233,12 @@ void sysexit_handler(struct intr_frame *f)
 void sysexec_handler(struct intr_frame *f)
 {
   char *cmdline = pop_stack(f);
-  tid_t newtid;
-  //printf("Command line: %s\n", cmdline);
-  //printf("(%s) run\n", cmdline);
 
-  newtid = process_execute(cmdline);
-  f->eax = newtid;
+  if (cmdline) {
+    sema_down(&filesys_sema);
+    f->eax = process_execute(cmdline);
+    sema_up(&filesys_sema);
+  }
 }
 
 /**
@@ -292,11 +304,9 @@ void syscreate_handler(struct intr_frame *f)
   if (filename == NULL || filesize < 0)
     terminate_thread();
 
-  int status = 0;
-  status = filesys_create(filename, filesize);
-
-  // Return status
-  f->eax = status;
+  sema_down(&filesys_sema);
+  f->eax = filesys_create(filename, filesize);
+  sema_up(&filesys_sema);
 }
 
 /**
@@ -312,11 +322,9 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = pop_stack(f);
 
-  int status = 0;
-  status = filesys_remove(filename);
-
-  // Return status
-  f->eax = status;
+  sema_down(&filesys_sema);
+  f->eax = filesys_remove(filename);
+  sema_up(&filesys_sema);
 }
 
 /** Thread calls sysopen
@@ -359,9 +367,7 @@ void sysopen_handler(struct intr_frame *f)
 
     struct fileHandle *newFile = (struct fileHandle*) malloc(sizeof(struct fileHandle));
     newFile->file = file;
-    //newFile->node = file->inode;
     newFile->fd = t->nextFD++;
-    //strlcpy(newFile->name, file_name, 16);
 
     list_push_back(&t->handles, &newFile->fileElem);
 
@@ -380,19 +386,15 @@ void sysfilesize_handler(struct intr_frame *f)
   // Get fd from stack
   int fd = (int) pop_stack(f);
 
-  struct thread *tp = thread_current();
-  struct list_elem *e;
-
-  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-      e = list_next(e)) {
-    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
-    if (fhp->fd == fd) {
-      f->eax = file_length(fhp->file);
-      return;
-    }
+  struct fileHandle *fhp = get_handle(fd);
+  if (fhp) {
+    sema_down(&filesys_sema);
+    f->eax = file_length(fhp->file);
+    sema_up(&filesys_sema);
   }
-
-  f->eax -1;
+  else {
+    f->eax -1;
+  }
 }
 
 /**
@@ -431,11 +433,15 @@ void sysread_handler(struct intr_frame *f)
   }
   else {
     struct fileHandle *fhp = get_handle(fd);
-    if (fhp)
+    if (fhp) {
+      sema_down(&filesys_sema);
       f->eax = file_read(fhp->file, buffer, size);
-    else
+      sema_up(&filesys_sema);
+    }
+    else {
       // File descriptor not found: return -1
       f->eax = -1;
+    }
   }
 }
 
@@ -460,14 +466,10 @@ void sysread_handler(struct intr_frame *f)
  */
 void syswrite_handler(struct intr_frame *f)
 {
-  // Get the number of the file descriptor to write buffer to
-  uint32_t fdnum = pop_stack(f);
-
-  // Get the address in UVAS of the buffer to write
-  uint32_t buffer = pop_stack(f);
-
-  // Lastly, get the size of the buffer to write
-  uint32_t bufferSize = pop_stack(f);
+  // Get arguments from the stack
+  uint32_t fdnum = pop_stack(f);        // file descriptor number
+  uint32_t buffer = pop_stack(f);       // address (in UVAS) of buffer
+  uint32_t bufferSize = pop_stack(f);   // size of the buffer to write
 
   // Check to see if it's a console out, and print if yes
   if(fdnum == 1) {
@@ -475,14 +477,18 @@ void syswrite_handler(struct intr_frame *f)
     f->eax = bufferSize;
   }
   // Not to console, so print to file
-  else if(fdnum > 1){
+  else if (fdnum > 1) {
     struct fileHandle *fhp = get_handle(fdnum);
 
     // Is the file currently executing?
-    if (fhp != NULL)
+    if (fhp != NULL) {
+      sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, buffer, bufferSize);
-    else
+      sema_up(&filesys_sema);
+    }
+    else {
       f->eax = -1;
+    }
   }
   else {
     f->eax = -1;
@@ -512,8 +518,11 @@ void sysseek_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp)
+  if (fhp) {
+    sema_down(&filesys_sema);
     file_seek(fhp->file, newpos);
+    sema_up(&filesys_sema);
+  }
 
 }
 
@@ -530,11 +539,15 @@ void systell_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp)
+  if (fhp) {
     // File descriptor found: read file
+    sema_down(&filesys_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
-  else
+    sema_up(&filesys_sema);
+  }
+  else {
     f->eax = -1;
+  }
 }
 
 /**
@@ -554,12 +567,14 @@ void sysclose_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-      e = list_next(e)) {
+       e = list_next(e)) {
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
+      sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
+      sema_up(&filesys_sema);
       return;
     }
   }

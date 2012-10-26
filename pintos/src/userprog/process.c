@@ -449,12 +449,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  t->ownfile = file;
-  file_deny_write(file);
   t->exec_value = success;
-  if(success == false)
-    file_close(file);
   sema_up(&t->exec_sema);
+  if (file) {
+    if (success) {
+      t->ownfile = file;
+      file_deny_write(file);
+    }
+    else {
+      file_close(file);
+    }
+  }
   return success;
 }
 
