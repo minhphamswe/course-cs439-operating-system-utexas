@@ -282,6 +282,7 @@ void sysopen_handler(struct intr_frame *f)
     newFile->file = file;
     //newFile->node = file->inode;
     newFile->fd = t->nextFD++;
+    //strlcpy(newFile->name, file_name, 16);
     
     list_push_back(&t->handles, &newFile->fileElem);
     
@@ -378,8 +379,12 @@ void syswrite_handler(struct intr_frame *f)
      f->eax = bufferSize;
   }
   // Not to console, so print to file
-  else if(fdnum > 1){
+  else if(fdnum > 1){    
     struct fileHandle *fhp = get_handle(fdnum);
+    
+    // Is the file currently executing?
+//    if(is_executing(&fhp->name) == true)
+//      f->eax = -1;
     if (fhp != NULL)
       f->eax = file_write(fhp->file, buffer, bufferSize);
     else

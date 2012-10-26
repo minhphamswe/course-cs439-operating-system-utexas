@@ -92,7 +92,7 @@ typedef struct priority_lock {
 
 // A single open file handler.
 struct fileHandle {
-  //struct inode *node;
+  char name[16];
   struct file *file;
   int fd;
   struct list_elem fileElem;
@@ -113,6 +113,7 @@ struct thread
   int nice;                       /* Niceness value of the thread */
   int recent_cpu;                 /* Recently-used CPU time (float) */
   int retVal;                     /* The return value when exiting */
+  struct file *ownfile;           /* My file, keep open to prevent writes */
 
   struct semaphore wait_sema;     /* Semaphore to signify the process waiter*/
   struct semaphore exec_sema;     /* Semaphore to signify the process executer*/
@@ -178,5 +179,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread* thread_by_tid(tid_t tid);
+
+//bool is_executing(char *filename);
 
 #endif /* threads/thread.h */

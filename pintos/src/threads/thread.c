@@ -797,3 +797,27 @@ updateActivePriority(struct thread *thread)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/*
+// Returns whether or not the file is currently running
+bool is_executing(char *filename)
+{
+  struct list_elem *e;
+  struct thread *tp;
+  char *name;
+  char *saveptr;  // Not used, but need a ptr to pass to strto_k
+printf("Checking to see if %s is currently running\n", filename);
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+       tp = list_entry (e, struct thread, allelem);
+
+       name = strtok_r(tp->name, " ", &saveptr);
+printf("Checking %s against %s\n", filename, name);
+       if(strcmp(name, filename) == 0) {
+          printf("Found running\n");
+         return true;
+         }
+  }
+  
+  // Not found in all_list, so not running
+  return false;
+}*/

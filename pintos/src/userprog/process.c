@@ -197,6 +197,9 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  
+  printf("Closing ownfile\n");
+  file_close(cur->ownfile);
 
   // Not used, but can't pass NULL to strtok_r
   char *saveptr;
@@ -244,7 +247,6 @@ process_activate (void)
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
-  //printf("Loading ELF executable\n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -444,8 +446,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+//  t->ownfile = file;
   t->exec_value = success;
+//  if(success == false)
+    file_close(file);
   sema_up(&t->exec_sema);
   return success;
 }
