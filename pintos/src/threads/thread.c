@@ -391,7 +391,7 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);   // disappear before dying
-  sema_up(&thread_current()->waiter_sema);     // signal before dying
+  sema_up(&thread_current()->wait_sema);      // signal before dying
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();
@@ -647,7 +647,14 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->nice = 0;
   t->recent_cpu = 0;
-  sema_init(&t->waiter_sema, 0);
+  sema_init(&t->wait_sema, 0);
+  sema_init(&t->exec_sema, 0);
+  t->retVal = 0;
+  t->exec_value = false;
+
+  // List and index for open files
+  t->nextFD = 2;
+  list_init(&t->handles);
 
   list_push_back(&all_list, &(t->allelem));
 }

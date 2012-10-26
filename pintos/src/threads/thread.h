@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -89,6 +90,16 @@ typedef struct priority_lock {
   struct thread* thread;                 /* Whose donation we are using */
 } priority_lock;
 
+// A single open file handler.
+struct fileHandle {
+  //struct inode *node;
+  struct file *file;
+  int fd;
+  struct list_elem fileElem;
+};
+
+#define MAXOPENFILES 16           /* Can only have 16 files in the OS for part 2 anyway */
+
 struct thread
 {
   /* Owned by thread.c. */
@@ -102,7 +113,10 @@ struct thread
   int nice;                       /* Niceness value of the thread */
   int recent_cpu;                 /* Recently-used CPU time (float) */
   int retVal;                     /* The return value when exiting */
-  struct semaphore waiter_sema;   /* Semaphore to signify the process waiter*/
+
+  struct semaphore wait_sema;     /* Semaphore to signify the process waiter*/
+  struct semaphore exec_sema;     /* Semaphore to signify the process executer*/
+  bool exec_value;                /* Whether or not we could successfully execute */
 
   /* Keep track of who donated to us */
   struct priority_lock donors[PRI_DEPTH];
@@ -112,6 +126,10 @@ struct thread
 
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;          /* List element. */
+  
+  /* Keep track of open files */
+  struct list handles;            /* List element for open files */
+  int nextFD;                     /* The next file, increment */
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
