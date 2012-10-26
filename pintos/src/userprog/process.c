@@ -119,13 +119,13 @@ process_execute (const char *file_name)
   
   struct thread *child = thread_by_tid(tid);
   sema_down(&child->exec_sema);
-  printf("CHild status: %d\n", child->status);
+  //printf("CHild status: %d\n", child->status);
   if (child == NULL || child->exec_value == false) {
-    printf("process failed.\n");
+    //printf("process failed.\n");
     return -1;
   }
   else {
-    printf("process loaded: %s\n", child->name);
+    //printf("process loaded: %s\n", child->name);
     return tid;
   }
 }

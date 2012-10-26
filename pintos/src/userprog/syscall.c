@@ -271,7 +271,7 @@ void sysopen_handler(struct intr_frame *f)
   struct file *file = filesys_open(file_name);
   
   // File cannot be opened: return -1
-  if (file == NULL) {
+  if (file == NULL) {  
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
@@ -337,7 +337,6 @@ void sysread_handler(struct intr_frame *f)
     return;
   }
   else {
-  
     struct thread *tp = thread_current();
     struct list_elem *e;
   
@@ -347,7 +346,7 @@ void sysread_handler(struct intr_frame *f)
       struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
       // File descriptor found: read file
       if (fhp->fd == fd) {
-        f->eax = file_read(fhp->file, &buffer, size);
+        f->eax = file_read(fhp->file, buffer, size);
         return;
       }
     }
