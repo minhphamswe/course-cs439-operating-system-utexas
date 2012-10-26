@@ -198,7 +198,6 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   
-  printf("Closing ownfile\n");
   file_close(cur->ownfile);
 
   // Not used, but can't pass NULL to strtok_r
@@ -446,9 +445,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-//  t->ownfile = file;
+  t->ownfile = file;
+  file_deny_write(file);
   t->exec_value = success;
-//  if(success == false)
+  if(success == false)
     file_close(file);
   sema_up(&t->exec_sema);
   return success;
