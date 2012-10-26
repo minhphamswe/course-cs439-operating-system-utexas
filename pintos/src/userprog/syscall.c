@@ -322,6 +322,11 @@ void sysread_handler(struct intr_frame *f)
   // Number of characters read
   int ret = 0;
   
+  // Check to make sure buffer is in user space
+  if (buffer > PHYS_BASE || get_user(buffer) == -1) {
+    terminate_thread();
+  }
+  
   // fd is 0: Read from stdin
   if (fd == 0) {
     *(char*) buffer = input_getc();
