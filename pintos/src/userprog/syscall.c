@@ -410,9 +410,6 @@ void sysread_handler(struct intr_frame *f)
   void *buffer = pop_stack(f);
   off_t size = pop_stack(f);
 
-  // Number of characters read
-  int ret = 0;
-
   // Check to make sure buffer is in user space
   if (get_user(buffer) == -1) {
     terminate_thread();
@@ -433,21 +430,12 @@ void sysread_handler(struct intr_frame *f)
     return;
   }
   else {
-    struct thread *tp = thread_current();
-    struct list_elem *e;
-
-    // Search for file descriptor in the thread open-file handles
-    for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-        e = list_next(e)) {
-      struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
-      // File descriptor found: read file
-      if (fhp->fd == fd) {
-        f->eax = file_read(fhp->file, buffer, size);
-        return;
-      }
-    }
-    // File descriptor not found: return -1
-    f->eax = -1;
+    struct fileHandle *fhp = get_handle(fd);
+    if (fhp)
+      f->eax = file_read(fhp->file, buffer, size);
+    else
+      // File descriptor not found: return -1
+      f->eax = -1;
   }
 }
 
@@ -491,8 +479,6 @@ void syswrite_handler(struct intr_frame *f)
     struct fileHandle *fhp = get_handle(fdnum);
 
     // Is the file currently executing?
-//    if(is_executing(&fhp->name) == true)
-//      f->eax = -1;
     if (fhp != NULL)
       f->eax = file_write(fhp->file, buffer, bufferSize);
     else
@@ -510,7 +496,7 @@ void syswrite_handler(struct intr_frame *f)
  * Changes the next byte to be read or written in open file fd to position,
  * expressed in bytes from the beginning of the file. (Thus, a position of 0
  * is the file's start.)
- * 
+ *
  * A seek past the current end of a file is not an error. A later read
  * obtains 0 bytes, indicating end of file. A later write extends the file,
  * filling any unwritten gap with zeros. (However, in Pintos, files will have
@@ -524,19 +510,11 @@ void sysseek_handler(struct intr_frame *f)
   int fd = pop_stack(f);
   off_t newpos = pop_stack(f);
 
-  struct thread *tp = thread_current();
-  struct list_elem *e;
-
   // Search for file descriptor in the thread open-file handles
-  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-      e = list_next(e)) {
-    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
-    // File descriptor found: read file
-    if (fhp->fd == fd) {
-      file_seek(fhp->file, newpos);
-      return;
-    }
-  }
+  struct fileHandle *fhp = get_handle(fd);
+  if (fhp)
+    file_seek(fhp->file, newpos);
+
 }
 
 /**
@@ -550,20 +528,13 @@ void systell_handler(struct intr_frame *f)
   // Get the file descriptor from the stack
   int fd = pop_stack(f);
 
-  struct thread *tp = thread_current();
-  struct list_elem *e;
-
   // Search for file descriptor in the thread open-file handles
-  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-      e = list_next(e)) {
-    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+  struct fileHandle *fhp = get_handle(fd);
+  if (fhp)
     // File descriptor found: read file
-    if (fhp->fd == fd) {
-      f->eax = (uint32_t) file_tell(fhp->file);
-      return;
-    }
-  }
-  f->eax = -1;
+    f->eax = (uint32_t) file_tell(fhp->file);
+  else
+    f->eax = -1;
 }
 
 /**
