@@ -1,0 +1,36 @@
+Copying tests/userprog/exec-missing to scratch partition...
+qemu -hda /tmp/i5fNS7IV7D.dsk -m 4 -net none -nographic -monitor null
+PiLo hda1
+Loading.........
+Kernel command line: -q -f extract run exec-missing
+Pintos booting with 4,096 kB RAM...
+383 pages available in kernel pool.
+383 pages available in user pool.
+Calibrating timer...  261,734,400 loops/s.
+hda: 5,040 sectors (2 MB), model "QM00001", serial "QEMU HARDDISK"
+hda1: 155 sectors (77 kB), Pintos OS kernel (20)
+hda2: 4,096 sectors (2 MB), Pintos file system (21)
+hda3: 101 sectors (50 kB), Pintos scratch (22)
+filesys: using hda2
+scratch: using hda3
+Formatting file system...done.
+Boot complete.
+Extracting ustar archive from scratch device into file system...
+Putting 'exec-missing' into the file system...
+Erasing ustar archive...
+Executing 'exec-missing':
+(exec-missing) begin
+load: no-such-file: open failed
+Kernel PANIC at ../../filesys/file.c:121 in file_deny_write(): assertion `file != NULL' failed.
+Call stack: 0xc0029039 0xc002d3ae 0xc002b7f5 0xc002b85f 0xc002136e.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 235 ticks
+Thread: 30 idle ticks, 204 kernel ticks, 1 user ticks
+hda2 (filesys): 80 reads, 206 writes
+hda3 (scratch): 100 reads, 2 writes
+Console: 1180 characters output
+Keyboard: 0 keys pressed
+Exception: 0 page faults
+Powering off...
