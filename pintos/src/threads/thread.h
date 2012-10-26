@@ -92,7 +92,7 @@ typedef struct priority_lock {
 
 // A single open file handler.
 struct fileHandle {
-  char name[16];
+//  char name[16];
   struct file *file;
   int fd;
   struct list_elem fileElem;

@@ -1,5 +1,5 @@
 Copying tests/userprog/sc-boundary-2 to scratch partition...
-qemu -hda /tmp/MS5gCbNLJs.dsk -m 4 -net none -nographic -monitor null
+qemu -hda /tmp/oZbc_tVWpV.dsk -m 4 -net none -nographic -monitor null
 PiLo hda1
 Loading.........
 Kernel command line: -q -f extract run sc-boundary-2
@@ -17,16 +17,3 @@ Formatting file system...done.
 Boot complete.
 Extracting ustar archive from scratch device into file system...
 Putting 'sc-boundary-2' into the file system...
-Erasing ustar archive...
-Executing 'sc-boundary-2':
-(sc-boundary-2) begin
-sc-boundary-2: exit(67)
-Execution of 'sc-boundary-2' complete.
-Timer: 268 ticks
-Thread: 30 idle ticks, 238 kernel ticks, 0 user ticks
-hda2 (filesys): 63 reads, 212 writes
-hda3 (scratch): 103 reads, 2 writes
-Console: 897 characters output
-Keyboard: 0 keys pressed
-Exception: 0 page faults
-Powering off...
