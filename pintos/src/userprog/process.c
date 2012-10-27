@@ -231,7 +231,6 @@ process_wait (tid_t child_tid)
     sema_down(&tp->wait_sema);
 
   struct exit_status *es = thread_get_exit_status(child_tid);
-printf("Child %d exit code is %d\n", child_tid, es->status);
   // Move the thread to the already-waited list
   thread_mark_waited(es);
   // Return exit status
