@@ -102,7 +102,11 @@ struct fileHandle {
 struct exit_status {
   tid_t tid;
   int status;
-  struct list_elem elem;
+
+  /* List elemnets */
+  struct list_elem exit_elem;   /* insert into global table of exit status */
+  struct list_elem wait_elem;   /* insert into thread's list of waited pid */
+  struct list_elem child_elem;  /* insert into thread's list of child pid */
 };
 
 #define MAXOPENFILES 16           /* Can only have 16 files in the OS for part 2 anyway */

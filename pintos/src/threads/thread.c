@@ -288,11 +288,10 @@ thread_create (const char *name, int priority,
 
   /* Add child tid to the current thread's child queue */
   struct exit_status *es = malloc(sizeof(struct exit_status));
-  struct exit_status *ess = malloc(sizeof(struct exit_status));
-  es->tid = ess->tid = t->tid;
-  es->status = ess->status = -1;
-  list_push_back(&exit_list, &es->elem);
-  list_push_back(&thread_current()->child_list, &ess->elem);
+  es->tid = t->tid;
+  es->status = -1;
+  list_push_back(&exit_list, &es->exit_elem);
+  list_push_back(&thread_current()->child_list, &es->child_elem);
 
   /* Re-enable interrupt */
   intr_set_level (old_level);
@@ -826,19 +825,13 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 /** Return true if the thread with this tid is our child thread. */
 bool thread_is_child(tid_t tid)
 {
-  intr_disable();
-
   struct thread *t = thread_current();
   struct exit_status *es;
   struct list_elem *e;
 
-  if(tid == 5) {
-    intr_enable();
-    return true;
-  }
   for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
        e = list_next(e)) {
-    es = list_entry(e, struct exit_status, elem);
+    es = list_entry(e, struct exit_status, child_elem);
       if (es->tid == tid)
        return true;
    }
@@ -848,15 +841,13 @@ bool thread_is_child(tid_t tid)
 /** Return true if we have started waiting for the thread with this tid. */
 bool thread_has_waited(tid_t tid)
 {
-//   printf("Calling thread_has_waited.\n");
   struct thread *t = thread_current();
   struct exit_status *es;
   struct list_elem *e;
 
   for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
        e = list_next(e)) {
-    es = list_entry(e, struct exit_status, elem);
-//     printf("Waited TID is: %d.\n", es->tid);
+    es = list_entry(e, struct exit_status, wait_elem);
     if (es->tid == tid) {
       return true;
     }
@@ -874,43 +865,20 @@ struct exit_status* thread_get_exit_status(tid_t tid)
 
   for (e = list_begin(&exit_list); e != list_end(&exit_list);
        e = list_next(e)) {
-    es = list_entry(e, struct exit_status, elem);
+    es = list_entry(e, struct exit_status, exit_elem);
     if (es->tid == tid) {
       // The thread has exited and has not been reaped
-      break;
+      return es;
     }
   }
 
-  if (es->tid == tid) {
-    return es;
-  }
-  else {
-    return NULL;
-  }
-  
-  printf("We should never get here.");
-  ASSERT(false);
+  return NULL;
 }
 
 /** Move the exit_status structure to the current thread's already-waited-on
  *  list. */
 void thread_mark_waited(struct exit_status* es)
 {
-//   intr_disable();
-//   printf("Thread mark waited CALLED.\n");
   struct thread *t = thread_current();
-
-//   printf("Caller thread ID: %d.\n", t->tid);
-
-//   printf("Calle ID: %d, status: %d", es->tid, es->status);
-
-  struct exit_status *ess = malloc(sizeof(struct exit_status));
-  ess->tid = es->tid;
-  ess->status = ess->status;
-
-  list_push_front(&t->wait_list, &ess->elem);
-
-//   ASSERT(thread_has_waited(es->tid));
-//   printf("Thread mark waited DONE.\n");
-//   intr_enable();
+  list_push_front(&t->wait_list, &es->wait_elem);
 }
