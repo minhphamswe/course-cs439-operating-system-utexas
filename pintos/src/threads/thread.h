@@ -123,7 +123,6 @@ struct thread
   int numDonors;                  /* Number of donors waiting */
   int nice;                       /* Niceness value of the thread */
   int recent_cpu;                 /* Recently-used CPU time (float) */
-  int retVal;                     /* The return value when exiting */
   struct file *ownfile;           /* My file, keep open to prevent writes */
 
   struct semaphore wait_sema;     /* Semaphore to signify the process waiter*/
@@ -200,7 +199,10 @@ int thread_get_load_avg (void);
 struct thread* thread_by_tid(tid_t tid);
 bool thread_is_child(tid_t tid);
 bool thread_has_waited(tid_t tid);
+
 struct exit_status* thread_get_exit_status(tid_t tid);
+void thread_set_exit_status(tid_t tid, int status);
+
 void thread_mark_waited(struct exit_status* es);
 
 //bool is_executing(char *filename);

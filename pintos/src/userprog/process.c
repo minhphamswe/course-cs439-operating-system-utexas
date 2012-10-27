@@ -127,20 +127,27 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-
-  struct thread *child = thread_by_tid(tid);
-  sema_down(&child->exec_sema);
-//   printf("Child status: %d\n", child->status);
-  if (child == NULL || child->exec_value == false) {
-//     printf("process failed.\n");
-    return -1;
-  }
-  else {
-//     printf("process loaded.\n");
     return tid;
   }
+
+  struct thread *child = thread_by_tid(tid);
+  if (child)
+    // Thread has not yet exited: wait for status of load
+    sema_down(&child->exec_sema);
+
+  return tid;
+
+// //   printf("Child status: %d\n", child->status);
+//   if (child == NULL || child->exec_value == false) {
+// //     printf("process failed.\n");
+//     return -1;
+//   }
+//   else {
+// //     printf("process loaded.\n");
+//     return tid;
+//   }
 }
 
 /* A thread function that loads a user process and starts it
@@ -161,8 +168,10 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success) {
+    thread_set_exit_status(thread_current()->tid, -1);
     thread_exit ();
+  }
 
   //printf("esp is at: %x\n", (unsigned int) if_.esp);
   //printf("eip is at: %x\n", (unsigned int) if_.eip);
@@ -231,10 +240,6 @@ process_exit (void)
   // Close open files
   file_close(cur->ownfile);
 
-  // Not used, but can't pass NULL to strtok_r
-  char *saveptr;
-
-//   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &saveptr), cur->retVal);
   printf("%s: exit(%d)\n", cur->name, thread_get_exit_status(cur->tid)->status);
 
   /* Destroy the current process's page directory and switch back

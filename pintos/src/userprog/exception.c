@@ -157,7 +157,7 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);*/
-  thread_current()->retVal = -1;
+  thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
   
   int tmp;

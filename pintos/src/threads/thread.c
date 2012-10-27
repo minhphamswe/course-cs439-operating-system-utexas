@@ -666,7 +666,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = 0;
 
   /* ??? */
-  t->retVal = 0;
   t->exec_value = false;
 
   /* Initialize list and index for open files */
@@ -874,6 +873,13 @@ struct exit_status* thread_get_exit_status(tid_t tid)
 
   return NULL;
 }
+
+void thread_set_exit_status(tid_t tid, int status)
+{
+  struct exit_status *es = thread_get_exit_status(tid);
+  es->status = status;
+}
+
 
 /** Move the exit_status structure to the current thread's already-waited-on
  *  list. */

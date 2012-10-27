@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
+#include "threads/malloc.h"
 
 #include "lib/kernel/list.h"
 #include "devices/shutdown.h"
@@ -218,11 +219,7 @@ void sysexit_handler(struct intr_frame *f)
 //   printf("%s: exit(%d)\n", thread_current()->name, exitValue);
 
   // Set the exit value
-  struct exit_status *es = thread_get_exit_status(thread_current()->tid);
-  if (es) {
-//     printf("Setting status of thread %d to be: %d\n", es->tid, exitValue);
-    es->status = exitValue;
-  }
+  thread_set_exit_status(thread_current()->tid, exitValue);
 
   // End the currently running thread
   thread_exit();
@@ -616,6 +613,6 @@ struct fileHandle* get_handle(int fd)
 // Fails gracefully whenever a program does something bad
 void terminate_thread()
 {
-  thread_current()->retVal = -1;
+  thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
