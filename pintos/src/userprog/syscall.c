@@ -214,11 +214,14 @@ void syshalt_handler(struct intr_frame *f)
 void sysexit_handler(struct intr_frame *f)
 {
   // Get the exit value from the stack
+//  hex_dump(f->esp, f->esp, 8 * sizeof(int), true);
   int exitValue = (int) pop_stack(f);
-
+if(exitValue > 1)
+printf("exitVale: %d\n", exitValue);
 //   printf("%s: exit(%d)\n", thread_current()->name, exitValue);
 
   // Set the exit value
+  //printf("Setting %d exit status as %d\n", thread_current()->tid, exitValue);
   thread_set_exit_status(thread_current()->tid, exitValue);
 
   // End the currently running thread

@@ -121,7 +121,7 @@ process_execute (const char *file_name)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
-      return -1;
+      return TID_ERROR;
     }
   file_close(file);
 
@@ -129,13 +129,23 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-    return tid;
+    return TID_ERROR;
   }
 
   struct thread *child = thread_by_tid(tid);
-  if (child)
+  if (child) {
     // Thread has not yet exited: wait for status of load
     sema_down(&child->exec_sema);
+
+    if(thread_get_exit_status(tid)->status == -1234) {
+      thread_set_exit_status(tid, -1);
+      tid = -1;
+    }
+  }
+  if (!child)
+    tid = -1;
+
+printf("Starting process %d\n", tid);
 
   return tid;
 
@@ -169,7 +179,8 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-    thread_set_exit_status(thread_current()->tid, -1);
+    thread_set_exit_status(thread_current()->tid, -1234);
+    sema_up(&(thread_current()->exec_sema)); 
     thread_exit ();
   }
 
@@ -182,6 +193,7 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+  sema_up(&(thread_current()->exec_sema)); 
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -203,13 +215,13 @@ process_wait (tid_t child_tid)
 
   // Check that the tid is a child of the requesting thread
   if (!thread_is_child(child_tid)) {
-//     printf("This thread is not your child, so you can't wait for it.\n");
+     printf("This thread is not your child, so you can't wait for it.\n");
     return -1;
   }
 
   // Check that the tid has not been waited for by the requesting thread
   if (thread_has_waited(child_tid)) {
-//     printf("You have already waited for this tid, so go away!\n");
+     printf("You have already waited for this tid, so go away!\n");
     return -1;
   }
 
@@ -219,10 +231,9 @@ process_wait (tid_t child_tid)
     sema_down(&tp->wait_sema);
 
   struct exit_status *es = thread_get_exit_status(child_tid);
-
+printf("Child %d exit code is %d\n", child_tid, es->status);
   // Move the thread to the already-waited list
   thread_mark_waited(es);
-
   // Return exit status
   return es->status;
 }
@@ -239,6 +250,12 @@ process_exit (void)
 
   // Close open files
   file_close(cur->ownfile);
+/*  struct list_elem *e;
+  for (e = list_begin(&cur->handles); e != list_end(&cur->handles); e = list_next(e)) {
+    struct fileHandle handle = list_entry (e, struct thread, elem);
+    file_close(handle->file);
+  }  
+*/
 
   printf("%s: exit(%d)\n", cur->name, thread_get_exit_status(cur->tid)->status);
 
@@ -483,7 +500,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   t->exec_value = success;
-  sema_up(&t->exec_sema);
   if (file) {
     if (success) {
       strlcpy(t->name, argv[0], 16);  // Assign new name to thread
@@ -494,6 +510,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       file_close(file);
     }
   }
+  //sema_up(&t->exec_sema);  
   return success;
 }
 
