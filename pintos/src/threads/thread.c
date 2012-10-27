@@ -33,6 +33,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of all exit status. Processes are added to this list when they exit
+ * and removed when they or their parent exit. */
+static struct list exit_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -103,6 +107,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&exit_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -281,6 +286,14 @@ thread_create (const char *name, int priority,
       t->nativePriority = PRI_MAX;
   }
 
+  /* Add child tid to the current thread's child queue */
+  struct exit_status *es = malloc(sizeof(struct exit_status));
+  es->tid = tid;
+  es->status = -1;
+  list_push_back(&exit_list, &es->elem);
+  list_push_back(&thread_current()->child_list, &es->elem);
+
+  /* Re-enable interrupt */
   intr_set_level (old_level);
 
   /* Add to run queue. */
@@ -631,9 +644,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
+  t->magic = THREAD_MAGIC;
+
+  /* Initialize values for native and effective priority */
   t->priority = priority;
   t->nativePriority = priority;
-  t->magic = THREAD_MAGIC;
+
+  /* Initialize values and structures for the priority donation system */
   t->numDonors = 0;
 
   int i;
@@ -644,17 +661,25 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donees.thread = NULL;
   t->donees.lock = NULL;
 
+  /* Initialize values for the advanced scheduler */
   t->nice = 0;
   t->recent_cpu = 0;
-  sema_init(&t->wait_sema, 0);
-  sema_init(&t->exec_sema, 0);
+
+  /* ??? */
   t->retVal = 0;
   t->exec_value = false;
 
-  // List and index for open files
+  /* Initialize list and index for open files */
   t->nextFD = 2;
   list_init(&t->handles);
 
+  /* Initialize wait-on and child list for WAIT system call */
+  sema_init(&t->wait_sema, 0);
+  sema_init(&t->exec_sema, 0);
+  list_init(&t->wait_list);
+  list_init(&t->child_list);
+
+  /* When done, add thread to all-thread list */
   list_push_back(&all_list, &(t->allelem));
 }
 
@@ -797,26 +822,81 @@ updateActivePriority(struct thread *thread)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/*
-// Returns whether or not the file is currently running
-bool is_executing(char *filename)
+/** Return true if the thread with this tid is our child thread. */
+bool thread_is_child(tid_t tid)
 {
+  struct thread *t = thread_current();
+  struct exit_status *es;
   struct list_elem *e;
-  struct thread *tp;
-  char *name;
-  char *saveptr;  // Not used, but need a ptr to pass to strto_k
-printf("Checking to see if %s is currently running\n", filename);
-  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
-       tp = list_entry (e, struct thread, allelem);
 
-       name = strtok_r(tp->name, " ", &saveptr);
-printf("Checking %s against %s\n", filename, name);
-       if(strcmp(name, filename) == 0) {
-          printf("Found running\n");
-         return true;
-         }
+  for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, elem);
+//     printf("Thread ID: %d\n", es->tid);
+    if (es->tid == tid) {
+      return true;
+    }
   }
-  
-  // Not found in all_list, so not running
   return false;
-}*/
+}
+
+/** Return true if we have started waiting for the thread with this tid. */
+bool thread_has_waited(tid_t tid)
+{
+//   printf("Calling thread_has_waited.\n");
+  struct thread *t = thread_current();
+  struct exit_status *es;
+  struct list_elem *e;
+
+  for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, elem);
+//     printf("Waited TID is: %d.\n", es->tid);
+    if (es->tid == tid) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Return a pointer to an exit_status struct if the thread has exited,
+ *  a null pointer otherwise. */
+struct exit_status* thread_get_exit_status(tid_t tid)
+{
+  struct exit_status *es;
+  struct list_elem *e;
+
+  for (e = list_begin(&exit_list); e != list_end(&exit_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, elem);
+    if (es->tid == tid) {
+      // The thread has exited and has not been reaped
+      return es;
+    }
+  }
+
+  return NULL;
+
+  printf("We should never get here.");
+  ASSERT(false);
+}
+
+/** Move the exit_status structure to the current thread's already-waited-on
+ *  list. */
+void thread_mark_waited(struct exit_status* es)
+{
+//   intr_disable();
+//   printf("Thread mark waited CALLED.\n");
+  struct thread *t = thread_current();
+
+//   printf("Caller thread ID: %d.\n", t->tid);
+
+//   printf("Calle ID: %d, status: %d", es->tid, es->status);
+
+  list_push_front(&t->wait_list, &es->elem);
+
+//   ASSERT(thread_has_waited(es->tid));
+//   printf("Thread mark waited DONE.\n");
+//   intr_enable();
+}

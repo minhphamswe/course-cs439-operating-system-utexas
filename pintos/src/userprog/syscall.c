@@ -212,9 +212,17 @@ void syshalt_handler(struct intr_frame *f)
  */
 void sysexit_handler(struct intr_frame *f)
 {
-  // Get the exit return value and set it.
+  // Get the exit value from the stack
   int exitValue = (int) pop_stack(f);
-  thread_current()->retVal = exitValue;
+
+//   printf("%s: exit(%d)\n", thread_current()->name, exitValue);
+
+  // Set the exit value
+  struct exit_status *es = thread_get_exit_status(thread_current()->tid);
+  if (es) {
+//     printf("Setting status of thread %d to be: %d\n", es->tid, exitValue);
+    es->status = exitValue;
+  }
 
   // End the currently running thread
   thread_exit();
@@ -299,7 +307,7 @@ void syscreate_handler(struct intr_frame *f)
 {
   // Get file name and size from stack
   char *filename = pop_stack(f);
-  uint32_t filesize = pop_stack(f);
+  off_t filesize = pop_stack(f);
 
   if (filename == NULL || filesize < 0)
     terminate_thread();

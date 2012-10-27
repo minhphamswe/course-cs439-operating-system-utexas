@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
+#include "kernel/list.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -116,16 +117,16 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  
+
   struct thread *child = thread_by_tid(tid);
   sema_down(&child->exec_sema);
-  //printf("CHild status: %d\n", child->status);
+//   printf("Child status: %d\n", child->status);
   if (child == NULL || child->exec_value == false) {
-    //printf("process failed.\n");
+//     printf("process failed.\n");
     return -1;
   }
   else {
-    //printf("process loaded: %s\n", child->name);
+//     printf("process loaded.\n");
     return tid;
   }
 }
@@ -174,21 +175,35 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid) 
+process_wait (tid_t child_tid)
 {
-  struct thread* tp = thread_by_tid(child_tid);
 
-  if ((tp != NULL) && (tp->status != THREAD_DYING)) {
-    // running thread found, wait to return exit status
-    sema_down(&tp->wait_sema);
+//   printf("Getting the status of thread ID: %d\n", child_tid);
 
-    // when sema is released, thread should have exited, so return exit status
-    return tp->retVal;
-  }
-  else {
-    // no thread found: immediately return
+  // Check that the tid is a child of the requesting thread
+  if (!thread_is_child(child_tid)) {
+//     printf("This thread is not your child, so you can't wait for it.\n");
     return -1;
   }
+
+  // Check that the tid has not been waited for by the requesting thread
+  if (thread_has_waited(child_tid)) {
+//     printf("You have already waited for this tid, so go away!\n");
+    return -1;
+  }
+
+  // Wait until the thread with that tid exits
+  struct thread *tp = thread_by_tid(child_tid);
+  if (tp)
+    sema_down(&tp->wait_sema);
+
+  struct exit_status *es = thread_get_exit_status(child_tid);
+
+  // Move the thread to the already-waited list
+  thread_mark_waited(es);
+
+  // Return exit status
+  return es->status;
 }
 
 /* Free the current process's resources. */
@@ -207,7 +222,8 @@ process_exit (void)
   // Not used, but can't pass NULL to strtok_r
   char *saveptr;
 
-  printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &saveptr), cur->retVal);
+//   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &saveptr), cur->retVal);
+  printf("%s: exit(%d)\n", cur->name, thread_get_exit_status(cur->tid)->status);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -453,6 +469,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   sema_up(&t->exec_sema);
   if (file) {
     if (success) {
+      strlcpy(t->name, argv[0], 16);  // Assign new name to thread
       t->ownfile = file;
       file_deny_write(file);
     }

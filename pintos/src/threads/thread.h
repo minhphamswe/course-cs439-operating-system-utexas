@@ -98,6 +98,13 @@ struct fileHandle {
   struct list_elem fileElem;
 };
 
+// A structure to hold the exit status for a thread
+struct exit_status {
+  tid_t tid;
+  int status;
+  struct list_elem elem;
+};
+
 #define MAXOPENFILES 16           /* Can only have 16 files in the OS for part 2 anyway */
 
 struct thread
@@ -127,9 +134,17 @@ struct thread
 
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;          /* List element. */
-  
+
+  /* List element for the wait-on list of the parent thread */
+  struct list_elem wait_elem;
+
+  /* List element for the children list of the parent thread */
+  struct list_elem child_elem;
+
   /* Keep track of open files */
   struct list handles;            /* List element for open files */
+  struct list wait_list;          /* List of child threads waited on */
+  struct list child_list;         /* List of all child threads */
   int nextFD;                     /* The next file, increment */
 
 #ifdef USERPROG
@@ -179,6 +194,10 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread* thread_by_tid(tid_t tid);
+bool thread_is_child(tid_t tid);
+bool thread_has_waited(tid_t tid);
+struct exit_status* thread_get_exit_status(tid_t tid);
+void thread_mark_waited(struct exit_status* es);
 
 //bool is_executing(char *filename);
 
