@@ -84,7 +84,6 @@ list_next (struct list_elem *elem)
   ASSERT (is_head (elem) || is_interior (elem));
   return elem->next;
 }
-
 /* Returns LIST's tail.
 
    list_end() is often used in iterating through a list from

@@ -309,6 +309,9 @@ void syscreate_handler(struct intr_frame *f)
   char *filename = pop_stack(f);
   off_t filesize = pop_stack(f);
 
+  if (get_user(filename) == -1) 
+    terminate_thread();
+
   if (filename == NULL || filesize < 0)
     terminate_thread();
 
@@ -373,14 +376,16 @@ void sysopen_handler(struct intr_frame *f)
   else {
     struct thread *t = thread_current();
 
-    struct fileHandle *newFile = (struct fileHandle*) malloc(sizeof(struct fileHandle));
-    newFile->file = file;
-    newFile->fd = t->nextFD++;
+    struct fileHandle *newHandle = (struct fileHandle*) malloc(sizeof(struct fileHandle));
+    struct file *newFile = calloc(1, sizeof (struct file));
+    memcpy(&newFile, file, sizeof (struct file));
+    newHandle->file = file;
+    newHandle->fd = t->nextFD++;
 
-    list_push_back(&t->handles, &newFile->fileElem);
+    list_push_back(&t->handles, &newHandle->fileElem);
 
     // return the file descriptor
-    f->eax = newFile->fd;
+    f->eax = newHandle->fd;
   }
 }
 
@@ -442,10 +447,8 @@ void sysread_handler(struct intr_frame *f)
   else {
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
-      sema_down(&filesys_sema);
       f->eax = file_read(fhp->file, buffer, size);
-      sema_up(&filesys_sema);
-    }
+     }
     else {
       // File descriptor not found: return -1
       f->eax = -1;
@@ -490,10 +493,8 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
-      sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, buffer, bufferSize);
-      sema_up(&filesys_sema);
-    }
+     }
     else {
       f->eax = -1;
     }
@@ -579,10 +580,10 @@ void sysclose_handler(struct intr_frame *f)
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
-      sema_down(&filesys_sema);
+      //sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
-      sema_up(&filesys_sema);
+      //sema_up(&filesys_sema);
       return;
     }
   }

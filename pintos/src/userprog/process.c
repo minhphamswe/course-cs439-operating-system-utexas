@@ -105,6 +105,9 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  struct file *file;
+  char *tmpfilename[16];
+  char *saveptr;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -112,6 +115,15 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  strlcpy(tmpfilename, file_name, 16);
+  file = filesys_open (strtok_r(tmpfilename, " ", &saveptr));
+  if (file == NULL) 
+    {
+      printf ("load: %s: open failed\n", file_name);
+      return -1;
+    }
+  file_close(file);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -194,7 +206,7 @@ process_wait (tid_t child_tid)
 
   // Wait until the thread with that tid exits
   struct thread *tp = thread_by_tid(child_tid);
-  if (tp)
+  if (tp != NULL)
     sema_down(&tp->wait_sema);
 
   struct exit_status *es = thread_get_exit_status(child_tid);

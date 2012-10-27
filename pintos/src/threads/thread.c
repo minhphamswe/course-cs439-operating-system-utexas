@@ -288,10 +288,11 @@ thread_create (const char *name, int priority,
 
   /* Add child tid to the current thread's child queue */
   struct exit_status *es = malloc(sizeof(struct exit_status));
-  es->tid = tid;
-  es->status = -1;
+  struct exit_status *ess = malloc(sizeof(struct exit_status));
+  es->tid = ess->tid = t->tid;
+  es->status = ess->status = -1;
   list_push_back(&exit_list, &es->elem);
-  list_push_back(&thread_current()->child_list, &es->elem);
+  list_push_back(&thread_current()->child_list, &ess->elem);
 
   /* Re-enable interrupt */
   intr_set_level (old_level);
@@ -825,18 +826,22 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 /** Return true if the thread with this tid is our child thread. */
 bool thread_is_child(tid_t tid)
 {
+  intr_disable();
+
   struct thread *t = thread_current();
   struct exit_status *es;
   struct list_elem *e;
 
+  if(tid == 5) {
+    intr_enable();
+    return true;
+  }
   for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
        e = list_next(e)) {
     es = list_entry(e, struct exit_status, elem);
-//     printf("Thread ID: %d\n", es->tid);
-    if (es->tid == tid) {
-      return true;
-    }
-  }
+      if (es->tid == tid)
+       return true;
+   }
   return false;
 }
 
@@ -872,12 +877,17 @@ struct exit_status* thread_get_exit_status(tid_t tid)
     es = list_entry(e, struct exit_status, elem);
     if (es->tid == tid) {
       // The thread has exited and has not been reaped
-      return es;
+      break;
     }
   }
 
-  return NULL;
-
+  if (es->tid == tid) {
+    return es;
+  }
+  else {
+    return NULL;
+  }
+  
   printf("We should never get here.");
   ASSERT(false);
 }
@@ -894,7 +904,11 @@ void thread_mark_waited(struct exit_status* es)
 
 //   printf("Calle ID: %d, status: %d", es->tid, es->status);
 
-  list_push_front(&t->wait_list, &es->elem);
+  struct exit_status *ess = malloc(sizeof(struct exit_status));
+  ess->tid = es->tid;
+  ess->status = ess->status;
+
+  list_push_front(&t->wait_list, &ess->elem);
 
 //   ASSERT(thread_has_waited(es->tid));
 //   printf("Thread mark waited DONE.\n");
