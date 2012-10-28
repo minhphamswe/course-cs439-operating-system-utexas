@@ -27,10 +27,6 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 #define PRI_DEPTH 8                     /* Number of possible donations per thread */
 
-/* Testing for OOM */
-#define MAX_NUM_THREADS 31
-static int currentThreads;
-
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -96,7 +92,6 @@ typedef struct priority_lock {
 
 // A single open file handler.
 struct fileHandle {
-//  char name[16];
   struct file *file;
   int fd;
   struct list_elem fileElem;
