@@ -237,10 +237,11 @@ process_exit (void)
   // Signal any waiting thread
   sema_up(&cur->wait_sema);      // signal before dying
 
+  printf("%s: exit(%d)\n", cur->name,
+         thread_get_exit_status(cur->tid)->status);
+
   // Close open files
   file_close(cur->ownfile);
-
-  printf("%s: exit(%d)\n", cur->name, thread_get_exit_status(cur->tid)->status);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -258,6 +259,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  thread_clear_child_exit_status(cur);
 }
 
 /* Sets up the CPU for running user code in the current
