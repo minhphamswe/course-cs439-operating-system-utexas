@@ -70,7 +70,6 @@ uint32_t pop_stack(struct intr_frame *f)
   if (((uint32_t) f->esp < (uint32_t) PHYS_BASE) && f->esp != NULL) {
     uint32_t ret = *(uint32_t *)f->esp;
     f->esp = (uint32_t *) f->esp + 1;
-    //printf("f->esp is: %x\n", (unsigned int)f->esp);
     return ret;
   }
   // Otherwise, bad access.  Terminate gracefully
@@ -93,99 +92,56 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-/*  printf("edi: %d\n", f->edi);
-  printf("esi: %d\n", f->esi);
-  printf("ebp: %d\n", f->ebp);
-  printf("ebx: %d\n", f->ebx);
-  printf("edx: %d\n", f->edx);
-  printf("ecx: %d\n", f->ecx);
-  printf("eax: %d\n", f->eax);
-  printf("gs: %d\n", f->gs);
-  printf("fs: %d\n", f->fs);
-  printf("es: %d\n", f->es);
-  printf("ds: %d\n", f->ds);
-
-  printf("vec_no: %d\n", f->vec_no);
-  printf("error_code: %d\n", f->error_code);
-  printf("frame ptr: %x\n", (uint32_t) f->frame_pointer);
-  printf("esp: %x\n", (uint32_t) f->esp);
-  printf("ss: %d\n", f->ss);
-
-  printf("Value at esp: %x\n", *((int *) f->esp));
-*/
-//   hex_dump(f->esp, f->esp, 16 * sizeof(int), false);
-
+  // It's easier to pop the stack as we go, so we will need to reset it
   void *tmpesp = f->esp;
-  //printf("Eflags is: %d\n", f->eflags);
-  //printf("Address of f is: %x\n", (unsigned int)f);
-  //hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
 
   // Examine user memory to find out which system call gets called
   int syscall_number = pop_stack(f);
-  //printf("Syscal Number is: %d\n", syscall_number);
+
   switch (syscall_number) {
     case SYS_HALT:
-      //printf("SYS_HALT Called\n");
       syshalt_handler(f);
       break;
     case SYS_EXIT:
-      //printf("SYS_EXIT Called\n");
       sysexit_handler(f);
       break;
     case SYS_EXEC:
-      //printf("SYS_EXEC Called\n");
       sysexec_handler(f);
       break;
     case SYS_WAIT:
-      //printf("SYS_WAIT Called\n");
       syswait_handler(f);
       break;
     case SYS_CREATE:
-      //printf("SYS_CREATE Called\n");
       syscreate_handler(f);
       break;
     case SYS_REMOVE:
-      //printf("SYS_REMOVE Called\n");
       sysremove_handler(f);
       break;
     case SYS_OPEN:
-      //printf("SYS_OPEN Called\n");
       sysopen_handler(f);
       break;
     case SYS_FILESIZE:
-      //printf("SYS_FILESIZE Called\n");
       sysfilesize_handler(f);
       break;
     case SYS_READ:
-      //printf("SYS_READ Called\n");
       sysread_handler(f);
       break;
     case SYS_WRITE:
-      //printf("SYS_WRITE Called\n");
       syswrite_handler(f);
       break;
     case SYS_SEEK:
-      //printf("SYS_SEEK Called\n");
       sysseek_handler(f);
       break;
     case SYS_TELL:
-      //printf("SYS_TELL Called\n");
       systell_handler(f);
       break;
     case SYS_CLOSE:
-      //printf("SYS_ClOSE Called\n");
       sysclose_handler(f);
       break;
   }
 
-  //printf("Preparing to jump...\n");
-  //printf("f->eip is: %x\n", (unsigned int) f->eip);
-  //hex_dump(f->esp, f->esp, 0xc0000000 - (unsigned int)f->esp, false);
+  // Replace stack pointer back to where it was for the application
   f->esp = tmpesp;
-//   f->eip = f->esp;
-//   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (f) : "memory");
-//   NOT_REACHED ();
-//   thread_exit ();
 }
 
 
@@ -214,13 +170,9 @@ void syshalt_handler(struct intr_frame *f)
 void sysexit_handler(struct intr_frame *f)
 {
   // Get the exit value from the stack
-//  hex_dump(f->esp, f->esp, 8 * sizeof(int), true);
   int exitValue = (int) pop_stack(f);
-if(exitValue > 1)
-//   printf("%s: exit(%d)\n", thread_current()->name, exitValue);
 
   // Set the exit value
-  //printf("Setting %d exit status as %d\n", thread_current()->tid, exitValue);
   thread_set_exit_status(thread_current()->tid, exitValue);
 
   // End the currently running thread
@@ -292,7 +244,6 @@ void syswait_handler(struct intr_frame *f)
   // Get PID from stack
   tid_t child = pop_stack(f);
   f->eax = process_wait(child);
-  //printf("TID status: %d\n", status);
 }
 
 /** Thread calls syscreate
@@ -501,7 +452,6 @@ void syswrite_handler(struct intr_frame *f)
   else {
     f->eax = -1;
   }
-  //printf("Exiting Syswrite Handler\n");
 }
 
 /**

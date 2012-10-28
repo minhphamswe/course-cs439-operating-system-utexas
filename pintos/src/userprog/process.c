@@ -116,6 +116,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // See if the file exists before trying to execute it
   strlcpy(tmpfilename, file_name, 16);
   file = filesys_open (strtok_r(tmpfilename, " ", &saveptr));
   if (file == NULL) 
@@ -125,13 +126,14 @@ process_execute (const char *file_name)
     }
   file_close(file);
 
-  /* Create a new thread to execute FILE_NAME. */
+  // Create a new thread to execute FILE_NAME.
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     return TID_ERROR;
   }
 
+  // Check if the thread loaded properly
   struct thread *child = thread_by_tid(tid);
   if (child) {
     // Thread has not yet exited: wait for status of load
@@ -145,19 +147,8 @@ process_execute (const char *file_name)
   if (!child)
     tid = -1;
 
-printf("Starting process %d\n", tid);
-
+  // Everything was good, send back up our child's tid.
   return tid;
-
-// //   printf("Child status: %d\n", child->status);
-//   if (child == NULL || child->exec_value == false) {
-// //     printf("process failed.\n");
-//     return -1;
-//   }
-//   else {
-// //     printf("process loaded.\n");
-//     return tid;
-//   }
 }
 
 /* A thread function that loads a user process and starts it
@@ -184,9 +175,6 @@ start_process (void *file_name_)
     thread_exit ();
   }
 
-  //printf("esp is at: %x\n", (unsigned int) if_.esp);
-  //printf("eip is at: %x\n", (unsigned int) if_.eip);
-
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -210,18 +198,15 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-
-//   printf("Getting the status of thread ID: %d\n", child_tid);
-
   // Check that the tid is a child of the requesting thread
   if (!thread_is_child(child_tid)) {
-     printf("This thread is not your child, so you can't wait for it.\n");
+    // This thread is not your child, so you can't wait for it.
     return -1;
   }
 
   // Check that the tid has not been waited for by the requesting thread
   if (thread_has_waited(child_tid)) {
-     printf("You have already waited for this tid, so go away!\n");
+    // You have already waited for this tid, so go away!
     return -1;
   }
 
@@ -251,7 +236,7 @@ process_exit (void)
   file_close(cur->ownfile);
 /*  struct list_elem *e;
   for (e = list_begin(&cur->handles); e != list_end(&cur->handles); e = list_next(e)) {
-    struct fileHandle handle = list_entry (e, struct thread, elem);
+    struct fileHandle *handle = list_entry (e, struct thread, elem);
     file_close(handle->file);
   }  
 */
@@ -323,16 +308,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Parse arguments into tokens */
   argc = 0;
-//   printf("file_name is %s\n", file_name);
-//   printf("fn_copy is %s\n", fn_copy);
   for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
-//     printf("Token is: %s\n", token);
     argv[argc] = token;
     argc++;
   }
-
-  //printf("Argc is: %d\n", argc);
 
   /* Open executable file. */
   file = filesys_open (argv[0]);
@@ -430,7 +410,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Allocate space for stack */
   btop = *esp;
-//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
 
   /* Put tokens onto the stack */
   for (i = argc-1; i >= 0; i--) {
@@ -440,31 +419,25 @@ load (const char *file_name, void (**eip) (void), void **esp)
     // move the stack pointer and copy token onto the stack
     *esp = (char*) *esp - (strlen(token) + 1);
     strlcpy(*esp, token, strlen(token) + 1);
-    //printf("Token is: %s\n", token);
-//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
 
     // save copy-to address
     token_addr[i] = (char**) *esp;
   }
 
   /* align stack by word size (4) */
-  //printf("Byte-aligning stack\n");
   while (((unsigned int) *esp % 4) != 0) {
     *esp = (uint8_t*) *esp - 1;
     *(uint8_t*) *esp = 0;
   }
 
   // push null pointer at end of argument list
-  //printf("Pushing argv[argc]\n");
   *esp = (char**) *esp - 1;
   *(char**)*esp = (char*) 0;
-//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push addresses (order from right to left)
   for (i = argc - 1; i >= 0; i--) {
     *esp = (char***) *esp - 1;
     *(char***)*esp = token_addr[i];
-//     printf("Top is: %x\tIncrement: %d\n", (unsigned int) *esp, (unsigned int) btop - (unsigned int) *esp);
   }
 
   // push address of argument vector
@@ -474,27 +447,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   // push token count
   *esp = (int*) *esp - 1;
   *(int*)*esp = argc;
-//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   // push "return address" to end the "function call" on the stack
   typedef void (*void_fn_ptr)(void);  // declare type pointer to void function
-//   *eip = (void_fn_ptr) ehdr.e_entry;
   *esp = (void_fn_ptr*) *esp - 1;
   *(void_fn_ptr*)*esp = 0;
-//   printf("Top is: %x\tIncrement: %d\n", (unsigned int) top, (unsigned int) btop - (unsigned int) top);
 
   /* Start address. */
   *eip = (void_fn_ptr*) ehdr.e_entry;
-  //hex_dump(*esp, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
 
   success = true;
-//   bool success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, btop, true);
-//   if (success)
-//     hex_dump(0, ((unsigned int) PHYS_BASE) - PGSIZE, PGSIZE, true);
-//   printf("Address of btop is: %x\n", (unsigned int) btop);
-//   printf("Address of *esp is: %x\n", (unsigned int) *esp);
-//   hex_dump(0, *esp, ((unsigned int) btop - (unsigned int) *esp), true);
-//   hex_dump(0, *eip, 4 * sizeof(int*), true);
 
  done:
   /* We arrive here whether the load is successful or not. */
@@ -509,7 +471,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       file_close(file);
     }
   }
-  //sema_up(&t->exec_sema);  
   return success;
 }
 
@@ -570,7 +531,6 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
     return false;
   }
 
-  //printf("All tests succeeded.\n");
   /* It's okay. */
   return true;
 }
@@ -639,7 +599,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  //printf("Calling setup_stack\n");
   uint8_t *kpage;
   bool success = false;
 
@@ -647,7 +606,6 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-//       hex_dump(0, ((uint8_t *) PHYS_BASE) - PGSIZE, PGSIZE, true);
       if (success)
         *esp = PHYS_BASE;
       else
