@@ -233,9 +233,6 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  // Signal any waiting thread
-  sema_up(&cur->wait_sema);      // signal before dying
-
   printf("%s: exit(%d)\n", cur->name,
          thread_get_exit_status(cur->tid)->status);
 
@@ -247,6 +244,9 @@ process_exit (void)
     struct fileHandle *handle = list_entry (e, struct fileHandle, fileElem);
     file_close(handle->file);
   }
+
+  // Signal any waiting thread
+  sema_up(&cur->wait_sema);      // signal before dying
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

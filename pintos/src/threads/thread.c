@@ -119,6 +119,8 @@ thread_init (void)
   ready_threads = list_size(&ready_list);
   frac59 = DivI(Float(59), 60);
   frac01 = DivI(Float(1), 60);
+
+  static currentThreads = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -231,6 +233,9 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux)
 {
+  if(currentThreads > MAX_NUM_THREADS)
+    return -1;
+
   if(thread_mlfqs)
     priority = PRI_DEFAULT;
   struct thread *t;
@@ -290,7 +295,6 @@ thread_create (const char *name, int priority,
 
   /* Add child tid to the current thread's child queue */
   struct exit_status *es = malloc(sizeof(struct exit_status));
-//   printf("Allocate es: %x\n", es);
   es->tid = t->tid;
   es->status = 0;
   list_push_back(&exit_list, &es->exit_elem);
@@ -305,6 +309,9 @@ thread_create (const char *name, int priority,
   // If the child has higher priority than the current thread, yield to it
   if(t->priority > thread_current()->priority)
     thread_yield();
+
+  if(tid > 0)
+    currentThreads++;
 
   return tid;
 }
@@ -408,6 +415,7 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);   // disappear before dying
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
+  currentThreads--;
   schedule ();
   NOT_REACHED ();
 }
