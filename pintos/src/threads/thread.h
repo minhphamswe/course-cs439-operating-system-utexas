@@ -2,7 +2,7 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
-#include <list.h>
+#include "kernel/list.h"
 #include <stdint.h>
 #include "threads/synch.h"
 #include "filesys/file.h"
@@ -202,6 +202,7 @@ bool thread_has_waited(tid_t tid);
 
 struct exit_status* thread_get_exit_status(tid_t tid);
 void thread_set_exit_status(tid_t tid, int status);
+void thread_clear_child_exit_status(struct thread *t);
 
 void thread_mark_waited(struct exit_status* es);
 
