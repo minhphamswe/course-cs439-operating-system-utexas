@@ -472,6 +472,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
       file_close(file);
     }
   }
+  if (fn_copy != NULL)
+    palloc_free_page(fn_copy);
   return success;
 }
 
