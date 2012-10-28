@@ -194,9 +194,7 @@ void sysexec_handler(struct intr_frame *f)
   char *cmdline = pop_stack(f);
 
   if (cmdline) {
-    sema_down(&filesys_sema);
     f->eax = process_execute(cmdline);
-    sema_up(&filesys_sema);
   }
 }
 
@@ -316,7 +314,9 @@ void sysopen_handler(struct intr_frame *f)
   }
 
   // Open file
+  sema_down(&filesys_sema);
   struct file *file = filesys_open(file_name);
+  sema_up(&filesys_sema);
 
   // File cannot be opened: return -1
   if (file == NULL) {
@@ -326,9 +326,7 @@ void sysopen_handler(struct intr_frame *f)
   else {
     struct thread *t = thread_current();
 
-    struct fileHandle *newHandle = (struct fileHandle*) malloc(sizeof(struct fileHandle));
-    struct file *newFile = calloc(1, sizeof (struct file));
-    memcpy(&newFile, file, sizeof (struct file));
+    struct fileHandle *newHandle = malloc(sizeof(struct fileHandle));
     newHandle->file = file;
     newHandle->fd = t->nextFD++;
 
@@ -443,7 +441,9 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
+      sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, buffer, bufferSize);
+      sema_up(&filesys_sema);
      }
     else {
       f->eax = -1;
@@ -529,10 +529,10 @@ void sysclose_handler(struct intr_frame *f)
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
-      //sema_down(&filesys_sema);
+      sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
-      //sema_up(&filesys_sema);
+      sema_up(&filesys_sema);
       return;
     }
   }

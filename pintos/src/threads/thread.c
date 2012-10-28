@@ -668,9 +668,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;
   t->recent_cpu = 0;
 
-  /* ??? */
-  t->exec_value = false;
-
   /* Initialize list and index for open files */
   t->nextFD = 2;
   list_init(&t->handles);

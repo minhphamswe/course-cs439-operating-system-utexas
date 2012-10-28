@@ -118,7 +118,13 @@ process_execute (const char *file_name)
 
   // See if the file exists before trying to execute it
   strlcpy(tmpfilename, file_name, 16);
+
+  struct semaphore s;
+  sema_init(&s, 1);
+  sema_down(&s);
   file = filesys_open (strtok_r(tmpfilename, " ", &saveptr));
+  sema_up(&s);
+
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -294,6 +300,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   void *btop;
   char *save_ptr, *token, *argv[128];
   char **token_addr[128];
+  struct semaphore s;
+
+  sema_init(&s, 1);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -316,7 +325,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
 
   /* Open executable file. */
+  sema_down(&s);
   file = filesys_open (argv[0]);
+  sema_up(&s);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", argv[0]);
@@ -324,6 +335,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Read and verify executable header. */
+  sema_down(&s);
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
       || ehdr.e_type != 2
@@ -335,6 +347,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: error loading executable\n", argv[0]);
       goto done; 
     }
+  sema_up(&s);
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
@@ -461,15 +474,18 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  t->exec_value = success;
   if (file) {
     if (success) {
       strlcpy(t->name, argv[0], 16);  // Assign new name to thread
       t->ownfile = file;
+      sema_down(&s);
       file_deny_write(file);
+      sema_up(&s);
     }
     else {
+      sema_down(&s);
       file_close(file);
+      sema_up(&s);
     }
   }
   if (fn_copy != NULL)
