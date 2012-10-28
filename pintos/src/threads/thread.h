@@ -2,7 +2,7 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
-#include <list.h>
+#include "kernel/list.h"
 #include <stdint.h>
 #include "threads/synch.h"
 #include "filesys/file.h"

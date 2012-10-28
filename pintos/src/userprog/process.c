@@ -256,12 +256,12 @@ process_exit (void)
 
   // Close open files
   file_close(cur->ownfile);
-/*  struct list_elem *e;
-  for (e = list_begin(&cur->handles); e != list_end(&cur->handles); e = list_next(e)) {
-    struct fileHandle handle = list_entry (e, struct thread, elem);
+  struct list_elem *e;
+  for (e = list_begin(&cur->handles); e != list_end(&cur->handles);
+       e = list_remove(e)) {
+    struct fileHandle *handle = list_entry (e, struct fileHandle, fileElem);
     file_close(handle->file);
-  }  
-*/
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
