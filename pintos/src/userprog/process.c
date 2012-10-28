@@ -146,32 +146,7 @@ process_execute (const char *file_name)
       return tid;
     }
   }
-<<<<<<< HEAD
-  if (!child)
-    tid = -1;
-
-  // Everything was good, send back up our child's tid.
   return tid;
-=======
-
-  return tid;
-//   if (!child)
-//     tid = -1;
-
-// printf("Starting process %d\n", tid);
-
-//   return thread_get_exit_status(tid);
-
-// //   printf("Child status: %d\n", child->status);
-//   if (child == NULL || child->exec_value == false) {
-// //     printf("process failed.\n");
-//     return -1;
-//   }
-//   else {
-// //     printf("process loaded.\n");
-//     return tid;
-//   }
->>>>>>> daccccaaed879663ae8a261de9007a264c72fe7b
 }
 
 /* A thread function that loads a user process and starts it
@@ -223,21 +198,13 @@ process_wait (tid_t child_tid)
 {
   // Check that the tid is a child of the requesting thread
   if (!thread_is_child(child_tid)) {
-<<<<<<< HEAD
     // This thread is not your child, so you can't wait for it.
-=======
-//      printf("This thread is not your child, so you can't wait for it.\n");
->>>>>>> daccccaaed879663ae8a261de9007a264c72fe7b
     return -1;
   }
 
   // Check that the tid has not been waited for by the requesting thread
   if (thread_has_waited(child_tid)) {
-<<<<<<< HEAD
     // You have already waited for this tid, so go away!
-=======
-//      printf("You have already waited for this tid, so go away!\n");
->>>>>>> daccccaaed879663ae8a261de9007a264c72fe7b
     return -1;
   }
 
@@ -268,16 +235,10 @@ process_exit (void)
 
   // Close open files
   file_close(cur->ownfile);
-<<<<<<< HEAD
-/*  struct list_elem *e;
-  for (e = list_begin(&cur->handles); e != list_end(&cur->handles); e = list_next(e)) {
-    struct fileHandle *handle = list_entry (e, struct thread, elem);
-=======
   struct list_elem *e;
   for (e = list_begin(&cur->handles); e != list_end(&cur->handles);
        e = list_remove(e)) {
     struct fileHandle *handle = list_entry (e, struct fileHandle, fileElem);
->>>>>>> daccccaaed879663ae8a261de9007a264c72fe7b
     file_close(handle->file);
   }
 
@@ -511,10 +472,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       file_close(file);
     }
   }
-<<<<<<< HEAD
-=======
-  //sema_up(&t->exec_sema);
->>>>>>> daccccaaed879663ae8a261de9007a264c72fe7b
   return success;
 }
 

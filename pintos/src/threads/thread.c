@@ -902,8 +902,6 @@ void thread_clear_child_exit_status(struct thread* t)
   for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
        e = list_remove(e)) {
     es = list_entry(e, struct exit_status, wait_elem);
-//     printf("%x", (uint32_t) es);
-//     printf("%x %x %x %x\n", es, &es->exit_elem, &es->wait_elem, &es->child_elem);
     list_remove(&es->exit_elem);
     list_remove(&es->child_elem);
 //     free(es);
