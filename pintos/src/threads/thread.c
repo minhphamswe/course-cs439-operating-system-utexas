@@ -290,8 +290,9 @@ thread_create (const char *name, int priority,
 
   /* Add child tid to the current thread's child queue */
   struct exit_status *es = malloc(sizeof(struct exit_status));
+//   printf("Allocate es: %x\n", es);
   es->tid = t->tid;
-  es->status = -1;
+  es->status = 0;
   list_push_back(&exit_list, &es->exit_elem);
   list_push_back(&thread_current()->child_list, &es->child_elem);
 
@@ -868,7 +869,7 @@ struct exit_status* thread_get_exit_status(tid_t tid)
        e = list_next(e)) {
     es = list_entry(e, struct exit_status, exit_elem);
     if (es->tid == tid) {
-      // The thread has exited and has not been reaped
+      // The pid supplied is of a thread that has run
       return es;
     }
   }
@@ -876,10 +877,39 @@ struct exit_status* thread_get_exit_status(tid_t tid)
   return NULL;
 }
 
+/** Set the exit status of this pid to the new status. */
 void thread_set_exit_status(tid_t tid, int status)
 {
+  enum intr_level old_level = intr_disable();
+
   struct exit_status *es = thread_get_exit_status(tid);
   es->status = status;
+
+  intr_set_level(old_level);
+}
+
+
+/** Remove the pid and exit status of all of this thread's children from the
+ *  exit list.
+ */
+void thread_clear_child_exit_status(struct thread* t)
+{
+  enum intr_level old_level = intr_disable();
+
+  struct list_elem *e;
+  struct exit_status *es;
+
+  for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
+       e = list_remove(e)) {
+    es = list_entry(e, struct exit_status, wait_elem);
+//     printf("%x", (uint32_t) es);
+//     printf("%x %x %x %x\n", es, &es->exit_elem, &es->wait_elem, &es->child_elem);
+    list_remove(&es->exit_elem);
+    list_remove(&es->child_elem);
+//     free(es);
+  }
+
+  intr_set_level(old_level);
 }
 
 
