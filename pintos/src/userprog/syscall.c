@@ -216,7 +216,7 @@ void sysexit_handler(struct intr_frame *f)
   // Get the exit value from the stack
 //  hex_dump(f->esp, f->esp, 8 * sizeof(int), true);
   int exitValue = (int) pop_stack(f);
-if(exitValue > 1)
+// if(exitValue > 1)
 //   printf("%s: exit(%d)\n", thread_current()->name, exitValue);
 
   // Set the exit value

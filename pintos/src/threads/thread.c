@@ -292,7 +292,7 @@ thread_create (const char *name, int priority,
   struct exit_status *es = malloc(sizeof(struct exit_status));
 //   printf("Allocate es: %x\n", es);
   es->tid = t->tid;
-  es->status = -1;
+  es->status = 0;
   list_push_back(&exit_list, &es->exit_elem);
   list_push_back(&thread_current()->child_list, &es->child_elem);
 

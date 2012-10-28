@@ -137,17 +137,21 @@ process_execute (const char *file_name)
     // Thread has not yet exited: wait for status of load
     sema_down(&child->exec_sema);
 
-    if(thread_get_exit_status(tid)->status == -1234) {
-      thread_set_exit_status(tid, -1);
-      tid = -1;
+    if(thread_get_exit_status(tid)->status == -1) {
+      return TID_ERROR;
+    }
+    else {
+      return tid;
     }
   }
-  if (!child)
-    tid = -1;
-
-printf("Starting process %d\n", tid);
 
   return tid;
+//   if (!child)
+//     tid = -1;
+
+// printf("Starting process %d\n", tid);
+
+//   return thread_get_exit_status(tid);
 
 // //   printf("Child status: %d\n", child->status);
 //   if (child == NULL || child->exec_value == false) {
@@ -179,8 +183,8 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
-    thread_set_exit_status(thread_current()->tid, -1234);
-    sema_up(&(thread_current()->exec_sema)); 
+    thread_set_exit_status(thread_current()->tid, -1);
+    sema_up(&thread_current()->exec_sema);
     thread_exit ();
   }
 
@@ -193,7 +197,7 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
-  sema_up(&(thread_current()->exec_sema)); 
+  sema_up(&thread_current()->exec_sema);
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -215,13 +219,13 @@ process_wait (tid_t child_tid)
 
   // Check that the tid is a child of the requesting thread
   if (!thread_is_child(child_tid)) {
-     printf("This thread is not your child, so you can't wait for it.\n");
+//      printf("This thread is not your child, so you can't wait for it.\n");
     return -1;
   }
 
   // Check that the tid has not been waited for by the requesting thread
   if (thread_has_waited(child_tid)) {
-     printf("You have already waited for this tid, so go away!\n");
+//      printf("You have already waited for this tid, so go away!\n");
     return -1;
   }
 
@@ -512,7 +516,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       file_close(file);
     }
   }
-  //sema_up(&t->exec_sema);  
+  //sema_up(&t->exec_sema);
   return success;
 }
 
