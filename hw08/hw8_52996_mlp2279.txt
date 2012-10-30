@@ -1,0 +1,28 @@
+Student: Minh Pham
+EID: mlp2279
+CSID: minhpham
+
+Homework 8
+
+1. Is it fundamentally necessary to store on disk the information about
+the unallocated disk sectors? Explain why.
+
+2. Pooh Software Ltd. is selling a file system that uses a UNIX-like
+file system with multi-level indexing.
+For more reliability, the inode array is actually replicated on the disk
+in two different places. The intent is that if one or a group of sectors
+that are storing either replica of the array become bad, the system can
+always recover from the replica. Discuss the effect of having this
+replicated data structure on performance.
+
+3. True or False. A virtual memory system that uses paging is vulnerable
+to external fragmentation.
+
+4. Some file allocation schemes limit the size of the file whether or not there is enough space for a larger file. Which ones and why?
+    Linked
+    Direct
+    Contiguous
+    Multi-Level index
+    Extents
+Which file allocation scheme that we studied is mot similar to paging?
+Segmentation? 

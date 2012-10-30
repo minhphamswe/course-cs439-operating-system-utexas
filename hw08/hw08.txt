@@ -1,0 +1,24 @@
+
+1. Using the multilevel indexing scheme presented in class, and assuming that
+each indirect block contains 1024 pointers, how big is the maximum file size
+assuming disk blocks of size a) 1KB b) 4KB c) 8KB?
+
+2. A user would like to use the file /u/sally/cs372/projects/results.txt. How
+many disk accesses would it take the operating system to locate and begin
+reading results.txt using the absolute path? Explain.
+
+You may assume that each directory's entries fit in a single block.
+
+3. The user has modified the file results.txt and now saves it to the hard
+drive. List the steps the operating system takes to write the file to disk,
+beginning with the write() system call and assuming the machine has a DMA
+controller and so the OS uses DMA to communicate with the disk.
+
+4. In the answer to question 3, you list the steps the OS takes to write a file
+to disk. Now list the steps taken by the DMA controller and disk when they
+receive the request(s) from the operating system to actually perform the file write.
+
+5. In some early releases of an operating system that shall remain nameless,
+when a file was deleted, its sectors reverted to the free list but they were
+ot erased. What problems do you think may result from this? Why do you think
+the blocks were not erased?
