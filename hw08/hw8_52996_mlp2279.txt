@@ -7,6 +7,14 @@ Homework 8
 1. Is it fundamentally necessary to store on disk the information about
 the unallocated disk sectors? Explain why.
 
+Fundamentally it is unnecessary to store on disk the information about
+unallocated disk sectors. We could, theoretically, build this information
+at run-time instead of storing it on disk, by, for example, scanning all
+of the files and directories on disk, find their allocated regions, and
+substract them from the total amount of space on disk.
+However, it is still a much better idea to have this information available
+instead of re-computing it every time the computer boots.
+
 2. Pooh Software Ltd. is selling a file system that uses a UNIX-like
 file system with multi-level indexing.
 For more reliability, the inode array is actually replicated on the disk
@@ -15,8 +23,24 @@ that are storing either replica of the array become bad, the system can
 always recover from the replica. Discuss the effect of having this
 replicated data structure on performance.
 
+The side effects of this implementation are:
+  * 100% storage space overhead for the inode array (but not for all the
+  files - thank goodness!)
+  * Some check mechanism (like parity) has to be implemented as well (other-
+  wise how would we know which sector has gone bad?), increasing storage
+  overhead.
+  * Every read into the inode array needs to be checked (since we don't know
+  when they may go bad)
+  * Every write into the inode array needs to be replicated on two places
+  on the disk (where we store the inodes)
+
 3. True or False. A virtual memory system that uses paging is vulnerable
 to external fragmentation.
+
+Assuming we are talking about virtual memory fragmentation. This is false.
+A virtual memory system that uses paging (if implemented correctly) does
+not suffer from external fragmentation, but is still vulnerable to internal
+fragmentation.
 
 4. Some file allocation schemes limit the size of the file whether or not there is enough space for a larger file. Which ones and why?
     Linked
@@ -25,4 +49,18 @@ to external fragmentation.
     Multi-Level index
     Extents
 Which file allocation scheme that we studied is mot similar to paging?
-Segmentation? 
+Segmentation?
+
+The direct allocation scheme limits the size of the file, because we store
+pointers to data blocks in the index block, and the size of the index
+block is fixed.
+Multi-level indexed allocation also limits the size of the file, because
+the structure of the inode can only hold a limited number of index nodes,
+each of which has a fixed level of indirection and fixed size. However,
+the file size limit is usually massive, so this is not a practical problem
+yet.
+
+I have no idea what extents allocation is.
+
+Indexed allocation is most similar to paging, with tables (inodes and 
+index nodes) mapping logical addresses to location on disk.
