@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "kernel/list.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -628,18 +629,20 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+//  uint8_t *kpage;
   bool success = false;
+  
+  success = allocate_frame(((uint8_t *) PHYS_BASE) - PGSIZE, true);
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+//  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+//  if (kpage != NULL) 
+//    {
+//      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
-      else
-        palloc_free_page (kpage);
-    }
+//      else
+//        palloc_free_page (kpage);
+//    }
   return success;
 }
 
