@@ -47,6 +47,8 @@ of this project.
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 
+#include "stdio.h"
+
 static struct list all_frames;
 
 void frame_init() {
@@ -63,33 +65,33 @@ int allocate_frame(void* upage, int writable) {
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
   if (kpage == NULL) {
-    // Can't allocate page, will need to do swaps
+    printf("Can't allocate page, will need to do swaps.\n");
     return false;
   }
   else {
     // Page allocated
     struct thread *t = thread_current ();
-    
+
     // Compute a valid user page address
     printf("User address before: %x\n", (uint32_t) upage);
-    upage = ((((uint32_t) upage) / PGSIZE) - 1) * PGSIZE;
+    upage = ((((uint32_t) upage - (1)) / PGSIZE)) * PGSIZE;
     printf("User address after: %x\n", (uint32_t) upage);
 
-    // Verify that there's not already a page at that virtual
-    // address, then map our page there.
     if (pagedir_get_page (t->pagedir, upage) == NULL
         && pagedir_set_page (t->pagedir, upage, kpage, writable)) {
+      // Page is not already allocated: map our page there.
       struct frame *fp = malloc(sizeof(struct frame));
-      
+
       fp->upage = upage;
       fp->kpage = kpage;
       fp->writable = writable;
       list_push_back(&all_frames, &fp->elem);
-      
+
       return true;
     }
-    // Page is already allocated: free frame and return false
     else {
+      // Page is already allocated to some process: free frame & return false
+      printf("Page is already allocated to some process.\n");
       palloc_free_page (kpage);
       return false;
     }  

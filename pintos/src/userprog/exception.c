@@ -4,12 +4,14 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+static void kill_process (struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -157,43 +159,58 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);*/
-  
-  if (write && user) {
-    printf("User write.\n");
+
+  printf("not_present: %d\n", not_present);
+  printf("write: %d\n", write);
+  printf("user: %d\n", user);
+  printf("fault_addr: %x\n", (uint32_t) fault_addr);
+  printf("esp: %x\n", (uint32_t) f->esp);
+
+  if (not_present && write && !user) {
+    // Fault in load
+    printf("Hanling page fault while loading.\n");
     // Try to allocate more space
-    int success = allocate_frame(fault_addr);
+    int success = allocate_frame(fault_addr, true);
     if (!success) {
-      thread_set_exit_status(thread_current()->tid, -1);
-      thread_exit();
+      printf("Allocation of stack frame unsuccessful.\n");
+      kill_process(f);
     }
     else {
       printf("Exiting pagefault 1.\n");
       return;
     }
-    
+  }
+  else if (not_present && write && user) {
+    printf("Handling page fault while allocating memory on stack.\n");
+    int success = allocate_frame(fault_addr, true);
+    if (!success) {
+      printf("Allocation of stack frame unsuccessful.\n");
+      kill_process(f);
+    }
+    else {
+      printf("Exiting pagefault 1.\n");
+      return;
+    }
   }
   else {
-    printf("NOT User write.\n");
-    thread_set_exit_status(thread_current()->tid, -1);
-    thread_exit();
-    
-    int tmp;
-    uint32_t new_eax = 0xffffffff;
-    printf("Exiting pagefault 2.\n");
-    asm ("movl %%eax, %0; movl %1, %%eax;"
-         : "=g" (tmp)
-         : "g" (new_eax));
-    asm ("jmp %0;"
-         :: "g" (tmp));
+    printf("Invalid Access.\n");
+    kill_process(f);
   }
-    int tmp;
-    uint32_t new_eax = 0xffffffff;
-    printf("Exiting pagefault 2.\n");
-    asm ("movl %%eax, %0; movl %1, %%eax;"
-         : "=g" (tmp)
-         : "g" (new_eax));
-    asm ("jmp %0;"
-         :: "g" (tmp));
- // }
 }
 
+static void
+kill_process (struct intr_frame *f)
+{
+  printf("Killing process...\n");
+  thread_set_exit_status(thread_current()->tid, -1);
+  thread_exit();
+
+  uint32_t new_eax = 0xffffffff;
+  int tmp;
+  asm ("movl %%eax, %0; movl %1, %%eax;"
+        : "=g" (tmp)
+        : "g" (new_eax));
+  asm ("jmp %0;"
+        :: "g" (tmp));
+
+}
