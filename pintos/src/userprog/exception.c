@@ -11,6 +11,7 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+static void extend_stack (struct intr_frame *, void *fault_addr);
 static void kill_process (struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
@@ -160,41 +161,48 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);*/
 
-//   printf("not_present: %d\n", not_present);
-//   printf("write: %d\n", write);
-//   printf("user: %d\n", user);
-//   printf("fault_addr: %x\n", (uint32_t) fault_addr);
-//   printf("esp: %x\n", (uint32_t) f->esp);
+  printf("not_present: %d\n", not_present);
+  printf("write: %d\n", write);
+  printf("user: %d\n", user);
+  printf("fault_addr: %x\n", (uint32_t) fault_addr);
+  printf("esp: %x\n", (uint32_t) f->esp);
 
   if (not_present && write && !user) {
-    // Fault in load
-//     printf("Hanling page fault while loading.\n");
+    printf("Hanling page fault while loading.\n");
     // Try to allocate more space
-    int success = allocate_frame(fault_addr, true);
-    if (!success) {
-//       printf("Allocation of stack frame unsuccessful.\n");
-      kill_process(f);
-    }
-    else {
-//       printf("Allocation of stack frame sucessful. Returning to system process.\n");
-      return;
-    }
+    extend_stack(f, fault_addr);
+    printf("Returning to system process.\n");
+    return;
   }
   else if (not_present && write && user) {
-//     printf("Handling page fault while allocating memory on stack.\n");
-    int success = allocate_frame(fault_addr, true);
-    if (!success) {
-//       printf("Allocation of stack frame unsucessful.\n");
-      kill_process(f);
-    }
-    else {
-//       printf("Allocation of stack frame sucessful. Returning to user process.\n");
-      return;
-    }
+    printf("Handling page fault while allocating memory on stack.\n");
+    extend_stack(f, fault_addr);
+    printf("Returning to user process.\n");
+    return;
+  }
+  else if (not_present && !write && !user) {
+    printf("Handling something.\n");
+//     extend_stack(f, fault_addr);
+    kill_process(f);
+    printf("Returning to system process.\n");
+    return;
   }
   else {
-//     printf("Invalid Access.\n");
+    printf("Invalid Access.\n");
     kill_process(f);
+  }
+}
+
+static void
+extend_stack (struct intr_frame *f, void *fault_addr) {
+  int success = allocate_frame(fault_addr, true);
+  if (!success) {
+//     printf("Allocation of stack frame unsucessful.\n");
+    kill_process(f);
+  }
+  else {
+//     printf("Allocation of stack frame sucessful.\n");
+    return;
   }
 }
 
@@ -212,5 +220,4 @@ kill_process (struct intr_frame *f)
         : "g" (new_eax));
   asm ("jmp %0;"
         :: "g" (tmp));
-
 }
