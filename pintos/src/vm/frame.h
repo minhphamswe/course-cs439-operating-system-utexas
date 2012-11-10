@@ -16,6 +16,8 @@ int allocate_frame(void* upage, int writeble);
 
 void set_frame(void* upage, void* kpage, int writable);
 void unset_frame(struct frame *fp);
+
 struct frame * get_frame(void *upage);
+struct frame * get_kernel_frame(void *kpage);
 
 #endif /* vm/frame.h */

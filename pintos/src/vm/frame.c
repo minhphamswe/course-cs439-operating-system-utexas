@@ -73,9 +73,10 @@ int allocate_frame(void* upage, int writable) {
     struct thread *t = thread_current ();
 
     // Compute a valid user page address
-    printf("User address before: %x\n", (uint32_t) upage);
-    upage = ((((uint32_t) upage - (1)) / PGSIZE)) * PGSIZE;
-    printf("User address after: %x\n", (uint32_t) upage);
+//     printf("User address before: %x\n", (uint32_t) upage);
+    upage = (((uint32_t) upage) / PGSIZE) * PGSIZE;
+//     upage = ((((uint32_t) upage - (1)) / PGSIZE)) * PGSIZE;
+//     printf("User address after: %x\n", (uint32_t) upage);
 
     if (pagedir_get_page (t->pagedir, upage) == NULL
         && pagedir_set_page (t->pagedir, upage, kpage, writable)) {
@@ -94,7 +95,7 @@ int allocate_frame(void* upage, int writable) {
       printf("Page is already allocated to some process.\n");
       palloc_free_page (kpage);
       return false;
-    }  
+    }
   }
 }
 
@@ -102,9 +103,11 @@ int allocate_frame(void* upage, int writable) {
 void set_frame(void* upage, void* kpage, int writable)
 {
   struct frame *fp = get_frame(upage);
-  
-  fp->upage = upage;
-  fp->writable = writable;
+
+  if (fp) {
+    fp->upage = upage;
+    fp->writable = writable;
+  }
 }
 
 /** Remove the frame pointed to by fp */
@@ -112,10 +115,10 @@ void unset_frame(struct frame *fp)
 {
   // Free the frame
   palloc_free_page(fp->kpage);
-  
+
   // Remove the frame from the list
   list_remove(&fp->elem);
-  
+
   // Free the frame
   free(fp);
 }
@@ -126,11 +129,26 @@ struct frame * get_frame(void *upage)
   struct list_elem *e;
 
   for (e = list_begin (&all_frames); e != list_end (&all_frames);
-     e = list_next (e))
+       e = list_next (e))
   {
     struct frame *f = list_entry (e, struct frame, elem);
     if(f->upage == upage)
       return f;
   }
+  return NULL;
 }
 
+/** Get a KPAGE by KPAGE */
+struct frame * get_kernel_frame(void *kpage)
+{
+  struct list_elem *e;
+
+  for (e = list_begin (&all_frames); e != list_end (&all_frames);
+       e = list_next (e))
+  {
+    struct frame *f = list_entry (e, struct frame, elem);
+    if(f->kpage == kpage)
+      return f;
+  }
+  return NULL;
+}
