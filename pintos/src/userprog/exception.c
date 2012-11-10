@@ -157,15 +157,43 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);*/
-  thread_set_exit_status(thread_current()->tid, -1);
-  thread_exit();
   
-  int tmp;
-  uint32_t new_eax = 0xffffffff;
-  asm ("movl %%eax, %0; movl %1, %%eax;"
-       : "=g" (tmp)
-       : "g" (new_eax));
-  asm ("jmp %0;"
-       :: "g" (tmp));
+  if (write && user) {
+    printf("User write.\n");
+    // Try to allocate more space
+    int success = allocate_frame(fault_addr);
+    if (!success) {
+      thread_set_exit_status(thread_current()->tid, -1);
+      thread_exit();
+    }
+    else {
+      printf("Exiting pagefault 1.\n");
+      return;
+    }
+    
+  }
+  else {
+    printf("NOT User write.\n");
+    thread_set_exit_status(thread_current()->tid, -1);
+    thread_exit();
+    
+    int tmp;
+    uint32_t new_eax = 0xffffffff;
+    printf("Exiting pagefault 2.\n");
+    asm ("movl %%eax, %0; movl %1, %%eax;"
+         : "=g" (tmp)
+         : "g" (new_eax));
+    asm ("jmp %0;"
+         :: "g" (tmp));
+  }
+    int tmp;
+    uint32_t new_eax = 0xffffffff;
+    printf("Exiting pagefault 2.\n");
+    asm ("movl %%eax, %0; movl %1, %%eax;"
+         : "=g" (tmp)
+         : "g" (new_eax));
+    asm ("jmp %0;"
+         :: "g" (tmp));
+ // }
 }
 
