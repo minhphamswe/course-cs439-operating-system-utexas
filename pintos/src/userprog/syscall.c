@@ -40,6 +40,7 @@ static struct semaphore filesys_sema;
 */
 static int
 get_user (const uint32_t *uaddr) {
+  //  printf("Reading user address: %x\n", uaddr);
   int result = -1;
   if (uaddr < PHYS_BASE)
     asm ( "movl $1f, %0; movl %1, %0; 1:"
@@ -54,6 +55,7 @@ get_user (const uint32_t *uaddr) {
 */
 static bool
 put_user (uint8_t *udst, uint8_t byte) {
+  //  printf("Putting user address: %x\n", udst);
   int error_code;
   asm ( "movl $1f, %0; movb %b2, %1; 1:"
         : "=&a" (error_code), "=m" (*udst)
@@ -374,7 +376,7 @@ void sysread_handler(struct intr_frame *f)
   off_t size = pop_stack(f);
 
   // Check to make sure buffer is in user space
-  if (get_user(buffer) == -1) {
+  if (put_user(buffer, 0x1) == -1) {
     terminate_thread();
   }
 

@@ -65,7 +65,7 @@ int allocate_frame(void* upage, int writable) {
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
   if (kpage == NULL) {
-    printf("Can't allocate page, will need to do swaps.\n");
+    //    printf("Can't allocate page, will need to do swaps.\n");
     return false;
   }
   else {
@@ -92,7 +92,7 @@ int allocate_frame(void* upage, int writable) {
     }
     else {
       // Page is already allocated to some process: free frame & return false
-      printf("Page is already allocated to some process.\n");
+      //printf("Page is already allocated to some process.\n");
       palloc_free_page (kpage);
       return false;
     }

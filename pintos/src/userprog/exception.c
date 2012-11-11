@@ -170,27 +170,34 @@ page_fault (struct intr_frame *f)
   if (fault_addr == NULL) {
 //    printf("Access to null pointer");
     kill_process(f);
+    return;
   }
 
   if (not_present && write && !user) {
     // Load & Write-bad
-//    printf("Handling page fault while loading.\n");
+    //   printf("Handling page fault while loading.\n");
     // Try to allocate more space
     extend_stack(f, fault_addr);
 //    printf("Returning to system process.\n");
     return;
   }
   else if (not_present && write && user) {
-//    printf("Handling page fault while allocating memory on stack.\n");
+    //  printf("Handling page fault while allocating memory on stack.\n");
     extend_stack(f, fault_addr);
 //    printf("Returning to user process.\n");
     return;
   }
   else if (not_present && !write && !user) {
-//    printf("Handling something.\n");
-//    extend_stack(f, fault_addr);
+    //    printf("Handling something.\n");
+    //     extend_stack(f, fault_addr);
+//    printf("Blah %x\n", fault_addr);
     kill_process(f);
 //    printf("Returning to system process.\n");
+    return;
+  }
+  else if (not_present && !write && user) {
+    // Swap if available, crash otherwise
+    kill_process(f);
     return;
   }
   else {
