@@ -587,6 +587,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  //  printf("Running load_segment\n");
+
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -631,7 +633,8 @@ setup_stack (void **esp)
 {
 //  uint8_t *kpage;
   bool success = false;
-  
+  //  int i;
+  //  for(i=0; i<20; i++) {
   success = allocate_frame(((uint8_t *) PHYS_BASE) - PGSIZE, true);
 
 //  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
@@ -640,9 +643,12 @@ setup_stack (void **esp)
 //      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
+      //      else
+	//	return false;
 //      else
 //        palloc_free_page (kpage);
 //    }
+//  }
   return success;
 }
 

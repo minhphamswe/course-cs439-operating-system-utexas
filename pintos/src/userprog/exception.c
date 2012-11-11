@@ -4,6 +4,7 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "vm/frame.h"
 
 /* Number of page faults processed. */
@@ -165,7 +166,7 @@ page_fault (struct intr_frame *f)
 //  printf("write: %d\n", write);
 //  printf("user: %d\n", user);
 //  printf("fault_addr: %x\n", (uint32_t) fault_addr);
-//  printf("esp: %x\n", (uint32_t) f->esp);
+//  printf("esp: %x\n", (uint32_t) f);
 
   if (fault_addr == NULL) {
 //    printf("Access to null pointer");
@@ -208,21 +209,32 @@ page_fault (struct intr_frame *f)
 
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
-  int success = allocate_frame(fault_addr, true);
-  if (!success) {
-//     printf("Allocation of stack frame unsuccessful.\n");
+  int frame_addr;
+  bool once;
+  //  printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
+  for (frame_addr = (int) fault_addr; frame_addr <= (int) f->frame_pointer;
+       frame_addr += PGSIZE) {
+    once = true;
+    //    printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n",
+    //	   frame_addr, fault_addr, f->frame_pointer);
+    int success = allocate_frame(frame_addr, true);
+    if (!success) {
+      break;
+    }
+  }
+  if (!once) {
+    //    printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
-  else {
-//     printf("Allocation of stack frame successful.\n");
-    return;
-  }
+
+  //printf("Allocation of stack frame successful.\n");
+  return;
 }
 
 static void
 kill_process (struct intr_frame *f)
 {
-//   printf("Killing process...\n");
+  //  printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 
@@ -232,5 +244,5 @@ kill_process (struct intr_frame *f)
         : "=g" (tmp)
         : "g" (new_eax));
   asm ("jmp %0;"
-        :: "g" (tmp));
+  :: "g" (tmp));
 }

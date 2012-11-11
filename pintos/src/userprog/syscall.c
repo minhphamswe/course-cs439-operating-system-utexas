@@ -41,12 +41,14 @@ static struct semaphore filesys_sema;
 static int
 get_user (const uint32_t *uaddr) {
   //  printf("Reading user address: %x\n", uaddr);
-  int result = -1;
-  if (uaddr < PHYS_BASE)
+  if (uaddr < PHYS_BASE) {
+    int result;
     asm ( "movl $1f, %0; movl %1, %0; 1:"
           : "=&a" (result)
           : "m" (*uaddr));
-  return result;
+    return result;
+  }
+  return -1;
 }
 
 /* Writes BYTE to user address UDST.
@@ -56,11 +58,14 @@ get_user (const uint32_t *uaddr) {
 static bool
 put_user (uint8_t *udst, uint8_t byte) {
   //  printf("Putting user address: %x\n", udst);
-  int error_code;
-  asm ( "movl $1f, %0; movb %b2, %1; 1:"
-        : "=&a" (error_code), "=m" (*udst)
-        : "q" (byte));
-  return error_code != -1;
+  if (udst < PHYS_BASE) {
+    int error_code;
+    asm ( "movl $1f, %0; movb %b2, %1; 1:"
+	  : "=&a" (error_code), "=m" (*udst)
+	  : "q" (byte));
+    return error_code != -1;
+  }
+  return false;
 }
 
 /* Given an interrupt frame pointer, return the value pointed to by f->esp,
@@ -375,11 +380,6 @@ void sysread_handler(struct intr_frame *f)
   void *buffer = pop_stack(f);
   off_t size = pop_stack(f);
 
-  // Check to make sure buffer is in user space
-  if (put_user(buffer, 0x1) == -1) {
-    terminate_thread();
-  }
-
   // fd is 0: Read from stdin
   if (fd == 0) {
     *(char*) buffer = input_getc();
@@ -395,6 +395,15 @@ void sysread_handler(struct intr_frame *f)
     return;
   }
   else {
+    // Check to make sure buffer is in user space
+    if (get_user(buffer) == -1) {
+      terminate_thread();
+    }
+
+    if (put_user(buffer, 0x1) == false) {
+      terminate_thread();
+    }
+
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
       f->eax = file_read(fhp->file, buffer, size);

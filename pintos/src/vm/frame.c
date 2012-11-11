@@ -76,7 +76,7 @@ int allocate_frame(void* upage, int writable) {
 //     printf("User address before: %x\n", (uint32_t) upage);
     upage = (((uint32_t) upage) / PGSIZE) * PGSIZE;
 //     upage = ((((uint32_t) upage - (1)) / PGSIZE)) * PGSIZE;
-//     printf("User address after: %x\n", (uint32_t) upage);
+//    printf("User address after: %x\n", (uint32_t) upage);
 
     if (pagedir_get_page (t->pagedir, upage) == NULL
         && pagedir_set_page (t->pagedir, upage, kpage, writable)) {
