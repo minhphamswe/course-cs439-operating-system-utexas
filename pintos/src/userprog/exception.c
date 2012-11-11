@@ -161,34 +161,40 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);*/
 
-  printf("not_present: %d\n", not_present);
-  printf("write: %d\n", write);
-  printf("user: %d\n", user);
-  printf("fault_addr: %x\n", (uint32_t) fault_addr);
-  printf("esp: %x\n", (uint32_t) f->esp);
+//  printf("not_present: %d\n", not_present);
+//  printf("write: %d\n", write);
+//  printf("user: %d\n", user);
+//  printf("fault_addr: %x\n", (uint32_t) fault_addr);
+//  printf("esp: %x\n", (uint32_t) f->esp);
+
+  if (fault_addr == NULL) {
+//    printf("Access to null pointer");
+    kill_process(f);
+  }
 
   if (not_present && write && !user) {
-    printf("Hanling page fault while loading.\n");
+    // Load & Write-bad
+//    printf("Handling page fault while loading.\n");
     // Try to allocate more space
     extend_stack(f, fault_addr);
-    printf("Returning to system process.\n");
+//    printf("Returning to system process.\n");
     return;
   }
   else if (not_present && write && user) {
-    printf("Handling page fault while allocating memory on stack.\n");
+//    printf("Handling page fault while allocating memory on stack.\n");
     extend_stack(f, fault_addr);
-    printf("Returning to user process.\n");
+//    printf("Returning to user process.\n");
     return;
   }
   else if (not_present && !write && !user) {
-    printf("Handling something.\n");
-//     extend_stack(f, fault_addr);
+//    printf("Handling something.\n");
+//    extend_stack(f, fault_addr);
     kill_process(f);
-    printf("Returning to system process.\n");
+//    printf("Returning to system process.\n");
     return;
   }
   else {
-    printf("Invalid Access.\n");
+//    printf("Invalid Access.\n");
     kill_process(f);
   }
 }
@@ -197,11 +203,11 @@ static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
   int success = allocate_frame(fault_addr, true);
   if (!success) {
-//     printf("Allocation of stack frame unsucessful.\n");
+//     printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
   else {
-//     printf("Allocation of stack frame sucessful.\n");
+//     printf("Allocation of stack frame successful.\n");
     return;
   }
 }
