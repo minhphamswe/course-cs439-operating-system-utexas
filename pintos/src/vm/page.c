@@ -61,6 +61,8 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include <threads/malloc.h>
 #include <threads/thread.h>
 
+#include "threads/vaddr.h"
+
 #include <stdio.h>
 
 /** Initialize a page table */
@@ -88,18 +90,25 @@ int allocate_page(void* uaddr)
 //   printf("Allocating page\n");
 
   struct thread *t = thread_current();
+  struct page_entry *entry = get_page_entry(uaddr);
+  int success;
 
-  struct page_entry *entry = malloc(sizeof(struct page_entry));
-  entry->uaddr = uaddr;
-
-  int success = allocate_frame(entry, true);
-  if (success) {
-    // if page was successfully allocate, track frame
-    list_push_back(&(t->pages.pages), &entry->elem);
+  if (entry) {
+    success = true;
   }
   else {
-    // otherwise free it and don't bother
-    free_page_entry(entry);
+    entry = malloc(sizeof(struct page_entry));
+    entry->uaddr = uaddr;
+
+    success = allocate_frame(entry, true);
+    if (success) {
+      // if page was successfully allocate, track frame
+      list_push_back(&(t->pages.pages), &entry->elem);
+    }
+    else {
+      // otherwise free it and don't bother
+      free_page_entry(entry);
+    }
   }
 
   return success;
@@ -140,6 +149,8 @@ struct page_entry* get_page_entry(void* uaddr)
   struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
   struct list_elem *e;
+
+  uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
 
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages);
        e = list_next(e)) {

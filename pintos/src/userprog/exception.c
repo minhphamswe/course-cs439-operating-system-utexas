@@ -5,7 +5,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+
 #include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -162,17 +165,17 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);*/
 
-  printf("not_present: %d\n", not_present);
-  printf("write: %d\n", write);
-  printf("user: %d\n", user);
+//   printf("not_present: %d\n", not_present);
+//   printf("write: %d\n", write);
+//   printf("user: %d\n", user);
 //  printf("fault_addr: %x\n", (uint32_t) fault_addr);
 //  printf("esp: %x\n", (uint32_t) f);
 
-  if (fault_addr == NULL) {
-    printf("Access to null pointer");
-    kill_process(f);
-    return;
-  }
+//   if (fault_addr == NULL) {
+//     printf("Access to null pointer\n");
+//     kill_process(f);
+//     return;
+//   }
 
   if (not_present && write && !user) {
     // Load & Write-bad
@@ -189,14 +192,34 @@ page_fault (struct intr_frame *f)
     return;
   }
   else if (not_present && !write && !user) {
-    printf("Handling something.\n");
-    kill_process(f);
-    printf("Returning to system process.\n");
+//     printf("Handling something.\n");
+
+    int status = get_page_status(fault_addr);
+    if (status == PAGE_NOT_EXIST) {
+      printf("Read access to page you do not own -> KILL\n");
+      kill_process(f);
+    }
+    else if (status == PAGE_SWAPPED) {
+//       printf("Read acceess to swapped page.\n");
+      pull_from_swap(get_frame(get_page_entry(fault_addr)));
+    }
+//     printf("Returning to system process.\n");
     return;
   }
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
-    kill_process(f);
+//     printf("Handling something else.\n");
+
+    int status = get_page_status(fault_addr);
+    if (status == PAGE_NOT_EXIST) {
+      printf("Read access to page you do not own -> KILL\n");
+      kill_process(f);
+    }
+    else if (status == PAGE_SWAPPED) {
+//       printf("Read acceess to swapped page.\n");
+      pull_from_swap(get_frame(get_page_entry(fault_addr)));
+    }
+//     printf("Returning to user process.\n");
     return;
   }
   else {

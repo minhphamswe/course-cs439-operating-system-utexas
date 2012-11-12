@@ -99,7 +99,6 @@ main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-  vm_init();
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -127,6 +126,7 @@ main (void)
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
+  vm_init();
 #endif
 
   printf ("Boot complete.\n");
