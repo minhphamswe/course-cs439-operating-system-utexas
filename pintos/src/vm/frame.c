@@ -38,6 +38,7 @@ from or prevent such situations, but these policies are beyond the scope
 of this project.
 */
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 #include "lib/kernel/list.h"
 
@@ -51,7 +52,8 @@ of this project.
 
 static struct list all_frames;
 
-void frame_init() {
+/** Initialize the frame table system. */
+void frame_init(void) {
   list_init(&all_frames);
 }
 
@@ -60,23 +62,23 @@ void frame_init() {
  * if success, and false if a page cannot be allocated.
  */
 int allocate_frame(void* upage, int writable) {
-  // Allocate frame and get its kernel page address 
+  // Allocate frame and get its kernel page address
+  printf("Allocating frame...\n");
   uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
   if (kpage == NULL) {
-    //    printf("Can't allocate page, will need to do swaps.\n");
+    printf("TODO: Can't allocate page, will need to do evict page.\n");
     return false;
   }
   else {
     // Page allocated
+    printf("Got a free frame.\n");
     struct thread *t = thread_current ();
 
     // Compute a valid user page address
-//     printf("User address before: %x\n", (uint32_t) upage);
     upage = (((uint32_t) upage) / PGSIZE) * PGSIZE;
-//     upage = ((((uint32_t) upage - (1)) / PGSIZE)) * PGSIZE;
-//    printf("User address after: %x\n", (uint32_t) upage);
+//     printf("User address after: %x\n", (uint32_t) upage);
 
     if (pagedir_get_page (t->pagedir, upage) == NULL
         && pagedir_set_page (t->pagedir, upage, kpage, writable)) {
@@ -92,7 +94,7 @@ int allocate_frame(void* upage, int writable) {
     }
     else {
       // Page is already allocated to some process: free frame & return false
-      //printf("Page is already allocated to some process.\n");
+      printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
       palloc_free_page (kpage);
       return false;
     }
@@ -102,11 +104,16 @@ int allocate_frame(void* upage, int writable) {
 /** Remap the frame at KPAGE to contain the page pointed at by UPAGE.*/
 void set_frame(void* upage, void* kpage, int writable)
 {
-  struct frame *fp = get_frame(upage);
+  struct list_elem *e;
 
-  if (fp) {
-    fp->upage = upage;
-    fp->writable = writable;
+  for (e = list_begin (&all_frames); e != list_end (&all_frames);
+       e = list_next (e))
+  {
+    struct frame *f = list_entry (e, struct frame, elem);
+    if(f->kpage == upage) {
+      f->upage = upage;
+      f->writable = writable;
+    }
   }
 }
 

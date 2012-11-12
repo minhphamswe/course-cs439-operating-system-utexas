@@ -341,7 +341,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   sema_up(&s);
   if (file == NULL) 
     {
-      //printf ("load: %s: open failed\n", argv[0]);
+      printf ("load: %s: open failed\n", argv[0]);
       goto done; 
     }
 
@@ -355,7 +355,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      //printf ("load: %s: error loading executable\n", argv[0]);
+      printf ("load: %s: error loading executable\n", argv[0]);
       goto done; 
     }
   sema_up(&s);
@@ -367,13 +367,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
       struct Elf32_Phdr phdr;
 
       if (file_ofs < 0 || file_ofs > file_length (file)) {
-        //printf("Reading past the end of file.\n");
+        printf("Reading past the end of file.\n");
         goto done;
       }
       file_seek (file, file_ofs);
 
       if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
-        //printf("Reading file did not complete.\n");
+        printf("Reading file did not complete.\n");
         goto done;
       }
       file_ofs += sizeof phdr;
@@ -415,12 +415,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
                 }
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable)) {
-                //printf("failed to load segment\n");
+                printf("failed to load segment\n");
                 goto done;
               }
             }
           else {
-            //printf("segment is invalid\n"); 
+            printf("segment is invalid\n");
             goto done;
           }
           break;
@@ -429,7 +429,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Set up stack. */
   if (!setup_stack (esp)) {
-    //printf("Setting up of the stack failed.\n");
+    printf("Setting up of the stack failed.\n");
     goto done;
   }
 
@@ -631,24 +631,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-//  uint8_t *kpage;
   bool success = false;
-  //  int i;
-  //  for(i=0; i<20; i++) {
   success = allocate_frame(((uint8_t *) PHYS_BASE) - PGSIZE, true);
 
-//  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-//  if (kpage != NULL) 
-//    {
-//      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      //      else
-	//	return false;
-//      else
-//        palloc_free_page (kpage);
-//    }
-//  }
+  if (success)
+    *esp = PHYS_BASE;
+  else
+    printf("Setting up of the stack failed. In process.c/setup_stack()\n");
+
   return success;
 }
 

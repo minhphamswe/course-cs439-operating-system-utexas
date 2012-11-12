@@ -7,6 +7,8 @@
 #include "threads/synch.h"
 #include "filesys/file.h"
 
+#include "vm/page.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -146,6 +148,9 @@ struct thread
   struct list handles;            /* List element for open files */
   struct list wait_list;          /* List of child threads waited on */
   struct list child_list;         /* List of all child threads */
+
+  struct page_table pages;
+
   int nextFD;                     /* The next file, increment */
 
 #ifdef USERPROG

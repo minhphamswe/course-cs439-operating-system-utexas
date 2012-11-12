@@ -294,6 +294,7 @@ thread_create (const char *name, int priority,
   es->status = 0;
   list_push_back(&exit_list, &es->exit_elem);
   list_push_back(&thread_current()->child_list, &es->child_elem);
+  page_table_init(&t->pages);
 
   /* Re-enable interrupt */
   intr_set_level (old_level);

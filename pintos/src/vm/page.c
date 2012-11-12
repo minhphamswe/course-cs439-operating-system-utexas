@@ -1,16 +1,17 @@
 /**
-The supplemental page table supplements the page table with additional data
-about each page. Since the page table's format allows it to only contain very
-specific information (see section A.7 Page Table), the supplemental page table
-contains supplemental information such as whether the page is currently swapped
-or in the file system. In real life, such a data structure is often called a
-"page table" also; we add the word "supplemental" to reduce confusion.
-
-The supplemental page table is used for at least two purposes. Most importantly,
-on a page fault, the kernel looks up the virtual page that faulted in the
-supplemental page table to find out what data should be there. Second, the
-kernel consults the supplemental page table when a process terminates, to
-decide what resources to free.
+ * The supplemental page table supplements the page table with additional data
+ * about each page. Since the page table's format allows it to only contain
+ * very specific information (see section A.7 Page Table), the supplemental
+ * page table contains supplemental information such as whether the page is
+ * currently swapped or in the file system. In real life, such a data
+ * structure is often called a "page table" also; we add the word
+ * "supplemental" to reduce confusion.
+ *
+ * The supplemental page table is used for at least two purposes. Most
+ * importantly, on a page fault, the kernel looks up the virtual page that
+ * faulted in the supplemental page table to find out what data should be
+ * there. Second, the kernel consults the supplemental page table when a
+ * process terminates, to decide what resources to free.
 
 You may organize the supplemental page table as you wish. There are at least
 two basic approaches to its organization: in terms of segments or in terms of
@@ -58,12 +59,24 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include "vm/page.h"
 #include "vm/frame.h"
 
-//~ uint32_t get_frame() {
-  // Try to allocate a new frame
-  
-  // Success: register frame
-  
-  // Failure: try to evict a frame
-//~ }
+#include <stdio.h>
+
+int allocate_page(void* upage)
+{
+  printf("Allocating page\n.");
+  int success = allocate_frame(upage, true);
+  return success;
+}
+
+void free_page(void* upage)
+{
+
+}
+
+void page_table_init(struct page_table *pt)
+{
+
+}
+
 
 

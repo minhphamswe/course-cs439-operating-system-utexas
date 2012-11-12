@@ -5,9 +5,11 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 
-void vm_init()
+/// Initialize all VM subsystems that need initialization
+void vm_init(void)
 {
   frame_init();
+  swap_init();
 }
 
 #endif

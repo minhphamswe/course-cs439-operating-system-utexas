@@ -10,7 +10,7 @@ struct frame {
   struct list_elem elem;
 };
 
-void frame_init();
+void frame_init(void);
 
 int allocate_frame(void* upage, int writeble);
 
@@ -19,5 +19,7 @@ void unset_frame(struct frame *fp);
 
 struct frame * get_frame(void *upage);
 struct frame * get_kernel_frame(void *kpage);
+
+void evict_frame();
 
 #endif /* vm/frame.h */

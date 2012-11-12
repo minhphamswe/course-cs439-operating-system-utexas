@@ -162,38 +162,37 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);*/
 
-//  printf("not_present: %d\n", not_present);
-//  printf("write: %d\n", write);
-//  printf("user: %d\n", user);
+ printf("not_present: %d\n", not_present);
+ printf("write: %d\n", write);
+ printf("user: %d\n", user);
 //  printf("fault_addr: %x\n", (uint32_t) fault_addr);
 //  printf("esp: %x\n", (uint32_t) f);
 
   if (fault_addr == NULL) {
-//    printf("Access to null pointer");
+   printf("Access to null pointer");
     kill_process(f);
     return;
   }
 
   if (not_present && write && !user) {
     // Load & Write-bad
-    //   printf("Handling page fault while loading.\n");
+      printf("Handling page fault while loading.\n");
     // Try to allocate more space
     extend_stack(f, fault_addr);
 //    printf("Returning to system process.\n");
     return;
   }
   else if (not_present && write && user) {
-    //  printf("Handling page fault while allocating memory on stack.\n");
+    printf("Handling page fault while allocating memory on stack.\n");
     extend_stack(f, fault_addr);
-//    printf("Returning to user process.\n");
+    printf("Returning to user process.\n");
     return;
   }
   else if (not_present && !write && !user) {
-    //    printf("Handling something.\n");
+    printf("Handling something.\n");
     //     extend_stack(f, fault_addr);
-//    printf("Blah %x\n", fault_addr);
     kill_process(f);
-//    printf("Returning to system process.\n");
+    printf("Returning to system process.\n");
     return;
   }
   else if (not_present && !write && user) {
@@ -202,7 +201,7 @@ page_fault (struct intr_frame *f)
     return;
   }
   else {
-//    printf("Invalid Access.\n");
+    printf("Invalid Access.\n");
     kill_process(f);
   }
 }
@@ -223,18 +222,18 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     }
   }
   if (!once) {
-    //    printf("Allocation of stack frame unsuccessful.\n");
+    printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
 
-  //printf("Allocation of stack frame successful.\n");
+  printf("Allocation of stack frame successful.\n");
   return;
 }
 
 static void
 kill_process (struct intr_frame *f)
 {
-  //  printf("Killing process...\n");
+  printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 
