@@ -58,13 +58,27 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 */
 #include "vm/page.h"
 #include "vm/frame.h"
+#include <threads/malloc.h>
+#include <threads/thread.h>
 
 #include <stdio.h>
+
+struct page_entry {
+  struct list_elem elem;
+};
 
 int allocate_page(void* upage)
 {
   printf("Allocating page\n.");
   int success = allocate_frame(upage, true);
+
+  // if page was successfully allocate, track frame
+  if (success) {
+    struct thread *t = thread_current();
+    struct page_entry *entry = malloc(sizeof(struct page_entry));
+    list_push_back(&(t->pages.pages), &entry->elem);
+  }
+
   return success;
 }
 
@@ -75,8 +89,21 @@ void free_page(void* upage)
 
 void page_table_init(struct page_table *pt)
 {
-
+  list_init(pt);
 }
+
+void page_table_destroy(void)
+{
+  struct thread *t = thread_current();
+  struct page_entry *pe;
+
+  while (!list_empty(&(t->pages.pages))) {
+    pe = list_pop_front(&(t->pages.pages));
+    // TODO: free the frame the entry points to
+    free(pe);
+  }
+}
+
 
 
 
