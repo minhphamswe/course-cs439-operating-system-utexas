@@ -576,7 +576,7 @@ struct fileHandle* get_handle(int fd)
 // Fails gracefully whenever a program does something bad
 void terminate_thread()
 {
-  printf("Terminating thread ...\n");
+//   printf("Terminating thread ...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }

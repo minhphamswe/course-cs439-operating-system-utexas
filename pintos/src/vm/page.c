@@ -63,47 +63,99 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 
 #include <stdio.h>
 
-struct page_entry {
-  struct list_elem elem;
-};
-
-int allocate_page(void* upage)
+/** Initialize a page table */
+void page_table_init(struct page_table *pt)
 {
-  printf("Allocating page\n.");
-  int success = allocate_frame(upage, true);
+  list_init(&pt->pages);
+}
 
-  // if page was successfully allocate, track frame
+/** Free all pages the page table points to. */
+void page_table_destroy(struct page_table *pt)
+{
+  struct page_entry *entry;
+  struct list_elem *e;
+
+  while (!list_empty(&pt->pages)) {
+    e = list_pop_front(&pt->pages);
+    entry = list_entry(e, struct page_entry, elem);
+    free_page_entry(entry);
+  }
+}
+
+/** Allocate and track a user page. */
+int allocate_page(void* uaddr)
+{
+//   printf("Allocating page\n");
+
+  struct thread *t = thread_current();
+
+  struct page_entry *entry = malloc(sizeof(struct page_entry));
+  entry->uaddr = uaddr;
+
+  int success = allocate_frame(entry, true);
   if (success) {
-    struct thread *t = thread_current();
-    struct page_entry *entry = malloc(sizeof(struct page_entry));
+    // if page was successfully allocate, track frame
     list_push_back(&(t->pages.pages), &entry->elem);
+  }
+  else {
+    // otherwise free it and don't bother
+    free_page_entry(entry);
   }
 
   return success;
 }
 
-void free_page(void* upage)
+/** Return the status of the page a user address points to. */
+page_status get_page_status(void* uaddr)
 {
-
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (entry)
+    return entry->status;
+  else
+    return PAGE_NOT_EXIST;
 }
 
-void page_table_init(struct page_table *pt)
+_Bool set_page_status(void* uaddr, page_status status)
 {
-  list_init(pt);
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (entry)
+    entry->status = status;
+  return (entry != NULL);
 }
 
-void page_table_destroy(void)
+/** */
+void free_page(void* uaddr)
+{
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (entry)
+    free_page_entry(entry);
+}
+
+/**
+ * Look in the current thread's page table for page containing UADDR.
+ * Return NULL if there is no such page.
+ */
+struct page_entry* get_page_entry(void* uaddr)
 {
   struct thread *t = thread_current();
-  struct page_entry *pe;
+  struct page_table *pt = &t->pages;
+  struct list_elem *e;
 
-  while (!list_empty(&(t->pages.pages))) {
-    pe = list_pop_front(&(t->pages.pages));
-    // TODO: free the frame the entry points to
-    free(pe);
+  for (e = list_begin(&pt->pages); e != list_end(&pt->pages);
+       e = list_next(e)) {
+    struct page_entry *entry = list_entry(e, struct page_entry, elem);
+    if (entry->uaddr == uaddr)
+      return entry;
   }
+
+  return NULL;
 }
 
-
-
-
+/** Free a page, and any frame it points to. */
+void free_page_entry(struct page_entry* entry)
+{
+  // TODO: free the frame the entry points to
+  if (entry != NULL) {
+    free(entry);
+  }
+}

@@ -632,7 +632,7 @@ static bool
 setup_stack (void **esp) 
 {
   bool success = false;
-  success = allocate_frame(((uint8_t *) PHYS_BASE) - PGSIZE, true);
+  success = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
 
   if (success)
     *esp = PHYS_BASE;

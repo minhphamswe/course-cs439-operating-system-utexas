@@ -39,6 +39,7 @@ of this project.
 */
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "vm/page.h"
 
 #include "lib/kernel/list.h"
 
@@ -58,31 +59,36 @@ void frame_init(void) {
 }
 
 /**
- * Allocate a new frame to hold the page pointed to by UPAGE, returning true
- * if success, and false if a page cannot be allocated.
+ * Allocate a new frame to hold the page pointed to by UPAGE.
+ * Frames will be evicted to make space for the page. This method should
+ * return true (success) in all cases except when swap is full.
  */
-int allocate_frame(void* upage, int writable) {
+int allocate_frame(struct page_entry *upage, int writable) {
   // Allocate frame and get its kernel page address
-  printf("Allocating frame...\n");
+//   printf("Allocating frame...\n");
   uint8_t *kpage;
+  void * uaddr;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
   if (kpage == NULL) {
-    printf("TODO: Can't allocate page, will need to do evict page.\n");
+//     printf("TODO: Can't allocate frame, will need to evict.\n");
     return false;
   }
   else {
     // Page allocated
-    printf("Got a free frame.\n");
+//     printf("Got a free frame\n");
     struct thread *t = thread_current ();
 
     // Compute a valid user page address
-    upage = (((uint32_t) upage) / PGSIZE) * PGSIZE;
+    uaddr = upage->uaddr;
+    uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
 //     printf("User address after: %x\n", (uint32_t) upage);
 
-    if (pagedir_get_page (t->pagedir, upage) == NULL
-        && pagedir_set_page (t->pagedir, upage, kpage, writable)) {
-      // Page is not already allocated: map our page there.
+    if (pagedir_get_page (t->pagedir, uaddr) == NULL
+        && pagedir_set_page (t->pagedir, uaddr, kpage, writable)) {
+      // Page is not already allocate
+
+      // Map and track frame
       struct frame *fp = malloc(sizeof(struct frame));
 
       fp->upage = upage;
@@ -90,11 +96,15 @@ int allocate_frame(void* upage, int writable) {
       fp->writable = writable;
       list_push_back(&all_frames, &fp->elem);
 
+      // Update page entry
+      upage->frame = fp;
+      upage->status = PAGE_PRESENT;
+
       return true;
     }
     else {
       // Page is already allocated to some process: free frame & return false
-      printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
+//       printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
       palloc_free_page (kpage);
       return false;
     }
@@ -102,7 +112,7 @@ int allocate_frame(void* upage, int writable) {
 }
 
 /** Remap the frame at KPAGE to contain the page pointed at by UPAGE.*/
-void set_frame(void* upage, void* kpage, int writable)
+void set_frame(struct page_entry* upage, void* kpage, int writable)
 {
   struct list_elem *e;
 
@@ -131,7 +141,7 @@ void unset_frame(struct frame *fp)
 }
 
 /** Get a KPAGE by UPAGE */
-struct frame * get_frame(void *upage)
+struct frame * get_frame(struct page_entry* upage)
 {
   struct list_elem *e;
 
