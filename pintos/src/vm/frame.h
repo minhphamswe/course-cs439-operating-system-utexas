@@ -22,6 +22,6 @@ void unset_frame(struct frame *fp);
 struct frame * get_frame(struct page_entry *upage);
 struct frame * get_kernel_frame(void *kpage);
 
-void evict_frame(void);
+void* evict_frame(void);
 
 #endif /* vm/frame.h */

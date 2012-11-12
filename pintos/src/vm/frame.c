@@ -71,43 +71,42 @@ int allocate_frame(struct page_entry *upage, int writable) {
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
   if (kpage == NULL) {
-//     printf("TODO: Can't allocate frame, will need to evict.\n");
-    return false;
+    kpage = evict_frame();
+    //return false;
   }
-  else {
-    // Page allocated
-//     printf("Got a free frame\n");
-    struct thread *t = thread_current ();
 
-    // Compute a valid user page address
-    uaddr = upage->uaddr;
-    uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
+  // Page allocated
+//     printf("Got a free frame\n");
+  struct thread *t = thread_current ();
+
+  // Compute a valid user page address
+  uaddr = upage->uaddr;
+  uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
 //     printf("User address after: %x\n", (uint32_t) upage);
 
-    if (pagedir_get_page (t->pagedir, uaddr) == NULL
-        && pagedir_set_page (t->pagedir, uaddr, kpage, writable)) {
-      // Page is not already allocate
+  if (pagedir_get_page (t->pagedir, uaddr) == NULL
+      && pagedir_set_page (t->pagedir, uaddr, kpage, writable)) {
+    // Page is not already allocate
 
-      // Map and track frame
-      struct frame *fp = malloc(sizeof(struct frame));
+    // Map and track frame
+    struct frame *fp = malloc(sizeof(struct frame));
 
-      fp->upage = upage;
-      fp->kpage = kpage;
-      fp->writable = writable;
-      list_push_back(&all_frames, &fp->elem);
+    fp->upage = upage;
+    fp->kpage = kpage;
+    fp->writable = writable;
+    list_push_back(&all_frames, &fp->elem);
 
-      // Update page entry
-      upage->frame = fp;
-      upage->status = PAGE_PRESENT;
+    // Update page entry
+    upage->frame = fp;
+    upage->status = PAGE_PRESENT;
 
-      return true;
-    }
-    else {
-      // Page is already allocated to some process: free frame & return false
+    return true;
+  }
+  else {
+    // Page is already allocated to some process: free frame & return false
 //       printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
-      palloc_free_page (kpage);
-      return false;
-    }
+    palloc_free_page (kpage);
+    return false;
   }
 }
 
@@ -169,3 +168,13 @@ struct frame * get_kernel_frame(void *kpage)
   }
   return NULL;
 }
+
+void* evict_frame(void )
+{
+  struct list_elem *e = list_pop_front(&all_frames);
+  struct frame *fp = list_entry(e, struct frame, elem);
+  list_push_back(&all_frames, &fp->elem);
+  push_to_swap(fp);
+  return fp->kpage;
+}
+
