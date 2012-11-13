@@ -58,6 +58,7 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 */
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 #include <threads/malloc.h>
 #include <threads/thread.h>
 
@@ -74,6 +75,7 @@ void page_table_init(struct page_table *pt)
 /** Free all pages the page table points to. */
 void page_table_destroy(struct page_table *pt)
 {
+//   printf("Destroying page table\n");
   struct page_entry *entry;
   struct list_elem *e;
 
@@ -117,6 +119,7 @@ int allocate_page(void* uaddr)
 /** Return the status of the page a user address points to. */
 page_status get_page_status(void* uaddr)
 {
+//   printf("Getting page status\n");
   struct page_entry *entry = get_page_entry(uaddr);
   if (entry)
     return entry->status;
@@ -126,6 +129,7 @@ page_status get_page_status(void* uaddr)
 
 _Bool set_page_status(void* uaddr, page_status status)
 {
+//   printf("Setting page status\n");
   struct page_entry *entry = get_page_entry(uaddr);
   if (entry)
     entry->status = status;
@@ -135,9 +139,35 @@ _Bool set_page_status(void* uaddr, page_status status)
 /** */
 void free_page(void* uaddr)
 {
+//   printf("Freeing page\n");
+  struct thread *t = thread_current();
+  struct page_table *pt = &t->pages;
   struct page_entry *entry = get_page_entry(uaddr);
-  if (entry)
+  if (entry) {
+    list_remove(&entry->elem);
     free_page_entry(entry);
+  }
+}
+
+/**
+ * Bring a page belonging to this process into main memory from wherever
+ * it is (e.g. swap). Return false if the address does not belong to the
+ * process.
+ */
+_Bool load_page(void* uaddr)
+{
+  struct thread *t = thread_current();
+  struct page_table *pt = &t->pages;
+
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (!entry)
+    return false;
+
+  struct frame *fp = get_frame(entry);
+  if (!fp)
+    return false;
+
+  return pull_from_swap(fp);
 }
 
 /**
@@ -146,6 +176,7 @@ void free_page(void* uaddr)
  */
 struct page_entry* get_page_entry(void* uaddr)
 {
+//   printf("Getting page entry\n");
   struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
   struct list_elem *e;
@@ -155,6 +186,7 @@ struct page_entry* get_page_entry(void* uaddr)
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages);
        e = list_next(e)) {
     struct page_entry *entry = list_entry(e, struct page_entry, elem);
+//     printf("Page entry address: %x\n", entry);
     if (entry->uaddr == uaddr)
       return entry;
   }
@@ -165,6 +197,7 @@ struct page_entry* get_page_entry(void* uaddr)
 /** Free a page, and any frame it points to. */
 void free_page_entry(struct page_entry* entry)
 {
+//   printf("Freeing page entry\n");
   // TODO: free the frame the entry points to
   if (entry != NULL) {
     free(entry);

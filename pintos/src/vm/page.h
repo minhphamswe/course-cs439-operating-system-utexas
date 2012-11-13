@@ -30,6 +30,7 @@ int allocate_page(void *uaddr);
 page_status get_page_status(void *uaddr);
 bool set_page_status(void *uaddr, page_status status);
 void free_page(void *uaddr);
+bool load_page(void *uaddr);
 
 // Page entry operations (for VM internal operations)
 struct page_entry* get_page_entry(void *uaddr);

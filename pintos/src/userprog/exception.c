@@ -129,6 +129,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
+//   printf("Handling a page fault\n");
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -178,30 +179,44 @@ page_fault (struct intr_frame *f)
 //   }
 
   if (not_present && write && !user) {
-    // Load & Write-bad
-    printf("Handling page fault while loading.\n");
+//     printf("Handling page fault while loading.\n");
     // Try to allocate more space
     extend_stack(f, fault_addr);
 //    printf("Returning to system process.\n");
     return;
   }
   else if (not_present && write && user) {
-    printf("Handling page fault while allocating memory on stack.\n");
+//     printf("Handling page fault while allocating memory on stack.\n");
     extend_stack(f, fault_addr);
-    printf("Returning to user process.\n");
+//     printf("Returning to user process.\n");
     return;
   }
   else if (not_present && !write && !user) {
 //     printf("Handling something.\n");
 
     int status = get_page_status(fault_addr);
+//     printf("Page status: %d\n", status);
     if (status == PAGE_NOT_EXIST) {
-      printf("Read access to page you do not own -> KILL\n");
+//       printf("Read access to page you do not own -> KILL\n");
       kill_process(f);
     }
     else if (status == PAGE_SWAPPED) {
 //       printf("Read acceess to swapped page.\n");
-      pull_from_swap(get_frame(get_page_entry(fault_addr)));
+      if (!load_page(fault_addr)) {
+//         printf("Nothing there belonging to system process -> KILL\n");
+        kill_process(f);
+      }
+//       struct frame *fp = get_frame(get_page_entry(fault_addr));
+//       ASSERT(fp != NULL);
+//       printf("Before - Pulled frame's addr: %x\n", fp);
+//       printf("Before - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
+//       printf("Before - Pulled frame's page status: %d\n", fp->upage->status);
+//       printf("Before - Pulled frame's frame addr: %x\n", fp->kpage);
+//       pull_from_swap(fp);
+//       printf("After - Pulled frame's addr: %x\n", fp);
+//       printf("After - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
+//       printf("After - Pulled frame's page status: %d\n", fp->upage->status);
+//       printf("After - Pulled frame's frame addr: %x\n", fp->kpage);
     }
 //     printf("Returning to system process.\n");
     return;
@@ -211,19 +226,32 @@ page_fault (struct intr_frame *f)
 //     printf("Handling something else.\n");
 
     int status = get_page_status(fault_addr);
+//     printf("Page status: %d\n", status);
     if (status == PAGE_NOT_EXIST) {
-      printf("Read access to page you do not own -> KILL\n");
+//       printf("Read access to page you do not own -> KILL\n");
       kill_process(f);
     }
     else if (status == PAGE_SWAPPED) {
-//       printf("Read acceess to swapped page.\n");
-      pull_from_swap(get_frame(get_page_entry(fault_addr)));
+//       printf("Read access to swapped page.\n");
+      if (!load_page(fault_addr)) {
+//         printf("Nothing there belonging to user process -> KILL\n");
+        kill_process(f);
+      }
+//       struct frame *fp = get_frame(get_page_entry(fault_addr));
+//       ASSERT(fp != NULL);
+//       printf("Before - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
+//       printf("Before - Pulled frame's page status: %d\n", fp->upage->status);
+//       printf("Before - Pulled frame's frame addr: %x\n", fp->kpage);
+//       pull_from_swap(fp);
+//       printf("After - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
+//       printf("After - Pulled frame's page status: %d\n", fp->upage->status);
+//       printf("After - Pulled frame's frame addr: %x\n",   fp->kpage);
     }
 //     printf("Returning to user process.\n");
     return;
   }
   else {
-    printf("Invalid Access.\n");
+//     printf("Invalid Access.\n");
     kill_process(f);
   }
 }
@@ -244,18 +272,18 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     }
   }
   if (!once) {
-    printf("Allocation of stack frame unsuccessful.\n");
+//     printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
 
-  printf("Allocation of stack frame successful.\n");
+//   printf("Allocation of stack frame successful.\n");
   return;
 }
 
 static void
 kill_process (struct intr_frame *f)
 {
-  printf("Killing process...\n");
+//   printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 

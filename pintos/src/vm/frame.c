@@ -74,7 +74,7 @@ int allocate_frame(struct page_entry *upage, int writable) {
   // Compute a page-aligned user page address
   uaddr = upage->uaddr;
   uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
-  printf("User address after: %x\n", (uint32_t) upage);
+//   printf("User address after: %x\n", (uint32_t) uaddr);
 
   // Attempt to allocate a new physical address
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
@@ -82,9 +82,10 @@ int allocate_frame(struct page_entry *upage, int writable) {
   {
     // All physical addresses are used: evict a frame
     fp = evict_frame();
-    printf("Before - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
-    printf("Before - Evicted frame's page status: %d\n", fp->upage->status);
-    printf("Before - Evicted frame's frame addr: %x\n", fp->kpage);
+//     printf("Before - Evicted frame's addr: %x\n", fp);
+//     printf("Before - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
+//     printf("Before - Evicted frame's page status: %d\n", fp->upage->status);
+//     printf("Before - Evicted frame's frame addr: %x\n", fp->kpage);
     kpage = fp->kpage;
   }
   else
@@ -106,11 +107,9 @@ int allocate_frame(struct page_entry *upage, int writable) {
     upage->frame = fp;
     upage->status = PAGE_PRESENT;
 
-    printf("After - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
-    printf("After - Evicted frame's page status: %d\n", fp->upage->status);
-    printf("After - Evicted frame's frame addr: %x\n", fp->kpage);
-
-
+//     printf("After - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
+//     printf("After - Evicted frame's page status: %d\n", fp->upage->status);
+//     printf("After - Evicted frame's frame addr: %x\n", fp->kpage);
     return true;
   }
   else {
@@ -154,16 +153,17 @@ void unset_frame(struct frame *fp)
 /** Get a KPAGE by UPAGE */
 struct frame * get_frame(struct page_entry* upage)
 {
-  struct list_elem *e;
-
-  for (e = list_begin (&all_frames); e != list_end (&all_frames);
-       e = list_next (e))
-  {
-    struct frame *f = list_entry (e, struct frame, elem);
-    if(f->upage == upage)
-      return f;
-  }
-  return NULL;
+  return upage->frame;
+//   struct list_elem *e;
+// 
+//   for (e = list_begin (&all_frames); e != list_end (&all_frames);
+//        e = list_next (e))
+//   {
+//     struct frame *f = list_entry (e, struct frame, elem);
+//     if(f->upage->uaddr == upage->uaddr)
+//       return f;
+//   }
+//   return NULL;
 }
 
 /** Get a KPAGE by KPAGE */

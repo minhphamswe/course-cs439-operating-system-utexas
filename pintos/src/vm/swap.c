@@ -25,11 +25,11 @@
 #include "devices/block.h"
 #include "lib/kernel/list.h"
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
 
 #include "stdio.h"
 
 static struct block* swap_block;
-static uint32_t swap_size;
 static uint32_t next_sector;
 
 struct list swap_list;
@@ -45,8 +45,6 @@ struct swap_slot {
 void swap_init(void) {
 //   printf("Initializing swap\n");
   swap_block = block_get_role(BLOCK_SWAP);
-//    printf("swap block address: %x\n", swap_block);
-//    swap_size = block_size(swap_block);
   next_sector = 0;
   list_init(&swap_list);
 }
@@ -54,25 +52,28 @@ void swap_init(void) {
 void push_to_swap(struct frame* fp)
 {
 //   printf("Pushing to swap\n");
+  ASSERT(fp != NULL);
 
-  printf("Next sector: %d\n", next_sector);
+//   printf("Next sector: %d\n", next_sector);
   struct swap_slot *temp;
-  if (!list_empty(&swap_list))
-  {
-//     printf("Here\n");
-    struct list_elem *e = list_back(&swap_list);
+  struct list_elem *e;
+
+  e = list_tail(&swap_list)->prev;
+
+  if (e != list_head(&swap_list)) {
+    // list is not empty
     temp = list_entry(e, struct swap_slot, elem);
     if(temp->used == false)
     {
 //       printf("In here\n");
-        e = list_pop_back(&swap_list);
+      e = list_pop_back(&swap_list);
+      temp = list_entry(e, struct swap_slot, elem);
     }
     else
     {
 //       printf("In there\n");
       temp = malloc(sizeof(struct swap_slot));
       temp->sector = next_sector;
-      next_sector++;
     }
   }
   else
@@ -80,33 +81,49 @@ void push_to_swap(struct frame* fp)
 //     printf("There\n");
     temp = malloc(sizeof(struct swap_slot));
     temp->sector = next_sector;
-    next_sector++;
   }
   fp->upage->status = PAGE_SWAPPED;
   temp->frame = fp;
   temp->used = true;
 
   list_push_front(&swap_list, &temp->elem);
-  block_write(swap_block, temp->sector, temp->frame->kpage);
-  printf("Frame Push Address: %x\n", temp->frame->kpage);
+
+  int i;
+  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
+    block_write(swap_block, next_sector, temp->frame->upage->uaddr + i * BLOCK_SECTOR_SIZE);
+    next_sector++;
+  }
+//   printf("Frame Push Address: %x\n", temp->frame->kpage);
 }
 
-
-void pull_from_swap(struct frame* fp)
+/**
+ * Read a frame from the swap space into main memory. Return false if the
+ * frame cannot be found from the swap slots.
+ */
+bool pull_from_swap(struct frame* fp)
 {
-//   printf("Pulling from swap.\n");
+//   printf("Pulling from swap\n");
+  ASSERT(fp != NULL);
+//   printf("Pulling from swap for frame %x.\n", fp->kpage);
+
   struct list_elem *e;
-  for (e = list_begin(&swap_list); e != list_end(&swap_list); e = list_next(e))
+  for (e = list_begin(&swap_list); e != list_end(&swap_list);
+       e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    printf("Frame pull address: %x\n", slot->frame->kpage);
-    if (slot->frame == fp) {
-      block_read(swap_block, slot->sector, fp->kpage);
-      fp->upage->status = PAGE_PRESENT;
+//     printf("Frame pull address: %x\n", slot->frame->kpage);
+    if (slot->frame->kpage == fp->kpage) {
+      int i;
+      for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
+        block_read(swap_block, slot->sector + i, fp->upage->uaddr + i * BLOCK_SECTOR_SIZE);
       slot->used = false;
+      slot->frame->upage->status = PAGE_PRESENT;
+
+      // Rotate slot element
       list_remove(&slot->elem);
       list_push_back(&swap_list, &slot->elem);
-      return;
+      return true;
     }
   }
+  return false;
 }

@@ -6,6 +6,6 @@
 void swap_init(void);
 
 void push_to_swap(struct frame* fp);
-void pull_from_swap(struct frame* fp);
+bool pull_from_swap(struct frame* fp);
 
 #endif /* vm/swap.h */
