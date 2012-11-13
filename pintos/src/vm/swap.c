@@ -42,7 +42,6 @@ struct list swap_list;
 struct swap_slot {
   uint32_t sector;
   struct frame *frame;
-  bool used;
   struct list_elem elem;
 };
 
@@ -72,7 +71,6 @@ bool push_to_swap(struct frame* fp)
   if (temp) {
     // Track the swap slot
     temp->frame = fp;
-    temp->used = true;
     temp->sector = next_sector;
     list_push_front(&swap_list, &temp->elem);
 
@@ -108,9 +106,6 @@ bool pull_from_swap(struct frame* fp)
     // Read data in the swap slot into memory
     read_swap(slot);
 
-    // Update the slot
-    slot->used = false;
-
     // Update the CPU-based page directory
     struct thread *t = thread_current();
     printf("Setting frame given: %x\n", fp);
@@ -120,6 +115,9 @@ bool pull_from_swap(struct frame* fp)
 
     // Update the page
     slot->frame->upage->status = PAGE_PRESENT;
+
+    // Update the slot
+    slot->frame = NULL;
 
     // Rotate slot element
     list_remove(&slot->elem);
@@ -140,7 +138,7 @@ struct swap_slot* get_free_slot(void)
   e = list_tail(&swap_list)->prev;
 
   if (e != list_head(&swap_list) &&
-      list_entry(e, struct swap_slot, elem)->used == false) {
+      list_entry(e, struct swap_slot, elem)->frame == NULL) {
     // Last element is free: return it
     e = list_pop_back(&swap_list);
     temp = list_entry(e, struct swap_slot, elem);
@@ -165,7 +163,7 @@ struct swap_slot* get_used_slot(struct frame* fp)
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->frame->kpage == fp->kpage)
+    if (slot->frame == fp)
       return slot;
   }
   return NULL;
