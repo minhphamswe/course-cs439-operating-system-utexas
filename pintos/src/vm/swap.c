@@ -87,7 +87,7 @@ bool push_to_swap(struct frame* fp)
 
 //     printf("Frame Push Address: %x\n", temp->frame->kpage);
     printf("Clearing page: %x\n", fp->upage);
-    printf("Clearing address: %x\n", fp->upage->uaddr);
+//     printf("Clearing address: %x\n", fp->upage->uaddr);
   }
   return (temp != NULL);
 }
@@ -109,10 +109,10 @@ bool pull_from_swap(struct frame* fp)
 
     // Update the CPU-based page directory
     struct thread *t = thread_current();
-    printf("Setting frame given: %x\n", fp);
-    printf("Setting frame looked up: %x\n", slot->frame);
+//     printf("Setting frame given: %x\n", fp);
+//     printf("Setting frame looked up: %x\n", slot->frame);
     printf("Setting page: %x\n", fp->upage);
-    printf("Setting address: %x\n", fp->upage->uaddr);
+//     printf("Setting address: %x\n", fp->upage->uaddr);
     pagedir_set_page(t->pagedir, fp->upage->uaddr, fp->kpage, fp->writable);
 
     // Update the page
