@@ -13,7 +13,6 @@ static char buf[SIZE];
 void
 test_main (void)
 {
-  msg ("llolcat");
   struct arc4 arc4;
   size_t i;
 

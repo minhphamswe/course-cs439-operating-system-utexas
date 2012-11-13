@@ -41,7 +41,7 @@ struct list swap_list;
 
 struct swap_slot {
   uint32_t sector;
-  struct frame *frame;
+  struct page_entry *upage;
   struct list_elem elem;
 };
 
@@ -70,12 +70,10 @@ bool push_to_swap(struct frame* fp)
   struct swap_slot *temp = get_free_slot();
   if (temp) {
     // Track the swap slot
-    temp->frame = fp;
+    temp->upage = fp->upage;
+    temp->upage->status = PAGE_SWAPPED;
     temp->sector = next_sector;
     list_push_front(&swap_list, &temp->elem);
-
-    // Update the supplemental page entry
-    fp->upage->status = PAGE_SWAPPED;
 
     // Write data out onto the swap disk
     write_swap(temp);
@@ -83,10 +81,10 @@ bool push_to_swap(struct frame* fp)
 
     // Update the CPU-based page directory
     struct thread *t = thread_current();
-    pagedir_clear_page(t->pagedir, fp->upage->uaddr);
+    pagedir_clear_page(t->pagedir, temp->upage->uaddr);
 
 //     printf("Frame Push Address: %x\n", temp->frame->kpage);
-    printf("Clearing page: %x\n", fp->upage);
+    printf("Clearing page: %x\n", temp->upage);
 //     printf("Clearing address: %x\n", fp->upage->uaddr);
   }
   return (temp != NULL);
@@ -98,7 +96,7 @@ bool push_to_swap(struct frame* fp)
  */
 bool pull_from_swap(struct frame* fp)
 {
-  printf("Pulling from swap\n");
+//   printf("Pulling from swap\n");
   ASSERT(fp != NULL);
 
   struct swap_slot *slot = get_used_slot(fp);
@@ -111,15 +109,18 @@ bool pull_from_swap(struct frame* fp)
     struct thread *t = thread_current();
 //     printf("Setting frame given: %x\n", fp);
 //     printf("Setting frame looked up: %x\n", slot->frame);
-    printf("Setting page: %x\n", fp->upage);
+    printf("Setting page: %x\n", slot->upage);
 //     printf("Setting address: %x\n", fp->upage->uaddr);
-    pagedir_set_page(t->pagedir, fp->upage->uaddr, fp->kpage, fp->writable);
+    pagedir_set_page(t->pagedir,
+                     slot->upage->uaddr,
+                     slot->upage->frame->kpage,
+                     slot->upage->frame->writable);
 
     // Update the page
-    slot->frame->upage->status = PAGE_PRESENT;
+    slot->upage->status = PAGE_PRESENT;
 
     // Update the slot
-    slot->frame = NULL;
+    slot->upage = NULL;
 
     // Rotate slot element
     list_remove(&slot->elem);
@@ -140,7 +141,7 @@ struct swap_slot* get_free_slot(void)
   e = list_tail(&swap_list)->prev;
 
   if (e != list_head(&swap_list) &&
-      list_entry(e, struct swap_slot, elem)->frame == NULL) {
+      list_entry(e, struct swap_slot, elem)->upage == NULL) {
     // Last element is free: return it
     e = list_pop_back(&swap_list);
     temp = list_entry(e, struct swap_slot, elem);
@@ -165,7 +166,7 @@ struct swap_slot* get_used_slot(struct frame* fp)
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->frame == fp)
+    if (slot->upage && slot->upage->frame == fp)
       return slot;
   }
   return NULL;
@@ -175,7 +176,7 @@ struct swap_slot* get_used_slot(struct frame* fp)
 /** Read the disk sector into the frame; both are pointed to by SLOT.*/
 void read_swap(struct swap_slot* slot)
 {
-  void *kpage = slot->frame->kpage;
+  void *kpage = slot->upage->frame->kpage;
   int i;
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
@@ -184,7 +185,7 @@ void read_swap(struct swap_slot* slot)
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
 void write_swap(struct swap_slot* slot)
 {
-  void *uaddr = slot->frame->upage->uaddr;
+  void *uaddr = slot->upage->uaddr;
   int i;
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_write(swap_block, slot->sector + i, uaddr + i * BLOCK_SECTOR_SIZE);
