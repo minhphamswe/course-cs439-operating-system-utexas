@@ -179,33 +179,41 @@ page_fault (struct intr_frame *f)
 //   }
 
   if (not_present && write && !user) {
-//     printf("Handling page fault while loading.\n");
+    printf("Handling page fault while loading.\n");
     // Try to allocate more space
-    extend_stack(f, fault_addr);
+    if (!load_page(fault_addr)) {
+      extend_stack(f, fault_addr);
+    }
 //    printf("Returning to system process.\n");
-    return;
   }
   else if (not_present && write && user) {
-//     printf("Handling page fault while allocating memory on stack.\n");
-    extend_stack(f, fault_addr);
+    printf("Handling page fault while allocating memory on stack.\n");
+    if (!load_page(fault_addr)) {
+      printf("Failed to load page\n");
+      extend_stack(f, fault_addr);
+    }
+    printf("Load page OK\n");
 //     printf("Returning to user process.\n");
-    return;
   }
   else if (not_present && !write && !user) {
     if (!load_page(fault_addr)) {
-//       printf("Nothing there belonging to system process -> KILL\n");
+      printf("%x does not belong to system process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
     if (!load_page(fault_addr)) {
-//       printf("Nothing there belonging to user process -> KILL\n");
+      printf("%x does not belong to user process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else {
-//     printf("Invalid Access.\n");
+    printf("Invalid Access.\n");
+    printf("not_present: %d\n", not_present);
+    printf("write: %d\n", write);
+    printf("user: %d\n", user);
+    printf("fault_addr: %x\n", (uint32_t) fault_addr);
     kill_process(f);
   }
 }
@@ -226,7 +234,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     }
   }
   if (!once) {
-//     printf("Allocation of stack frame unsuccessful.\n");
+    printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
 
@@ -237,7 +245,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 static void
 kill_process (struct intr_frame *f)
 {
-//   printf("Killing process...\n");
+  printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 

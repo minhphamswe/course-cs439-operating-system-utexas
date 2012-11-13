@@ -255,9 +255,13 @@ process_exit (void)
     struct exit_status *s = list_entry (e, struct exit_status, wait_elem);
     free(s);
   }
-  
+
   // Signal any waiting thread
   sema_up(&cur->wait_sema);      // signal before dying
+
+  // Destroy the supplemental page table, which frees all pages and frames
+  // in the process
+  page_table_destroy(&cur->pages);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

@@ -84,7 +84,7 @@ bool push_to_swap(struct frame* fp)
     pagedir_clear_page(t->pagedir, temp->upage->uaddr);
 
 //     printf("Frame Push Address: %x\n", temp->frame->kpage);
-    printf("Clearing page: %x\n", temp->upage);
+//     printf("Clearing page: %x\n", temp->upage);
 //     printf("Clearing address: %x\n", fp->upage->uaddr);
   }
   return (temp != NULL);
