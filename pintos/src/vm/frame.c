@@ -192,10 +192,6 @@ struct frame * evict_frame(void)
   // Write it to swap space
   push_to_swap(fp);
 
-  // Clear the page from the thread's page directory
-  struct thread *t = thread_current();
-  pagedir_clear_page(t->pagedir, fp->upage->uaddr);
-
   return fp;
 }
 

@@ -192,63 +192,17 @@ page_fault (struct intr_frame *f)
     return;
   }
   else if (not_present && !write && !user) {
-//     printf("Handling something.\n");
-
-    int status = get_page_status(fault_addr);
-//     printf("Page status: %d\n", status);
-    if (status == PAGE_NOT_EXIST) {
-//       printf("Read access to page you do not own -> KILL\n");
+    if (!load_page(fault_addr)) {
+//       printf("Nothing there belonging to system process -> KILL\n");
       kill_process(f);
     }
-    else if (status == PAGE_SWAPPED) {
-//       printf("Read acceess to swapped page.\n");
-      if (!load_page(fault_addr)) {
-//         printf("Nothing there belonging to system process -> KILL\n");
-        kill_process(f);
-      }
-//       struct frame *fp = get_frame(get_page_entry(fault_addr));
-//       ASSERT(fp != NULL);
-//       printf("Before - Pulled frame's addr: %x\n", fp);
-//       printf("Before - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
-//       printf("Before - Pulled frame's page status: %d\n", fp->upage->status);
-//       printf("Before - Pulled frame's frame addr: %x\n", fp->kpage);
-//       pull_from_swap(fp);
-//       printf("After - Pulled frame's addr: %x\n", fp);
-//       printf("After - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
-//       printf("After - Pulled frame's page status: %d\n", fp->upage->status);
-//       printf("After - Pulled frame's frame addr: %x\n", fp->kpage);
-    }
-//     printf("Returning to system process.\n");
-    return;
   }
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
-//     printf("Handling something else.\n");
-
-    int status = get_page_status(fault_addr);
-//     printf("Page status: %d\n", status);
-    if (status == PAGE_NOT_EXIST) {
-//       printf("Read access to page you do not own -> KILL\n");
+    if (!load_page(fault_addr)) {
+//       printf("Nothing there belonging to user process -> KILL\n");
       kill_process(f);
     }
-    else if (status == PAGE_SWAPPED) {
-//       printf("Read access to swapped page.\n");
-      if (!load_page(fault_addr)) {
-//         printf("Nothing there belonging to user process -> KILL\n");
-        kill_process(f);
-      }
-//       struct frame *fp = get_frame(get_page_entry(fault_addr));
-//       ASSERT(fp != NULL);
-//       printf("Before - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
-//       printf("Before - Pulled frame's page status: %d\n", fp->upage->status);
-//       printf("Before - Pulled frame's frame addr: %x\n", fp->kpage);
-//       pull_from_swap(fp);
-//       printf("After - Pulled frame's page uaddr: %x\n", fp->upage->uaddr);
-//       printf("After - Pulled frame's page status: %d\n", fp->upage->status);
-//       printf("After - Pulled frame's frame addr: %x\n",   fp->kpage);
-    }
-//     printf("Returning to user process.\n");
-    return;
   }
   else {
 //     printf("Invalid Access.\n");
