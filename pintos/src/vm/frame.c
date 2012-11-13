@@ -67,45 +67,58 @@ int allocate_frame(struct page_entry *upage, int writable) {
   // Allocate frame and get its kernel page address
 //   printf("Allocating frame...\n");
   struct thread *t = thread_current ();
+  struct frame *fp;
   uint8_t *kpage;
   void * uaddr;
 
-  // Compute a valid user page address
+  // Compute a page-aligned user page address
   uaddr = upage->uaddr;
   uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
-//     printf("User address after: %x\n", (uint32_t) upage);
+  printf("User address after: %x\n", (uint32_t) upage);
 
-  if (pagedir_get_page (t->pagedir, uaddr) == NULL) {
-    // Page is not already allocated
-    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-    if (kpage == NULL) {
-      kpage = evict_frame();
-    }
+  // Attempt to allocate a new physical address
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage == NULL)
+  {
+    // All physical addresses are used: evict a frame
+    fp = evict_frame();
+    printf("Before - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
+    printf("Before - Evicted frame's page status: %d\n", fp->upage->status);
+    printf("Before - Evicted frame's frame addr: %x\n", fp->kpage);
+    kpage = fp->kpage;
+  }
+  else
+  {
+    // Register a new frame
+    fp = malloc(sizeof(struct frame));
+  }
 
-    if (pagedir_set_page (t->pagedir, uaddr, kpage, writable)) {
-      // Map and track frame
-      struct frame *fp = malloc(sizeof(struct frame));
+  // Attempt to allocate the physical address to the page
+  if (pagedir_get_page(t->pagedir, uaddr) == NULL
+      && pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
+    // Physical address is not already allocated
+    fp->upage = upage;
+    fp->kpage = kpage;
+    fp->writable = writable;
+    list_push_back(&all_frames, &fp->elem);
 
-      fp->upage = upage;
-      fp->kpage = kpage;
-      fp->writable = writable;
-      list_push_back(&all_frames, &fp->elem);
+    // Update page entry
+    upage->frame = fp;
+    upage->status = PAGE_PRESENT;
 
-      // Update page entry
-      upage->frame = fp;
-      upage->status = PAGE_PRESENT;
+    printf("After - Evicted frame's page uaddr: %x\n", fp->upage->uaddr);
+    printf("After - Evicted frame's page status: %d\n", fp->upage->status);
+    printf("After - Evicted frame's frame addr: %x\n", fp->kpage);
 
-      return true;
-    }
-    else {
-      // Page is already allocated to some process: free frame & return false
-      //       printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
-      palloc_free_page (kpage);
-      return false;
-    }
+
+    return true;
   }
   else {
-    return true;
+    // Physical address is already allocated to some process:
+    // For now free frame & return false
+    printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
+    palloc_free_page (kpage);
+    return false;
   }
 }
 
@@ -168,18 +181,21 @@ struct frame * get_kernel_frame(void *kpage)
   return NULL;
 }
 
-void* evict_frame(void )
+struct frame * evict_frame(void)
 {
 //   printf("Evicting frame\n");
+  // Remove the oldest frame from frame table
   struct list_elem *e = list_pop_front(&all_frames);
   struct frame *fp = list_entry(e, struct frame, elem);
 
-  list_push_back(&all_frames, &fp->elem);
+//   list_push_back(&all_frames, &fp->elem);
+  // Write it to swap space
   push_to_swap(fp);
 
+  // Clear the page from the thread's page directory
   struct thread *t = thread_current();
   pagedir_clear_page(t->pagedir, fp->upage->uaddr);
 
-  return fp->kpage;
+  return fp;
 }
 
