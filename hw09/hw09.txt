@@ -1,0 +1,43 @@
+1. In Unix, the pipe(fd[0]) function call creates an I/O mechanism called a
+pipe and returns two file descriptors, fd[0] and fd[1]. The files associated
+with fd[0] and fd[1] are streams of data and are both opened for reading and
+writing. Suppose pipe always returns the two lowest-numbered file descriptors
+in the process's file descriptor table that are unused. Assume that initially
+fdt[], the file descriptor table has three open entries: fdt[0] is the
+default input device, fdt[1] is the default output device and fdt[2] is the
+default error output device; all other entries of the fdt are NULL. What does
+the fdt look like after each of the five following commands is executed in
+sequence by the process?
+
+1: pipe (&fd[0]);
+2: close(fd[0]);
+3: close(1);
+4: dup(fd[1]);
+5: close(fd[1]);
+
+When might such a sequence of commands be useful?
+
+You'll need to use the man pages for pipe, close, and dup to answer this
+question.
+
+2. Using the traceroute command, trace the hops a packet takes from one of
+the UTCS machines to a website in Europe. Inspect the trace. What do you
+notice? Do you see any machines you recognize? ISPs? Cities? Please be sure
+to tell us what website you used.
+
+Perform the trace again. How does the second time affect the output?
+
+3. Describe the steps necessary to prepare a server to accept connections.
+How does it accept a connection?
+
+4. Which is the best (fastest) network on which to implement a remote-memory
+read that sends a 100 byte packet from machine A to machine B and then sends
+a 8000 byte packet from machine B to machine A?
+
+  A network with 200 microsecond overhead, 10 Mbyte/s bandwidth, 20 microsecond latency
+  A network with 20 microsecond overhead, 10 Mbyte/s bandwidth, 200 microsecond latency
+  A network with 20 microsecond overhead, 1 Mbyte/s bandwidth, 2 microsecond latency
+  A network with 2 microsecond overhead, 1 Mbyte/s bandwidth, 20 microsecond latency
+
+5. In class, we covered the idea of remote procedure calls. We discussed difficulties encountered when one attempts to implement a remote procedure call. Name the four of the difficulties. There are additional complications when the procedure executes a system call. What are the complications and how might you fix them?
+Adapted from Tanenbaum page 607.
