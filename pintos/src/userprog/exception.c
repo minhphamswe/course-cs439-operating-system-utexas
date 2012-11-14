@@ -179,7 +179,7 @@ page_fault (struct intr_frame *f)
 //   }
 
   if (not_present && write && !user) {
-    printf("Handling page fault while loading.\n");
+//     printf("Handling page fault while loading.\n");
     // Try to allocate more space
     if (!load_page(fault_addr)) {
       extend_stack(f, fault_addr);
@@ -187,54 +187,56 @@ page_fault (struct intr_frame *f)
 //    printf("Returning to system process.\n");
   }
   else if (not_present && write && user) {
-    printf("Handling page fault while allocating memory on stack.\n");
+//     printf("Handling page fault while allocating memory on stack.\n");
     if (!load_page(fault_addr)) {
-      printf("Failed to load page\n");
+//       printf("Failed to load page\n");
       extend_stack(f, fault_addr);
     }
-    printf("Load page OK\n");
+//     printf("Load page OK\n");
 //     printf("Returning to user process.\n");
   }
   else if (not_present && !write && !user) {
     if (!load_page(fault_addr)) {
-      printf("%x does not belong to system process -> KILL\n", fault_addr);
+//       printf("%x does not belong to system process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
     if (!load_page(fault_addr)) {
-      printf("%x does not belong to user process -> KILL\n", fault_addr);
+//       printf("%x does not belong to user process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else {
-    printf("Invalid Access.\n");
-    printf("not_present: %d\n", not_present);
-    printf("write: %d\n", write);
-    printf("user: %d\n", user);
-    printf("fault_addr: %x\n", (uint32_t) fault_addr);
+//     printf("Invalid Access.\n");
+//     printf("not_present: %d\n", not_present);
+//     printf("write: %d\n", write);
+//     printf("user: %d\n", user);
+//     printf("fault_addr: %x\n", (uint32_t) fault_addr);
+//     if (!load_page(fault_addr))
     kill_process(f);
   }
 }
 
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
+//   printf("Extending stack..\n");
   int addr;
   bool once;
   //  printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
   for (addr = (int) fault_addr; addr <= (int) f->frame_pointer;
        addr += PGSIZE) {
     once = true;
-    //    printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n",
-    //	   frame_addr, fault_addr, f->frame_pointer);
+//     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n",
+//     	     addr, fault_addr, f->frame_pointer);
     int success = allocate_page((void *) addr);
     if (!success) {
       break;
     }
   }
   if (!once) {
-    printf("Allocation of stack frame unsuccessful.\n");
+//     printf("Allocation of stack frame unsuccessful.\n");
     kill_process(f);
   }
 
@@ -245,7 +247,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 static void
 kill_process (struct intr_frame *f)
 {
-  printf("Killing process...\n");
+//   printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 

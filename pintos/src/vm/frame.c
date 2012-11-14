@@ -115,7 +115,7 @@ int allocate_frame(struct page_entry *upage, int writable) {
   else {
     // Physical address is already allocated to some process:
     // For now free frame & return false
-    printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
+//     printf("TODO: Page is already allocated to some other process. Needs to implement sharing.\n");
     palloc_free_page (kpage);
     return false;
   }

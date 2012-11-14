@@ -109,7 +109,7 @@ bool pull_from_swap(struct frame* fp)
     struct thread *t = thread_current();
 //     printf("Setting frame given: %x\n", fp);
 //     printf("Setting frame looked up: %x\n", slot->frame);
-    printf("Setting page: %x\n", slot->upage);
+//     printf("Setting page: %x\n", slot->upage);
 //     printf("Setting address: %x\n", fp->upage->uaddr);
     pagedir_set_page(t->pagedir,
                      slot->upage->uaddr,
