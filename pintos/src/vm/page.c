@@ -156,7 +156,7 @@ void free_page(void* uaddr)
  */
 _Bool load_page(void* uaddr)
 {
-  struct thread *t = thread_current();
+/*  struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
 
   struct page_entry *entry = get_page_entry(uaddr);
@@ -167,7 +167,24 @@ _Bool load_page(void* uaddr)
   if (!fp)
     return false;
 
-  return pull_from_swap(fp);
+  return pull_from_swap(fp);*/
+  
+  // Make sure it's supposed to be there
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (!entry)
+    return false;
+    
+  // If it's swapped, let's go get it  
+  if (entry->status == PAGE_SWAPPED) {
+    // First need to get a free frame to put it in
+    int success = allocate_frame(entry, true);
+    if (!success)
+      return false;   // out of swap space, should be panic'd before here
+    
+    // Now swap back into free frame
+    get_from_swap(entry->frame, uaddr);
+  }
+  return true;
 }
 
 /**
