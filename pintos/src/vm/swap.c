@@ -241,12 +241,11 @@ printf("Read swap: %d\n", slot->sector);
 void write_swap(struct swap_slot* slot)
 {
 printf("Write swap: %d\n", slot->sector);
-  void *uaddr = slot->upage->uaddr;
-  printf("%x, %d\n",uaddr,slot->tid);
+  void *uaddr = slot->upage->frame->kpage;
+  printf("%x, %d, %d\n",uaddr,slot->tid,thread_current()->tid);
   int i;
-  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
+  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_write(swap_block, slot->sector + i, uaddr + i * BLOCK_SECTOR_SIZE);
-    printf("end write\n");}
 }
 
 

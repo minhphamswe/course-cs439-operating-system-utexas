@@ -186,7 +186,7 @@ struct frame * evict_frame(void)
 {
 //  printf("Evicting frame\n");
   // Remove the oldest frame from frame table
-  struct list_elem *e = list_pop_front(&all_frames);
+  struct list_elem *e = list_pop_back(&all_frames);
   struct frame *fp = list_entry(e, struct frame, elem);
 
   list_push_back(&all_frames, &fp->elem);
