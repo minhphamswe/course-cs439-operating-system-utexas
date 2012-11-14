@@ -89,7 +89,7 @@ void page_table_destroy(struct page_table *pt)
 /** Allocate and track a user page. */
 int allocate_page(void* uaddr)
 {
-//   printf("Allocating page\n");
+ //  printf("Allocating page\n");
 
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
@@ -104,7 +104,7 @@ int allocate_page(void* uaddr)
 
     success = allocate_frame(entry, true);
     if (success) {
-      // if page was successfully allocate, track frame
+      // if page was successfully allocated, track frame
       list_push_back(&(t->pages.pages), &entry->elem);
     }
     else {
@@ -178,6 +178,7 @@ _Bool load_page(void* uaddr)
   if (entry->status == PAGE_SWAPPED) {
     // First need to get a free frame to put it in
     int success = allocate_frame(entry, true);
+    
     if (!success)
       return false;   // out of swap space, should be panic'd before here
     

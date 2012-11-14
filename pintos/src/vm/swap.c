@@ -40,6 +40,7 @@ static uint32_t next_sector;
 struct list swap_list;
 
 struct swap_slot {
+  tid_t tid;
   uint32_t sector;
   struct page_entry *upage;
   struct list_elem elem;
@@ -72,6 +73,7 @@ bool push_to_swap(struct frame* fp)
     // Track the swap slot
     temp->upage = fp->upage;
     temp->upage->status = PAGE_SWAPPED;
+    temp->tid = fp->tid;
     list_push_front(&swap_list, &temp->elem);
 
     // Write data out onto the swap disk
@@ -199,11 +201,12 @@ struct swap_slot* get_free_slot(void)
 struct swap_slot* get_used_slot(struct frame* fp)
 {
   struct list_elem *e;
+  tid_t tid = thread_current()->tid;
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->frame == fp)
+    if (slot->upage && slot->upage->frame == fp && slot->tid == tid)
       return slot;
   }
   return NULL;
@@ -213,11 +216,12 @@ struct swap_slot* get_slot_by_vaddr(void* uaddr)
 {
   uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
   struct list_elem *e;
+  tid_t tid = thread_current()->tid;
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->uaddr == uaddr)
+    if (slot->upage && slot->upage->uaddr == uaddr && slot->tid == tid)
       return slot;
   }
   return NULL;
@@ -226,7 +230,7 @@ struct swap_slot* get_slot_by_vaddr(void* uaddr)
 /** Read the disk sector into the frame; both are pointed to by SLOT.*/
 void read_swap(struct swap_slot* slot)
 {
-//printf("Read swap: %d\n", slot->sector);
+printf("Read swap: %d\n", slot->sector);
   void *kpage = slot->upage->frame->kpage;
   int i;
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
@@ -236,11 +240,13 @@ void read_swap(struct swap_slot* slot)
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
 void write_swap(struct swap_slot* slot)
 {
-//printf("Write swap: %d\n", slot->sector);
+printf("Write swap: %d\n", slot->sector);
   void *uaddr = slot->upage->uaddr;
+  printf("%x, %d\n",uaddr,slot->tid);
   int i;
-  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
+  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
     block_write(swap_block, slot->sector + i, uaddr + i * BLOCK_SECTOR_SIZE);
+    printf("end write\n");}
 }
 
 

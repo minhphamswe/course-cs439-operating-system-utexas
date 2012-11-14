@@ -6,6 +6,7 @@
 #include "page.h"
 
 struct frame {
+  int tid;
   struct page_entry *upage;   // User page
   void* kpage;                // Kernel page = Physical address
   int writable;               // Whether the frame should be writable

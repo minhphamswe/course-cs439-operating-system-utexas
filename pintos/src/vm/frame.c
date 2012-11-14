@@ -101,6 +101,7 @@ int allocate_frame(struct page_entry *upage, int writable) {
     fp->upage = upage;
     fp->kpage = kpage;
     fp->writable = writable;
+    fp->tid = t->tid;
     list_push_back(&all_frames, &fp->elem);
 
     // Update page entry
