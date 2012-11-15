@@ -1,3 +1,9 @@
+Student: Minh Pham
+EID: mlp2279
+CSID: minhpham
+
+Homework 9
+
 1. The sequences of file descriptors opened and closed look like this:
 
                     File Descriptor Operations     File Descriptor Table
