@@ -223,7 +223,7 @@ static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
 //   printf("Extending stack..\n");
   int addr;
-  bool once;
+  bool once = false;
   //  printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
   for (addr = (int) fault_addr; addr <= (int) f->frame_pointer;
        addr += PGSIZE) {
