@@ -1,0 +1,125 @@
+1. The sequences of file descriptors opened and closed look like this:
+
+                    File Descriptor Operations     File Descriptor Table
+1: pipe (&fd[0]);   open 3, 4                       0, 1, 2, 3, 4    
+2: close(fd[0]);    close 3                         0, 1, 2, 4
+3: close(1);        close 1                         0, 2, 4
+4: dup(fd[1]);      duplicate 4                     0, 1(4), 2, 4
+5: close(fd[1]);    close 4                         0, 1(4), 2
+
+This sequence replaces file descriptor 1 with the file descriptor
+previously known as 4 (the output file in the first operation). This
+is used to redirect stdout to a desired location (like a file).
+
+2. Tracing from pride.cs.utexas.edu to www.idsia.ch, the website of the
+Dalle Molle Institute for Artificial Intelligence, Switzerland.
+
+Notable points:
+* Points 1 through 5 are gateway routers in the UT network, possibly
+installed for inter-department connections, as well as connection to
+the Internet.
+* Points 5 through 13 seems to be the network of some research
+institute. That's weird. Here we are routed through Atlanta, Washington,
+Philadelphia, and New York (not sure what Jack stands for)
+* Points 14 through 16 seem to be switches of an European ISP serving
+academic institutions.
+* From 17, we are in Swizerland, but the trace becomes unreadable soon
+after.
+
+traceroute to www.idsia.ch (195.176.70.135), 30 hops max, 60 byte packets
+ 1  cs-gw.cs.utexas.edu (128.83.139.1)  0.477 ms  0.481 ms  0.482 ms
+ 2  cs45k-cs65k-po1-p2p.aces.utexas.edu (128.83.37.65)  0.551 ms  0.556 ms  0.676 ms
+ 3  noca9-cs-v691.gw.utexas.edu (146.6.9.33)  0.478 ms  0.483 ms  0.613 ms
+ 4  nocb1-ten4-1-noca9-n7k.gw.utexas.edu (146.6.9.214)  0.561 ms  0.689 ms  0.689 ms
+ 5  noca2-po1-nocb1.gw.utexas.edu (128.83.3.81)  19.281 ms  19.289 ms hstn-utaust-nlr-ge-3-0-0-2-layer3.tx-learn.net (74.200.188.13)  3.661 ms
+ 6  hstn-utaust-nlr-ge-3-0-0-2-layer3.tx-learn.net (74.200.188.13)  3.675 ms  3.643 ms hstn-hstn-nlr-layer3.tx-learn.net (74.200.188.33)  3.646 ms
+ 7  vlan-51.jack.layer2.nlr.net (216.24.186.79)  48.616 ms  48.631 ms  48.629 ms
+ 8  vlan-51.jack.layer2.nlr.net (216.24.186.79)  48.759 ms  48.858 ms vlan-53.atla.layer2.nlr.net (216.24.186.54)  48.555 ms
+ 9  vlan-53.atla.layer2.nlr.net (216.24.186.54)  48.669 ms  48.671 ms  48.723 ms
+10  vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.489 ms vlan-54.rale.layer2.nlr.net (216.24.186.53)  48.704 ms vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.491 ms
+11  vlan-58.phil.layer2.nlr.net (216.24.186.86)  49.272 ms  49.273 ms vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.484 ms
+12  vlan-59.newy.layer2.nlr.net (216.24.186.84)  48.948 ms vlan-58.phil.layer2.nlr.net (216.24.186.86)  48.767 ms vlan-59.newy.layer2.nlr.net (216.24.186.84)  49.122 ms
+13  vlan-59.newy.layer2.nlr.net (216.24.186.84)  49.111 ms  49.107 ms 216.24.184.86 (216.24.184.86)  131.493 ms
+14  216.24.184.86 (216.24.184.86)  143.599 ms so-2-0-0.rt1.fra.de.geant2.net (62.40.112.9)  131.534 ms 216.24.184.86 (216.24.184.86)  131.496 ms
+15  so-5-0-0.rt1.gen.ch.geant2.net (62.40.112.162)  140.484 ms  140.493 ms  140.545 ms
+16  so-5-0-0.rt1.gen.ch.geant2.net (62.40.112.162)  140.548 ms  152.465 ms swiCE2-10GE-1-1.switch.ch (62.40.124.22)  477.755 ms
+17  swiCE2-10GE-1-1.switch.ch (62.40.124.22)  429.925 ms swiLUG2-P1.switch.ch (130.59.38.78)  143.152 ms swiCE2-10GE-1-1.switch.ch (62.40.124.22)  428.425 ms
+18  swiLUG2-P1.switch.ch (130.59.38.78)  155.370 ms swiMA1-10GE-1-3.switch.ch (130.59.38.94)  143.743 ms  143.767 ms
+19  swiMA1-10GE-1-3.switch.ch (130.59.38.94)  143.708 ms  143.737 ms 35-g0-10-ma2.ti-edu.ch (195.176.176.42)  156.880 ms
+20  * * 35-g0-10-ma2.ti-edu.ch (195.176.176.42)  157.109 ms
+21  * * *
+22  * * *
+23  * * *
+24  * * *
+25  * * *
+26  * * *
+27  * * *
+28  * * *
+29  * * *
+30  * * *
+
+A second trace. This path we take this time is different. Some gateway
+addresses have changed. We are also not going through Jack
+(Jacksonville?) anymore. 
+
+traceroute to www.idsia.ch (195.176.70.135), 30 hops max, 60 byte packets
+ 1  cs-gw.cs.utexas.edu (128.83.139.1)  0.397 ms  0.405 ms  0.517 ms
+ 2  cs45k-cs65k-po1-p2p.aces.utexas.edu (128.83.37.65)  0.553 ms  0.699 ms  0.703 ms
+ 3  noca9-cs-v691.gw.utexas.edu (146.6.9.33)  0.398 ms  0.497 ms  0.590 ms
+ 4  noca2-ten7-1-noca9-n7k.gw.utexas.edu (146.6.9.226)  0.436 ms  0.497 ms nocb1-ten4-1-noca9-n7k.gw.utexas.edu (146.6.9.214)  0.359 ms
+ 5  noca2-po1-nocb1.gw.utexas.edu (128.83.3.81)  0.558 ms hstn-utaust-nlr-ge-3-0-0-2-layer3.tx-learn.net (74.200.188.13)  7.032 ms noca2-po1-nocb1.gw.utexas.edu (128.83.3.81)  0.578 ms
+ 6  hstn-utaust-nlr-ge-3-0-0-2-layer3.tx-learn.net (74.200.188.13)  7.032 ms hstn-hstn-nlr-layer3.tx-learn.net (74.200.188.33)  3.970 ms hstn-utaust-nlr-ge-3-0-0-2-layer3.tx-learn.net (74.200.188.13)  6.041 ms
+ 7  hstn-hstn-nlr-layer3.tx-learn.net (74.200.188.33)  3.823 ms vlan-51.jack.layer2.nlr.net (216.24.186.79)  48.610 ms hstn-hstn-nlr-layer3.tx-learn.net (74.200.188.33)  3.807 ms
+ 8  vlan-53.atla.layer2.nlr.net (216.24.186.54)  48.616 ms  48.634 ms  48.742 ms
+ 9  vlan-53.atla.layer2.nlr.net (216.24.186.54)  48.892 ms vlan-54.rale.layer2.nlr.net (216.24.186.53)  48.634 ms  48.660 ms
+10  vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.586 ms vlan-54.rale.layer2.nlr.net (216.24.186.53)  48.724 ms vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.596 ms
+11  vlan-55.wash.layer2.nlr.net (216.24.186.91)  48.407 ms  48.411 ms  48.477 ms
+12  vlan-59.newy.layer2.nlr.net (216.24.186.84)  48.536 ms  48.578 ms  48.551 ms
+13  vlan-59.newy.layer2.nlr.net (216.24.186.84)  48.599 ms  48.602 ms  48.633 ms
+14  216.24.184.86 (216.24.184.86)  131.658 ms so-2-0-0.rt1.fra.de.geant2.net (62.40.112.9)  143.561 ms  143.535 ms
+15  so-2-0-0.rt1.fra.de.geant2.net (62.40.112.9)  143.568 ms so-5-0-0.rt1.gen.ch.geant2.net (62.40.112.162)  140.379 ms  140.337 ms
+16  swiCE2-10GE-1-1.switch.ch (62.40.124.22)  144.977 ms so-5-0-0.rt1.gen.ch.geant2.net (62.40.112.162)  152.507 ms  140.382 ms
+17  swiCE2-10GE-1-1.switch.ch (62.40.124.22)  194.270 ms  141.923 ms swiLUG2-P1.switch.ch (130.59.38.78)  143.266 ms
+18  swiLUG2-P1.switch.ch (130.59.38.78)  155.366 ms swiMA1-10GE-1-3.switch.ch (130.59.38.94)  155.506 ms  143.523 ms
+19  35-g0-10-ma2.ti-edu.ch (195.176.176.42)  153.618 ms  144.692 ms swiMA1-10GE-1-3.switch.ch (130.59.38.94)  155.563 ms
+20  * * 35-g0-10-ma2.ti-edu.ch (195.176.176.42)  145.707 ms
+21  * * *
+22  * * *
+23  * * *
+24  * * *
+25  * * *
+26  * * *
+27  * * *
+28  * * *
+29  * * *
+30  * * *
+
+3. To prepare the server to accept a connection we have to:
+* Open a port on which to accept connections
+* Listen on that port
+
+When a client request a connection, we:
+* Spawn a new socket to accept the connection, freeing the listening
+port
+* Bind the new socket
+* If TCP, send an ACK to establish connection
+
+4. We want to minimize the time it takes to send a 100 byte packet
+from machine A to machine B and then sends a 8000 byte packet from
+machine B to machine A
+
+  A network with 200 microsecond overhead, 10 Mbyte/s bandwidth, 20 microsecond latency
+    Time taken (A->B): 200 + 20 + 100/10000 = 220.01 ms
+    Time taken (B->A): 200 + 20 + 8000/10000 = 220.8 ms
+    Total time taken: 440.81 ms
+  A network with 20 microsecond overhead, 10 Mbyte/s bandwidth, 200 microsecond latency
+    Same time as above
+  A network with 20 microsecond overhead, 1 Mbyte/s bandwidth, 2 microsecond latency
+    Time taken (A->B): 20 + 2 + 100/1000 = 22.1 ms
+    Time taken (B->A): 20 + 2 + 8000/1000 = 30 ms
+    Total time taken: 52.1 ms
+  A network with 2 microsecond overhead, 1 Mbyte/s bandwidth, 20 microsecond latency
+    Same time as above
+So the 3rd or 4th network is the best.
+
+5. I don't know.
