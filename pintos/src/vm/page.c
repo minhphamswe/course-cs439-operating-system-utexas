@@ -171,7 +171,7 @@ _Bool load_page(void* uaddr)
   
   // Make sure it's supposed to be there
   struct page_entry *entry = get_page_entry(uaddr);
-  if (!entry)
+  if (entry == NULL)
     return false;
     
   // If it's swapped, let's go get it  

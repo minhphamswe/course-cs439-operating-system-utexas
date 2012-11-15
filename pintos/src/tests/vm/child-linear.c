@@ -18,15 +18,15 @@ main (int argc, char *argv[])
   const char *key = argv[argc - 1];
   struct arc4 arc4;
   size_t i;
-
+//printf("TRACE1\n");
   /* Encrypt zeros. */
   arc4_init (&arc4, key, strlen (key));
   arc4_crypt (&arc4, buf, SIZE);
-
+//printf("TRACE2\n");
   /* Decrypt back to zeros. */
   arc4_init (&arc4, key, strlen (key));
   arc4_crypt (&arc4, buf, SIZE);
-
+//printf("TRACE3\n");
   /* Check that it's all zeros. */
   for (i = 0; i < SIZE; i++)
     if (buf[i] != '\0')

@@ -28,6 +28,7 @@
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "threads/thread.h"
+#include "threads/interrupt.h"
 
 #include "userprog/pagedir.h"
 
@@ -74,14 +75,16 @@ bool push_to_swap(struct frame* fp)
     temp->upage = fp->upage;
     temp->upage->status = PAGE_SWAPPED;
     temp->tid = fp->tid;
-    list_push_front(&swap_list, &temp->elem);
 
     // Write data out onto the swap disk
     write_swap(temp);
 
     // Update the CPU-based page directory
+    enum intr_level old_level = intr_disable();
+    list_push_front(&swap_list, &temp->elem);
     struct thread *t = thread_current();
     pagedir_clear_page(t->pagedir, temp->upage->uaddr);
+    intr_set_level(old_level);
 
 //     printf("Frame Push Address: %x\n", temp->frame->kpage);
 //     printf("Clearing page: %x\n", temp->upage);
@@ -143,6 +146,8 @@ bool get_from_swap(struct frame* fp, void* uaddr)
 //printf("back from read\n");
     // Update the CPU-based page directory
  //   printf("trace1\n");
+    enum intr_level old_level = intr_disable();
+
     struct thread *t = thread_current();
 //     printf("Setting frame given: %x\n",slot->upage->frame->kpage);
 //     printf("Setting frame looked up: %x\n", fp->kpage);
@@ -151,7 +156,7 @@ bool get_from_swap(struct frame* fp, void* uaddr)
     pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
     pagedir_set_page(t->pagedir,
                      slot->upage->uaddr,
-                     slot->upage->frame-> kpage,
+                     slot->upage->frame->kpage,
                      slot->upage->frame->writable);
                      
     // Update the page
@@ -163,6 +168,7 @@ bool get_from_swap(struct frame* fp, void* uaddr)
     // Rotate slot element
     list_remove(&slot->elem);
     list_push_back(&swap_list, &slot->elem);
+    intr_set_level(old_level);
   }
   return (slot != NULL);
 }
@@ -175,6 +181,8 @@ struct swap_slot* get_free_slot(void)
 {
   struct swap_slot *temp;
   struct list_elem *e;
+
+  enum intr_level old_level = intr_disable();    
 
   e = list_tail(&swap_list)->prev;
 
@@ -195,6 +203,8 @@ struct swap_slot* get_free_slot(void)
       temp = NULL;
     }
   }
+
+  intr_set_level(old_level);
   return temp;
 }
 
@@ -202,13 +212,19 @@ struct swap_slot* get_used_slot(struct frame* fp)
 {
   struct list_elem *e;
   tid_t tid = thread_current()->tid;
+
+  enum intr_level old_level = intr_disable();    
+
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->frame == fp && slot->tid == tid)
+    if (slot->upage && slot->upage->frame == fp && slot->tid == tid) {
+      intr_set_level(old_level);    
       return slot;
+    }
   }
+  intr_set_level(old_level);  
   return NULL;
 }
 
@@ -217,20 +233,26 @@ struct swap_slot* get_slot_by_vaddr(void* uaddr)
   uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
   struct list_elem *e;
   tid_t tid = thread_current()->tid;
+
+  enum intr_level old_level = intr_disable();    
+
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->uaddr == uaddr && slot->tid == tid)
+    if (slot->upage && slot->upage->uaddr == uaddr && slot->tid == tid) {
+      intr_set_level(old_level);
       return slot;
+    }
   }
+  intr_set_level(old_level);  
   return NULL;
 }
 
 /** Read the disk sector into the frame; both are pointed to by SLOT.*/
 void read_swap(struct swap_slot* slot)
 {
-printf("Read swap: %d\n", slot->sector);
+//printf("Read swap: %d\n", slot->sector);
   void *kpage = slot->upage->frame->kpage;
   int i;
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
@@ -240,12 +262,45 @@ printf("Read swap: %d\n", slot->sector);
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
 void write_swap(struct swap_slot* slot)
 {
-printf("Write swap: %d\n", slot->sector);
-  void *uaddr = slot->upage->frame->kpage;
-  printf("%x, %d, %d\n",uaddr,slot->tid,thread_current()->tid);
+//printf("Write swap: %d\n", slot->sector);
+  void *kpage = slot->upage->frame->kpage;
+//  printf("%x, %d, %d ",kpage,slot->tid,thread_current()->tid);
   int i;
-  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
-    block_write(swap_block, slot->sector + i, uaddr + i * BLOCK_SECTOR_SIZE);
+  for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
+    block_write(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
+//    printf("%d ", i);
+  }
+//    printf("   done\n");
 }
 
+bool clean_swap(tid_t tid)
+{
+//printf("Cleaning all mentions of process %d from swap file\n", tid);
+  struct list_elem *e;  
+  enum intr_level old_level = intr_disable();
+  
+  for (e = list_begin(&swap_list); e != list_end(&swap_list);
+       e = list_next(e))
+  {
+    struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
+    
+    // Check to see if we're done with the active slots    
+    if (slot->upage == NULL)
+      break;
+
+    if (slot->tid == tid) {
+//printf("Slot %d cleaned\n", slot->sector);
+      // Clear the slot
+      slot->tid = 0;
+      slot->upage = NULL;
+    
+      // Rotate slot to back of list
+      list_remove(&slot->elem);
+      list_push_back(&swap_list, &slot->elem);
+    }    
+  }
+  
+  intr_set_level(old_level);
+  return true;
+}
 

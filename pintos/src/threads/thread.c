@@ -406,6 +406,7 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+  clean_swap(thread_current()->tid);          // Clean out any left swaps
   list_remove (&thread_current()->allelem);   // disappear before dying
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();

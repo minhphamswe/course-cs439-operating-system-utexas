@@ -102,7 +102,11 @@ int allocate_frame(struct page_entry *upage, int writable) {
     fp->kpage = kpage;
     fp->writable = writable;
     fp->tid = t->tid;
-    list_push_back(&all_frames, &fp->elem);
+    // Check if likely code or data segment.  Code is unavailable for eviction
+    if(uaddr > 0xb0000000)
+        fp->writable = false;
+    else
+        list_push_back(&all_frames, &fp->elem);
 
     // Update page entry
     upage->frame = fp;
@@ -186,12 +190,20 @@ struct frame * evict_frame(void)
 {
 //  printf("Evicting frame\n");
   // Remove the oldest frame from frame table
-  struct list_elem *e = list_pop_back(&all_frames);
+  struct list_elem *e = list_pop_front(&all_frames);
   struct frame *fp = list_entry(e, struct frame, elem);
 
-  list_push_back(&all_frames, &fp->elem);
+  while(!fp->writable) {
+    list_push_back(&all_frames, &fp->elem);
+    e = list_pop_front(&all_frames);
+    fp = list_entry(e, struct frame, elem);
+  }
+//  printf("Kpage: %x  Upage: %x Writable: %d\n", fp->kpage, fp->upage->uaddr, fp->writable);
+
   // Write it to swap space
   push_to_swap(fp);
+
+  list_push_back(&all_frames, &fp->elem);
 
   return fp;
 }

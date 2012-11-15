@@ -204,7 +204,7 @@ page_fault (struct intr_frame *f)
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
     if (!load_page(fault_addr)) {
-//       printf("%x does not belong to user process -> KILL\n", fault_addr);
+//      printf("%x does not belong to user process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
