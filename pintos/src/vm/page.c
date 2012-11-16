@@ -63,6 +63,8 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include <threads/thread.h>
 
 #include "threads/vaddr.h"
+#include <threads/interrupt.h>
+#include <userprog/pagedir.h>
 
 #include <stdio.h>
 
@@ -122,6 +124,7 @@ struct page_entry* allocate_page(void* uaddr)
     // Map it the new page entry to a frame
     struct frame* fp = allocate_frame(entry);
 
+    enum intr_level old_level = intr_disable();
     if (fp) {
 //       printf("Got here.\n");
       // if frame was successfully allocated, track page
@@ -132,6 +135,7 @@ struct page_entry* allocate_page(void* uaddr)
       free_page_entry(entry);
       entry = NULL;
     }
+    intr_set_level(old_level);
   }
 
 //   printf("allocate_page() returning is: %x\n", entry);
@@ -147,7 +151,6 @@ bool install_page(struct page_entry* entry, int writable)
   }
   else {
     bool success = install_frame(entry->frame, writable);
-//     bool success = install_frame(entry->frame, true);
 //     if (!success)
 //       free_page_entry(entry);    // FIXME: this causes a triple fault
 //     printf("install_page(): success is: %d\n", success);
@@ -195,23 +198,15 @@ void free_page(void* uaddr)
  */
 _Bool load_page(void* uaddr)
 {
-//   struct thread *t = thread_current();
-//   struct page_table *pt = &t->pages;
-// 
-//   struct page_entry *entry = get_page_entry(uaddr);
-//   if (entry == NULL)
-//     return false;
-// 
-//   struct frame *fp = entry->frame;
-//   if (fp == NULL)
-//     return false;
-// 
-//   return pull_from_swap(fp);
-  
   // Make sure it's supposed to be there
   struct page_entry *entry = get_page_entry(uaddr);
-  if (entry == NULL)
+  if (entry == NULL) {
     return false;
+  }
+
+  struct thread *t = thread_current();
+//   printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d)\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid);
+//   printf("Page status: %d\n", entry->status);
 
   // If it's swapped, let's go get it
   if (entry->status == PAGE_SWAPPED) {
@@ -225,8 +220,11 @@ _Bool load_page(void* uaddr)
     // Now swap back into free frame
 //     get_from_swap(entry->frame, uaddr);
     pull_from_swap(entry);
+    ASSERT(pagedir_get_page(thread_current()->pagedir, entry->uaddr) != NULL);
+    return true;
   }
-  return true;
+
+  return false;
 }
 
 /**
@@ -245,11 +243,13 @@ struct page_entry* get_page_entry(void* uaddr)
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages);
        e = list_next(e)) {
     struct page_entry *entry = list_entry(e, struct page_entry, elem);
-//     printf("Page entry address: %x\n", entry);
-    if (entry->uaddr == uaddr)
+    if (entry->uaddr == uaddr) {
+//       printf("get_page_entry(): Get thread %x(%d)| page %x @ %x(%d) \n", t, t->tid, uaddr, entry, entry->tid);
       return entry;
+    }
   }
 
+//   printf("get_page_entry(): Get thread %x(%d) | page %x @ NULL \n", t, t->tid, uaddr);
   return NULL;
 }
 

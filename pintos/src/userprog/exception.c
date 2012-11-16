@@ -170,6 +170,9 @@ page_fault (struct intr_frame *f)
 //   printf("write: %d\n", write);
 //   printf("user: %d\n", user);
 //   printf("fault_addr: %x\n", (uint32_t) fault_addr);
+
+  struct thread *t = thread_current();
+//   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
 
 //   if (fault_addr == NULL) {
@@ -207,19 +210,22 @@ page_fault (struct intr_frame *f)
   else if (not_present && !write && user) {
     // Swap if available, crash otherwise
     if (!load_page(fault_addr)) {
-//      printf("%x does not belong to user process -> KILL\n", fault_addr);
+//       printf("%x does not belong to user process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (!not_present && !write && user) {
     if (!load_page(fault_addr)) {
+//       printf("Attempted to read from address of another thread: %x -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (!not_present && write && user) {
+//     printf("Attempted to write to address of another thread: %x -> KILL\n", fault_addr);
     kill_process(f);
   }
   else {
+//     printf("Illegal access -> KILL\n");
     kill_process(f);
     //     printf("not_present: %d\n", not_present);
 //     printf("write: %d\n", write);

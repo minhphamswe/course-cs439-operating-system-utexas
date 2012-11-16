@@ -30,8 +30,6 @@
 #include "threads/thread.h"
 #include "threads/interrupt.h"
 
-#include "userprog/pagedir.h"
-
 #include "stdio.h"
 
 static struct block* swap_block;
@@ -49,7 +47,6 @@ struct swap_slot {
 
 /* Forward declaration for internal uses */
 struct swap_slot* get_free_slot(void);
-struct swap_slot* get_used_slot(struct frame *fp);
 
 void read_swap(struct swap_slot *slot);
 void write_swap(struct swap_slot *slot);
@@ -82,10 +79,6 @@ bool push_to_swap(struct frame* fp)
     // Update the CPU-based page directory
     enum intr_level old_level = intr_disable();
     list_push_front(&swap_list, &temp->elem);
-    struct thread *t = thread_current();
-
-//     printf("Unmapping page %x =/=> %x\n", temp->upage->uaddr, fp->kpage);
-    pagedir_clear_page(t->pagedir, temp->upage->uaddr);
     intr_set_level(old_level);
   }
   return (temp != NULL);
@@ -107,59 +100,12 @@ bool pull_from_swap(struct page_entry *upage)
     read_swap(slot);
 
     enum intr_level old_level = intr_disable();
-    // Update the CPU-based page directory
-//     struct thread *t = thread_current();
-//     pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
-//     printf("Mapping page %x ==> %x\n", slot->upage->uaddr, slot->upage->frame->kpage);
-//     pagedir_set_page(t->pagedir,
-//                      slot->upage->uaddr,
-//                      slot->upage->frame->kpage,
-//                      slot->upage->writable);
-
     // Update the page
     slot->upage->status = PAGE_PRESENT;
 
     // Update the slot
     slot->upage = NULL;
 
-    // Rotate slot element
-    list_remove(&slot->elem);
-    list_push_back(&swap_list, &slot->elem);
-    intr_set_level(old_level);
-  }
-  return (slot != NULL);
-}
-
-bool get_from_swap(struct frame* fp, void* uaddr)
-{
-//  printf("Getting from swap\n");
-  ASSERT(fp != NULL);
-
-  struct swap_slot *slot = get_slot_by_vaddr(uaddr);
-  if (slot) {
-//     printf("Frame pull address: %x\n", slot->frame->kpage);
-    slot->upage->frame = fp;
-    // Read data in the swap slot into memory
-    read_swap(slot);
-//printf("back from read\n");
-    // Update the CPU-based page directory
- //   printf("trace1\n");
-    enum intr_level old_level = intr_disable();
-
-    struct thread *t = thread_current();
-
-    pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
-    pagedir_set_page(t->pagedir,
-                     slot->upage->uaddr,
-                     slot->upage->frame->kpage,
-                     slot->upage->writable);
-                     
-    // Update the page
-    slot->upage->status = PAGE_PRESENT;
-    
-    // Update the slot
-    slot->upage = NULL;
-    
     // Rotate slot element
     list_remove(&slot->elem);
     list_push_back(&swap_list, &slot->elem);
@@ -203,59 +149,21 @@ struct swap_slot* get_free_slot(void)
   return temp;
 }
 
-struct swap_slot* get_used_slot(struct frame* fp)
-{
-  struct list_elem *e;
-  tid_t tid = thread_current()->tid;
-
-  enum intr_level old_level = intr_disable();    
-
-  for (e = list_begin(&swap_list); e != list_end(&swap_list);
-       e = list_next(e))
-  {
-    struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->frame == fp && slot->tid == tid) {
-      intr_set_level(old_level);    
-      return slot;
-    }
-  }
-  intr_set_level(old_level);  
-  return NULL;
-}
-
 struct swap_slot* get_swapped_page(struct page_entry *upage)
 {
   struct list_elem *e;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
     if (slot->upage && slot->upage == upage) {
-      return slot;
-    }
-  }
-  return NULL;
-}
-
-struct swap_slot* get_slot_by_vaddr(void* uaddr)
-{
-  uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
-  struct list_elem *e;
-  tid_t tid = thread_current()->tid;
-
-  enum intr_level old_level = intr_disable();    
-
-  for (e = list_begin(&swap_list); e != list_end(&swap_list);
-       e = list_next(e))
-  {
-    struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    if (slot->upage && slot->upage->uaddr == uaddr && slot->tid == tid) {
       intr_set_level(old_level);
       return slot;
     }
   }
-  intr_set_level(old_level);  
+  intr_set_level(old_level);
   return NULL;
 }
 
@@ -286,14 +194,14 @@ void write_swap(struct swap_slot* slot)
 bool clean_swap(int tid)
 {
 //printf("Cleaning all mentions of process %d from swap file\n", tid);
-  struct list_elem *e;  
+  struct list_elem *e;
   enum intr_level old_level = intr_disable();
-  
+
   for (e = list_begin(&swap_list); e != list_end(&swap_list);
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
-    
+
     // Check to see if we're done with the active slots    
     if (slot->upage == NULL)
       break;
@@ -303,13 +211,13 @@ bool clean_swap(int tid)
       // Clear the slot
       slot->tid = 0;
       slot->upage = NULL;
-    
+
       // Rotate slot to back of list
       list_remove(&slot->elem);
       list_push_back(&swap_list, &slot->elem);
-    }    
+    }
   }
-  
+
   intr_set_level(old_level);
   return true;
 }

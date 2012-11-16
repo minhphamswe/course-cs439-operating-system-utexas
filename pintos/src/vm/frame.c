@@ -41,13 +41,15 @@ of this project.
 #include "vm/swap.h"
 #include "vm/page.h"
 
+#include "userprog/pagedir.h"
+
 #include "lib/kernel/list.h"
 
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
-#include "userprog/pagedir.h"
+#include "threads/interrupt.h"
 
 #include "stdio.h"
 
@@ -94,7 +96,6 @@ struct frame* allocate_frame(struct page_entry* upage) {
   upage->frame = fp;
   upage->status = PAGE_PRESENT;
 
-//   printf("allocate_frame() returning: %x\n", fp);
   return fp;
 }
 
@@ -104,20 +105,15 @@ bool install_frame(struct frame* fp, int writable) {
     return false;
   }
   else {
+    enum intr_level old_level = intr_disable();
     struct thread *t = thread_current();
     void *uaddr = fp->upage->uaddr;
     void *kpage = fp->kpage;
     bool success = false;
 
-//     printf("Mapping page %x -> %x\n", uaddr, kpage);
-
     if (pagedir_get_page(t->pagedir, uaddr) == NULL
         && pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
-
-      // Check if likely code or data segment.  Code is unavailable for eviction
-  //     if(uaddr > 0xb0000000)
-  //         fp->writable = false;
-  //     else
+//       printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
       list_push_back(&all_frames, &fp->elem);
       success = true;
     }
@@ -127,6 +123,7 @@ bool install_frame(struct frame* fp, int writable) {
 //       free_frame(fp);   // FIXME: this may cause a PANIC
       success = false;
     }
+    intr_set_level(old_level);
 
 //     printf("install_frame(): success is: %d\n", success);
     return success;
@@ -135,10 +132,19 @@ bool install_frame(struct frame* fp, int writable) {
 
 void free_frame(struct frame* fp)
 {
-  struct thread *t = thread_current();
+  enum intr_level old_level = intr_disable();
+
+  // Remove page->frame mapping from the CPU-based page directory
+  struct thread *t = thread_by_tid(fp->tid);
   void *uaddr = fp->upage->uaddr;
+//   printf("free_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", t, t->tid, uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
   pagedir_clear_page(t->pagedir, uaddr);
+
+  // Remove page<->frame mapping from our supplemental structures
+  fp->upage->frame = NULL;
+  fp->upage = NULL;
   palloc_free_page(fp->kpage);
+  intr_set_level(old_level);
 }
 
 struct frame* evict_frame(void)
@@ -157,6 +163,20 @@ struct frame* evict_frame(void)
 
   // Write it to swap space
   push_to_swap(fp);
+
+  enum intr_level old_level = intr_disable();
+
+  // Remove page->frame mapping from the CPU-based page directory
+  struct thread *t = thread_current();
+  struct thread *victim = thread_by_tid(fp->tid);
+//   printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+  pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+
+  // Remove page<->frame mapping from our supplemental structures
+  fp->upage->frame = NULL;
+  fp->upage = NULL;
+
+  intr_set_level(old_level);
 
   list_push_back(&all_frames, &fp->elem);
 
