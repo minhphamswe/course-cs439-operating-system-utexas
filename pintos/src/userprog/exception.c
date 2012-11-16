@@ -212,13 +212,14 @@ page_fault (struct intr_frame *f)
     }
   }
   else {
-//     printf("Invalid Access.\n");
 //     printf("not_present: %d\n", not_present);
 //     printf("write: %d\n", write);
 //     printf("user: %d\n", user);
 //     printf("fault_addr: %x\n", (uint32_t) fault_addr);
-//     if (!load_page(fault_addr))
-    kill_process(f);
+    if (!load_page(fault_addr)) {
+//       printf("Invalid Access.\n");
+      kill_process(f);
+    }
   }
 }
 

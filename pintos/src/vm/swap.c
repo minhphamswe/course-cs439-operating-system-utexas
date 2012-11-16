@@ -83,12 +83,10 @@ bool push_to_swap(struct frame* fp)
     enum intr_level old_level = intr_disable();
     list_push_front(&swap_list, &temp->elem);
     struct thread *t = thread_current();
+
+//     printf("Unmapping page %x =/=> %x\n", temp->upage->uaddr, fp->kpage);
     pagedir_clear_page(t->pagedir, temp->upage->uaddr);
     intr_set_level(old_level);
-
-//     printf("Frame Push Address: %x\n", temp->frame->kpage);
-//     printf("Clearing page: %x\n", temp->upage);
-//     printf("Clearing address: %x\n", fp->upage->uaddr);
   }
   return (temp != NULL);
 }
@@ -97,27 +95,25 @@ bool push_to_swap(struct frame* fp)
  * Read a frame from the swap space into main memory. Return false if the
  * frame cannot be found from the swap slots.
  */
-bool pull_from_swap(struct frame* fp)
+bool pull_from_swap(struct page_entry *upage)
 {
 //   printf("Pulling from swap\n");
-  ASSERT(fp != NULL);
+  ASSERT(upage != NULL);
 
-  struct swap_slot *slot = get_used_slot(fp);
+  struct swap_slot *slot = get_swapped_page(upage);
   if (slot) {
 //     printf("Frame pull address: %x\n", slot->frame->kpage);
     // Read data in the swap slot into memory
     read_swap(slot);
 
     // Update the CPU-based page directory
-    struct thread *t = thread_current();
-//     printf("Setting frame given: %x\n", fp);
-//     printf("Setting frame looked up: %x\n", slot->frame);
-//     printf("Setting page: %x\n", slot->upage);
-//     printf("Setting address: %x\n", fp->upage->uaddr);
-    pagedir_set_page(t->pagedir,
-                     slot->upage->uaddr,
-                     slot->upage->frame->kpage,
-                     slot->upage->writable);
+//     struct thread *t = thread_current();
+//     pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
+//     printf("Mapping page %x ==> %x\n", slot->upage->uaddr, slot->upage->frame->kpage);
+//     pagedir_set_page(t->pagedir,
+//                      slot->upage->uaddr,
+//                      slot->upage->frame->kpage,
+//                      slot->upage->writable);
 
     // Update the page
     slot->upage->status = PAGE_PRESENT;
@@ -149,10 +145,7 @@ bool get_from_swap(struct frame* fp, void* uaddr)
     enum intr_level old_level = intr_disable();
 
     struct thread *t = thread_current();
-//     printf("Setting frame given: %x\n",slot->upage->frame->kpage);
-//     printf("Setting frame looked up: %x\n", fp->kpage);
-//     printf("Setting page: %x\n", slot->upage);
-//     printf("Setting address: %x\n", fp->upage->uaddr);
+
     pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
     pagedir_set_page(t->pagedir,
                      slot->upage->uaddr,
@@ -225,6 +218,21 @@ struct swap_slot* get_used_slot(struct frame* fp)
     }
   }
   intr_set_level(old_level);  
+  return NULL;
+}
+
+struct swap_slot* get_swapped_page(struct page_entry *upage)
+{
+  struct list_elem *e;
+
+  for (e = list_begin(&swap_list); e != list_end(&swap_list);
+       e = list_next(e))
+  {
+    struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
+    if (slot->upage && slot->upage == upage) {
+      return slot;
+    }
+  }
   return NULL;
 }
 

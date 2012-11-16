@@ -109,7 +109,7 @@ bool install_frame(struct frame* fp, int writable) {
     void *kpage = fp->kpage;
     bool success = false;
 
-//     printf("UAddr is: %x\n", uaddr);
+//     printf("Mapping page %x -> %x\n", uaddr, kpage);
 
     if (pagedir_get_page(t->pagedir, uaddr) == NULL
         && pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
@@ -135,6 +135,9 @@ bool install_frame(struct frame* fp, int writable) {
 
 void free_frame(struct frame* fp)
 {
+  struct thread *t = thread_current();
+  void *uaddr = fp->upage->uaddr;
+  pagedir_clear_page(t->pagedir, uaddr);
   palloc_free_page(fp->kpage);
 }
 

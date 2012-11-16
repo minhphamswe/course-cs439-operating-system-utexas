@@ -147,6 +147,7 @@ bool install_page(struct page_entry* entry, int writable)
   }
   else {
     bool success = install_frame(entry->frame, writable);
+//     bool success = install_frame(entry->frame, true);
     if (!success)
       free_page_entry(entry);
 //     printf("install_page(): success is: %d\n", success);
@@ -194,37 +195,38 @@ void free_page(void* uaddr)
  */
 _Bool load_page(void* uaddr)
 {
-  struct thread *t = thread_current();
-  struct page_table *pt = &t->pages;
-
-  struct page_entry *entry = get_page_entry(uaddr);
-  if (entry == NULL)
-    return false;
-
-  struct frame *fp = entry->frame;
-  if (fp == NULL)
-    return false;
-
-  return pull_from_swap(fp);
-  
-//   // Make sure it's supposed to be there
+//   struct thread *t = thread_current();
+//   struct page_table *pt = &t->pages;
+// 
 //   struct page_entry *entry = get_page_entry(uaddr);
 //   if (entry == NULL)
 //     return false;
 // 
-//   // If it's swapped, let's go get it
-//   if (entry->status == PAGE_SWAPPED) {
-//     // First need to get a free frame to put it in
-//     struct frame * fp = allocate_frame(entry);
-//     int success = install_frame(fp, true);
+//   struct frame *fp = entry->frame;
+//   if (fp == NULL)
+//     return false;
 // 
-//     if (!success)
-//       return false;   // out of swap space, should be panic'd before here
-// 
-//     // Now swap back into free frame
+//   return pull_from_swap(fp);
+  
+  // Make sure it's supposed to be there
+  struct page_entry *entry = get_page_entry(uaddr);
+  if (entry == NULL)
+    return false;
+
+  // If it's swapped, let's go get it
+  if (entry->status == PAGE_SWAPPED) {
+    // First need to get a free frame to put it in
+    struct frame * fp = allocate_frame(entry);
+    int success = install_frame(fp, true);
+
+    if (!success)
+      return false;   // out of swap space, should be panic'd before here
+
+    // Now swap back into free frame
 //     get_from_swap(entry->frame, uaddr);
-//   }
-//   return true;
+    pull_from_swap(entry);
+  }
+  return true;
 }
 
 /**
@@ -257,6 +259,10 @@ void free_page_entry(struct page_entry* entry)
 //   printf("Freeing page entry\n");
   // TODO: free the frame the entry points to
   if (entry != NULL) {
+    if (entry->frame != NULL) {
+      free_frame(entry->frame);
+      free(entry->frame);
+    }
     free(entry);
   }
 }
