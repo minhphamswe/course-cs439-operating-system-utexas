@@ -106,6 +106,7 @@ bool pull_from_swap(struct page_entry *upage)
     // Read data in the swap slot into memory
     read_swap(slot);
 
+    enum intr_level old_level = intr_disable();
     // Update the CPU-based page directory
 //     struct thread *t = thread_current();
 //     pagedir_clear_page(t->pagedir, slot->upage->frame->upage->uaddr);
@@ -124,6 +125,7 @@ bool pull_from_swap(struct page_entry *upage)
     // Rotate slot element
     list_remove(&slot->elem);
     list_push_back(&swap_list, &slot->elem);
+    intr_set_level(old_level);
   }
   return (slot != NULL);
 }

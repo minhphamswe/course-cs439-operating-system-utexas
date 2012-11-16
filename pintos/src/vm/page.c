@@ -148,8 +148,8 @@ bool install_page(struct page_entry* entry, int writable)
   else {
     bool success = install_frame(entry->frame, writable);
 //     bool success = install_frame(entry->frame, true);
-    if (!success)
-      free_page_entry(entry);
+//     if (!success)
+//       free_page_entry(entry);    // FIXME: this causes a triple fault
 //     printf("install_page(): success is: %d\n", success);
     return success;
   }
