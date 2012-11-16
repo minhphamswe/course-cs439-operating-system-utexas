@@ -225,20 +225,18 @@ page_fault (struct intr_frame *f)
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
 //   printf("Extending stack..\n");
-  int addr;
+  uint32_t addr = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;;
   bool once = false;
 
 //   printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
-  for (addr = (int) fault_addr; addr <= (int) f->frame_pointer;
-       addr += PGSIZE) {
-    once = true;
-//     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n",
-//     	     addr, fault_addr, f->frame_pointer);
+  for (; addr < (int) f->frame_pointer; addr += PGSIZE) {
+//     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n", addr, fault_addr, f->frame_pointer);
     struct page_entry *entry = allocate_page((void *) addr);
     int success = install_page(entry, true);
-    if (!success) {
+    if (!success)
       break;
-    }
+    else
+      once = true;
   }
   if (!once) {
 //     printf("Allocation of stack frame unsuccessful.\n");

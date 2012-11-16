@@ -261,7 +261,7 @@ process_exit (void)
 
   // Destroy the supplemental page table, which frees all pages and frames
   // in the process
-  page_table_destroy(&cur->pages);
+//   page_table_destroy(&cur->pages);   // FIXME: This causes a triple fault
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -604,13 +604,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       struct page_entry *entry = allocate_page(upage);
+      void* kpage = entry->frame->kpage;
       if (entry != NULL) {
-        if (file_read(file, entry->frame->kpage, page_read_bytes) != (int) page_read_bytes)
+        if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          free_page(upage);
+          free_page_entry(entry);
           return false;
         }
-        memset (entry->frame->kpage + page_read_bytes, 0, page_zero_bytes);
+        memset (kpage + page_read_bytes, 0, page_zero_bytes);
       }
       else {
         return false;

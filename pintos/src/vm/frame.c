@@ -78,6 +78,7 @@ struct frame* allocate_frame(struct page_entry* upage) {
   if (kpage == NULL) {
     // All physical addresses are used: evict a frame
     fp = evict_frame();
+    kpage = fp->kpage;
   }
   else {
     // We have space: register a new frame to track the address
@@ -93,17 +94,22 @@ struct frame* allocate_frame(struct page_entry* upage) {
   upage->frame = fp;
   upage->status = PAGE_PRESENT;
 
+//   printf("allocate_frame() returning: %x\n", fp);
   return fp;
 }
 
 bool install_frame(struct frame* fp, int writable) {
   if (fp == NULL) {
+//     printf("install_frame(): Null frame pointer, returning false\n");
     return false;
   }
   else {
     struct thread *t = thread_current();
     void *uaddr = fp->upage->uaddr;
     void *kpage = fp->kpage;
+    bool success = false;
+
+//     printf("UAddr is: %x\n", uaddr);
 
     if (pagedir_get_page(t->pagedir, uaddr) == NULL
         && pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
@@ -113,14 +119,17 @@ bool install_frame(struct frame* fp, int writable) {
   //         fp->writable = false;
   //     else
       list_push_back(&all_frames, &fp->elem);
-      return true;
+      success = true;
     }
     else {
       // Physical address is already allocated to some process:
       // For now free frame & return false
-      free_frame(fp);
-      return false;
+//       free_frame(fp);   // FIXME: this may cause a PANIC
+      success = false;
     }
+
+//     printf("install_frame(): success is: %d\n", success);
+    return success;
   }
 }
 
