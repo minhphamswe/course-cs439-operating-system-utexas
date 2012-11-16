@@ -15,8 +15,10 @@ struct page_table {
 };
 
 struct page_entry {
+  int tid;                  // ID of the owner of the page
   void *uaddr;              // User address
   page_status status;       // Status of the page
+  bool writable;            // Whether the page is writable
   struct frame *frame;      // Frame table entry address
   struct list_elem elem;    // List element for thread-based page table
 };
@@ -26,7 +28,9 @@ void page_table_init(struct page_table *pt);
 void page_table_destroy(struct page_table* pt);
 
 // Page operations (for user and kernel processes)
-int allocate_page(void *uaddr);
+struct page_entry* allocate_page(void* uaddr);
+bool install_page(struct page_entry *entry, int writable);
+
 page_status get_page_status(void *uaddr);
 bool set_page_status(void *uaddr, page_status status);
 void free_page(void *uaddr);

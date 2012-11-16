@@ -4,7 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
-#include <kernel/list.h>
+#include <lib/kernel/list.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -19,6 +19,8 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+
+#include "vm/swap.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top

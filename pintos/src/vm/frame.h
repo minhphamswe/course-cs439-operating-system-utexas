@@ -9,19 +9,14 @@ struct frame {
   int tid;
   struct page_entry *upage;   // User page
   void* kpage;                // Kernel page = Physical address
-  int writable;               // Whether the frame should be writable
   struct list_elem elem;
 };
 
 void frame_init(void);
 
-int allocate_frame(struct page_entry *upage, int writable);
-
-void set_frame(struct page_entry *upage, void* kpage, int writable);
-void unset_frame(struct frame *fp);
-
-struct frame * get_frame(struct page_entry *upage);
-struct frame * get_kernel_frame(void *kpage);
+struct frame* allocate_frame(struct page_entry* upage);
+bool install_frame(struct frame *fp, int writable);
+void free_frame(struct frame *fp);
 
 struct frame* evict_frame(void);
 

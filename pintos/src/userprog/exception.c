@@ -169,7 +169,7 @@ page_fault (struct intr_frame *f)
 //   printf("not_present: %d\n", not_present);
 //   printf("write: %d\n", write);
 //   printf("user: %d\n", user);
-//  printf("fault_addr: %x\n", (uint32_t) fault_addr);
+//   printf("fault_addr: %x\n", (uint32_t) fault_addr);
 //  printf("esp: %x\n", (uint32_t) f);
 
 //   if (fault_addr == NULL) {
@@ -182,8 +182,12 @@ page_fault (struct intr_frame *f)
 //     printf("Handling page fault while loading.\n");
     // Try to allocate more space
     if (!load_page(fault_addr)) {
+//       printf("Failed to load page\n");
       extend_stack(f, fault_addr);
     }
+//     else {
+//       printf("Load page OK\n");
+//     }
 //    printf("Returning to system process.\n");
   }
   else if (not_present && write && user) {
@@ -192,7 +196,6 @@ page_fault (struct intr_frame *f)
 //       printf("Failed to load page\n");
       extend_stack(f, fault_addr);
     }
-//     printf("Load page OK\n");
 //     printf("Returning to user process.\n");
   }
   else if (not_present && !write && !user) {
@@ -224,13 +227,15 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 //   printf("Extending stack..\n");
   int addr;
   bool once = false;
-  //  printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
+
+//   printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
   for (addr = (int) fault_addr; addr <= (int) f->frame_pointer;
        addr += PGSIZE) {
     once = true;
 //     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n",
 //     	     addr, fault_addr, f->frame_pointer);
-    int success = allocate_page((void *) addr);
+    struct page_entry *entry = allocate_page((void *) addr);
+    int success = install_page(entry, true);
     if (!success) {
       break;
     }
@@ -241,7 +246,6 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
   }
 
 //   printf("Allocation of stack frame successful.\n");
-  return;
 }
 
 static void
@@ -251,11 +255,11 @@ kill_process (struct intr_frame *f)
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 
-  uint32_t new_eax = 0xffffffff;
-  int tmp;
-  asm ("movl %%eax, %0; movl %1, %%eax;"
-        : "=g" (tmp)
-        : "g" (new_eax));
-  asm ("jmp %0;"
-  :: "g" (tmp));
+//   uint32_t new_eax = 0xffffffff;
+//   int tmp;
+//   asm ("movl %%eax, %0; movl %1, %%eax;"
+//         : "=g" (tmp)
+//         : "g" (new_eax));
+//   asm ("jmp %0;"
+//   :: "g" (tmp));
 }

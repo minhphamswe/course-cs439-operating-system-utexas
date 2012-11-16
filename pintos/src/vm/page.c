@@ -86,35 +86,64 @@ void page_table_destroy(struct page_table *pt)
   }
 }
 
-/** Allocate and track a user page. */
-int allocate_page(void* uaddr)
+/**
+ * Obtain a page to track a user page (specified by an address).
+ * If the address already belong to another address, and the address is not
+ * in the ancestor's 
+ */
+struct page_entry* allocate_page(void* uaddr)
 {
- //  printf("Allocating page\n");
-
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
-  int success;
 
   if (entry) {
-    success = true;
+    // This page is allocated: check if it is ours 
+    // TODO: or our ancestor's code segment
+    if (entry->tid != t->tid) {
+//       printf("Page does not belong to the running process. TODO: check if it's parent's code segment.\n");
+      entry = NULL;
+    } 
   }
   else {
+//     printf("Allocating new page at user address: %x\n", uaddr);
+//     printf("Writable: %d\n", writable);
+
+    // This address is free: make a new page entry to track it
     entry = malloc(sizeof(struct page_entry));
     entry->uaddr = uaddr;
+    entry->tid = t->tid;
 
-    success = allocate_frame(entry, true);
-    if (success) {
-      // if page was successfully allocated, track frame
-      list_push_back(&(t->pages.pages), &entry->elem);
-    }
-    else {
-      // otherwise free it and don't bother
-      free_page_entry(entry);
-    }
+    // Map it the new page entry to a frame
+    allocate_frame(entry);
   }
 
-  return success;
+  if (entry) {
+//       printf("Got here.\n");
+    // if frame was successfully allocated, track page
+    list_push_back(&(t->pages.pages), &entry->elem);
+  }
+  else {
+    // otherwise free it and don't bother
+    free_page_entry(entry);
+    entry = NULL;
+  }
+
+  return entry;
 }
+
+bool install_page(struct page_entry* entry, int writable)
+{
+  if (entry == NULL) {
+    return false;
+  }
+  else {
+    bool success = install_frame(entry->frame, writable);
+    if (!success)
+      free_page_entry(entry);
+    return success;
+  }
+}
+
 
 /** Return the status of the page a user address points to. */
 page_status get_page_status(void* uaddr)
@@ -136,12 +165,12 @@ _Bool set_page_status(void* uaddr, page_status status)
   return (entry != NULL);
 }
 
-/** */
+/** Called by page_table_destroy for each page entry to free it. */
 void free_page(void* uaddr)
 {
 //   printf("Freeing page\n");
-  struct thread *t = thread_current();
-  struct page_table *pt = &t->pages;
+//   struct thread *t = thread_current();
+//   struct page_table *pt = &t->pages;
   struct page_entry *entry = get_page_entry(uaddr);
   if (entry) {
     list_remove(&entry->elem);
@@ -156,36 +185,37 @@ void free_page(void* uaddr)
  */
 _Bool load_page(void* uaddr)
 {
-/*  struct thread *t = thread_current();
+  struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
 
   struct page_entry *entry = get_page_entry(uaddr);
   if (!entry)
     return false;
 
-  struct frame *fp = get_frame(entry);
+  struct frame *fp = entry->frame;
   if (!fp)
     return false;
 
-  return pull_from_swap(fp);*/
+  return pull_from_swap(fp);
   
-  // Make sure it's supposed to be there
-  struct page_entry *entry = get_page_entry(uaddr);
-  if (entry == NULL)
-    return false;
-    
-  // If it's swapped, let's go get it  
-  if (entry->status == PAGE_SWAPPED) {
-    // First need to get a free frame to put it in
-    int success = allocate_frame(entry, true);
-    
-    if (!success)
-      return false;   // out of swap space, should be panic'd before here
-    
-    // Now swap back into free frame
-    get_from_swap(entry->frame, uaddr);
-  }
-  return true;
+//   // Make sure it's supposed to be there
+//   struct page_entry *entry = get_page_entry(uaddr);
+//   if (entry == NULL)
+//     return false;
+// 
+//   // If it's swapped, let's go get it
+//   if (entry->status == PAGE_SWAPPED) {
+//     // First need to get a free frame to put it in
+//     struct frame * fp = allocate_frame(entry);
+//     int success = install_frame(fp, true);
+// 
+//     if (!success)
+//       return false;   // out of swap space, should be panic'd before here
+// 
+//     // Now swap back into free frame
+//     get_from_swap(entry->frame, uaddr);
+//   }
+//   return true;
 }
 
 /**

@@ -19,14 +19,14 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-#include "kernel/list.h"
+#include "lib/kernel/list.h"
+
+#include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
-/* load() helpers. */
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
@@ -603,18 +603,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      int success = allocate_page(upage);
-      if (success) {
-        if (file_read(file, upage, page_read_bytes) != (int) page_read_bytes)
+      struct page_entry *entry = allocate_page(upage);
+      if (entry != NULL) {
+        if (file_read(file, entry->frame->kpage, page_read_bytes) != (int) page_read_bytes)
         {
           free_page(upage);
           return false;
         }
-        memset (upage + page_read_bytes, 0, page_zero_bytes);
+        memset (entry->frame->kpage + page_read_bytes, 0, page_zero_bytes);
       }
       else {
         return false;
       }
+
+      if (!install_page(entry, writable))
+        return false;
 //       uint8_t *kpage = palloc_get_page (PAL_USER);
 //       if (kpage == NULL)
 //         return false;
@@ -648,7 +651,8 @@ static bool
 setup_stack (void **esp) 
 {
   bool success = false;
-  success = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
+  struct page_entry *entry = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
+  success = install_page(entry, true);
 
   if (success)
     *esp = PHYS_BASE;

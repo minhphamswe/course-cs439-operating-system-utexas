@@ -117,7 +117,7 @@ bool pull_from_swap(struct frame* fp)
     pagedir_set_page(t->pagedir,
                      slot->upage->uaddr,
                      slot->upage->frame->kpage,
-                     slot->upage->frame->writable);
+                     slot->upage->writable);
 
     // Update the page
     slot->upage->status = PAGE_PRESENT;
@@ -157,7 +157,7 @@ bool get_from_swap(struct frame* fp, void* uaddr)
     pagedir_set_page(t->pagedir,
                      slot->upage->uaddr,
                      slot->upage->frame->kpage,
-                     slot->upage->frame->writable);
+                     slot->upage->writable);
                      
     // Update the page
     slot->upage->status = PAGE_PRESENT;
@@ -273,7 +273,7 @@ void write_swap(struct swap_slot* slot)
 //    printf("   done\n");
 }
 
-bool clean_swap(tid_t tid)
+bool clean_swap(int tid)
 {
 //printf("Cleaning all mentions of process %d from swap file\n", tid);
   struct list_elem *e;  
