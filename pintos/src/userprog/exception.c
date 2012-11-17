@@ -171,15 +171,9 @@ page_fault (struct intr_frame *f)
 //   printf("user: %d\n", user);
 //   printf("fault_addr: %x\n", (uint32_t) fault_addr);
 
-  struct thread *t = thread_current();
+//   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
-
-//   if (fault_addr == NULL) {
-//     printf("Access to null pointer\n");
-//     kill_process(f);
-//     return;
-//   }
 
   if (not_present && write && !user) {
 //     printf("Handling page fault while loading.\n");
@@ -236,7 +230,7 @@ page_fault (struct intr_frame *f)
 
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
-//   printf("Extending stack..\n");
+//   printf("Start extend_stack(*f, %x)\n", fault_addr);
   uint32_t addr = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;;
   bool once = false;
 
@@ -252,10 +246,12 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
   }
   if (!once) {
 //     printf("Allocation of stack frame unsuccessful.\n");
+//     printf("End extend_stack(*f, %x)\n", fault_addr);
     kill_process(f);
   }
 
 //   printf("Allocation of stack frame successful.\n");
+//   printf("End extend_stack(*f, %x)\n", fault_addr);
 }
 
 static void

@@ -90,7 +90,7 @@ bool push_to_swap(struct frame* fp)
  */
 bool pull_from_swap(struct page_entry *upage)
 {
-//   printf("Pulling from swap\n");
+//   printf("Start pull_from_swap(%x)\n", upage);
   ASSERT(upage != NULL);
 
   struct swap_slot *slot = get_swapped_page(upage);
@@ -100,6 +100,7 @@ bool pull_from_swap(struct page_entry *upage)
     read_swap(slot);
 
     enum intr_level old_level = intr_disable();
+
     // Update the page
     slot->upage->status = PAGE_PRESENT;
 
@@ -111,6 +112,7 @@ bool pull_from_swap(struct page_entry *upage)
     list_push_back(&swap_list, &slot->elem);
     intr_set_level(old_level);
   }
+//   printf("End pull_from_swap(%x)\n", upage);
   return (slot != NULL);
 }
 
@@ -123,7 +125,7 @@ struct swap_slot* get_free_slot(void)
   struct swap_slot *temp;
   struct list_elem *e;
 
-  enum intr_level old_level = intr_disable();    
+  enum intr_level old_level = intr_disable();
 
   e = list_tail(&swap_list)->prev;
 
@@ -173,8 +175,10 @@ void read_swap(struct swap_slot* slot)
 //printf("Read swap: %d\n", slot->sector);
   void *kpage = slot->upage->frame->kpage;
   int i;
+//   enum intr_level old_level = intr_disable();
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
+//   intr_set_level*/(old_level);
 }
 
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
@@ -184,11 +188,11 @@ void write_swap(struct swap_slot* slot)
   void *kpage = slot->upage->frame->kpage;
 //  printf("%x, %d, %d ",kpage,slot->tid,thread_current()->tid);
   int i;
+//   enum intr_level old_level = intr_disable();
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
     block_write(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
-//    printf("%d ", i);
   }
-//    printf("   done\n");
+//   intr_set_level(old_level);
 }
 
 bool clean_swap(int tid)

@@ -66,7 +66,7 @@ void frame_init(void) {
  */
 struct frame* allocate_frame(struct page_entry* upage) {
   // Allocate frame and get its kernel page address
-//   printf("Allocating frame...\n");
+//   printf("Start allocate_frame()\n");
   struct frame *fp;
   uint8_t *kpage;
   void * uaddr;
@@ -96,6 +96,7 @@ struct frame* allocate_frame(struct page_entry* upage) {
   upage->frame = fp;
   upage->status = PAGE_PRESENT;
 
+//   printf("End allocate_frame()\n");
   return fp;
 }
 
@@ -149,7 +150,7 @@ void free_frame(struct frame* fp)
 
 struct frame* evict_frame(void)
 {
-//  printf("Evicting frame\n");
+//  printf("Start evict_frame()\n");
   // Remove the oldest frame from frame table
   struct list_elem *e = list_pop_front(&all_frames);
   struct frame *fp = list_entry(e, struct frame, elem);
@@ -180,6 +181,7 @@ struct frame* evict_frame(void)
 
   list_push_back(&all_frames, &fp->elem);
 
+//   printf("End evict_frame()\n");
   return fp;
 }
 

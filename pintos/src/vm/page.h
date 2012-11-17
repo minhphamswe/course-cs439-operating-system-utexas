@@ -31,8 +31,6 @@ void page_table_destroy(struct page_table* pt);
 struct page_entry* allocate_page(void* uaddr);
 bool install_page(struct page_entry *entry, int writable);
 
-page_status get_page_status(void *uaddr);
-bool set_page_status(void *uaddr, page_status status);
 void free_page(void *uaddr);
 bool load_page(void *uaddr);
 

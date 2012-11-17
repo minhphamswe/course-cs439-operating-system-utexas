@@ -95,6 +95,7 @@ void page_table_destroy(struct page_table *pt)
  */
 struct page_entry* allocate_page(void* uaddr)
 {
+//   printf("Start allocate_page(%x)\n", uaddr);
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
 
@@ -111,8 +112,6 @@ struct page_entry* allocate_page(void* uaddr)
     entry = NULL;
   }
   else {
-//     printf("Allocating new page at user address: %x\n", uaddr);
-//     printf("Writable: %d\n", writable);
     // Compute address of the nearest page
     uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
 
@@ -120,6 +119,7 @@ struct page_entry* allocate_page(void* uaddr)
     entry = malloc(sizeof(struct page_entry));
     entry->uaddr = uaddr;
     entry->tid = t->tid;
+    entry->writable = true;
 
     // Map it the new page entry to a frame
     struct frame* fp = allocate_frame(entry);
@@ -139,7 +139,7 @@ struct page_entry* allocate_page(void* uaddr)
   }
 
 //   printf("allocate_page() returning is: %x\n", entry);
-
+//   printf("End allocate_page(%x)\n", uaddr);
   return entry;
 }
 
@@ -150,7 +150,8 @@ bool install_page(struct page_entry* entry, int writable)
     return false;
   }
   else {
-    bool success = install_frame(entry->frame, writable);
+    entry->writable = writable;
+    bool success = install_frame(entry->frame, entry->writable);
 //     if (!success)
 //       free_page_entry(entry);    // FIXME: this causes a triple fault
 //     printf("install_page(): success is: %d\n", success);
@@ -158,29 +159,10 @@ bool install_page(struct page_entry* entry, int writable)
   }
 }
 
-/** Return the status of the page a user address points to. */
-page_status get_page_status(void* uaddr)
-{
-//   printf("Getting page status\n");
-  struct page_entry *entry = get_page_entry(uaddr);
-  if (entry)
-    return entry->status;
-  else
-    return PAGE_NOT_EXIST;
-}
-
-_Bool set_page_status(void* uaddr, page_status status)
-{
-//   printf("Setting page status\n");
-  struct page_entry *entry = get_page_entry(uaddr);
-  if (entry)
-    entry->status = status;
-  return (entry != NULL);
-}
-
 /** Called by page_table_destroy for each page entry to free it. */
 void free_page(void* uaddr)
 {
+//   printf("In free_page\n");
 //   printf("Freeing page\n");
 //   struct thread *t = thread_current();
 //   struct page_table *pt = &t->pages;
@@ -198,33 +180,35 @@ void free_page(void* uaddr)
  */
 _Bool load_page(void* uaddr)
 {
+//   printf("Start load_page(%x)\n", uaddr);
   // Make sure it's supposed to be there
+  bool success = false;
   struct page_entry *entry = get_page_entry(uaddr);
-  if (entry == NULL) {
-    return false;
+
+  if (entry != NULL) {
+    struct thread *t = thread_current();
+//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d)\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid);
+  //   printf("Page status: %d\n", entry->status);
+
+    // If it's swapped, let's go get it
+    if (entry->status == PAGE_SWAPPED) {
+//       enum intr_level old_level = intr_disable();
+      // First need to get a free frame to put it in
+      struct frame * fp = allocate_frame(entry);
+
+      // Now swap back into free frame
+      pull_from_swap(entry);
+
+      success = install_frame(fp, entry->writable);
+//       if (success) {
+//         ASSERT(pagedir_get_page(thread_current()->pagedir, entry->uaddr) != NULL);
+//       }
+//       intr_set_level(old_level);
+    }
   }
 
-  struct thread *t = thread_current();
-//   printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d)\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid);
-//   printf("Page status: %d\n", entry->status);
-
-  // If it's swapped, let's go get it
-  if (entry->status == PAGE_SWAPPED) {
-    // First need to get a free frame to put it in
-    struct frame * fp = allocate_frame(entry);
-    int success = install_frame(fp, true);
-
-    if (!success)
-      return false;   // out of swap space, should be panic'd before here
-
-    // Now swap back into free frame
-//     get_from_swap(entry->frame, uaddr);
-    pull_from_swap(entry);
-    ASSERT(pagedir_get_page(thread_current()->pagedir, entry->uaddr) != NULL);
-    return true;
-  }
-
-  return false;
+//   printf("End load_page(%x)\n", uaddr);
+  return success;
 }
 
 /**
