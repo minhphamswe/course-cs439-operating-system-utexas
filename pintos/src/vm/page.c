@@ -81,11 +81,13 @@ void page_table_destroy(struct page_table *pt)
   struct page_entry *entry;
   struct list_elem *e;
 
+  enum intr_level old_level = intr_disable();
   while (!list_empty(&pt->pages)) {
     e = list_pop_front(&pt->pages);
     entry = list_entry(e, struct page_entry, elem);
     free_page_entry(entry);
   }
+  intr_set_level(old_level);
 }
 
 /**
@@ -99,7 +101,7 @@ struct page_entry* allocate_page(void* uaddr)
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
 
-  if (entry) {
+  if (entry != NULL) {
     // This page is allocated: check if it is ours 
     // TODO: or our ancestor's code segment
     if (entry->tid != t->tid) {
@@ -120,6 +122,7 @@ struct page_entry* allocate_page(void* uaddr)
     entry->uaddr = uaddr;
     entry->tid = t->tid;
     entry->writable = true;
+    entry->status = PAGE_NOT_EXIST;
 
     // Map it the new page entry to a frame
     struct frame* fp = allocate_frame(entry);
@@ -145,32 +148,34 @@ struct page_entry* allocate_page(void* uaddr)
 
 bool install_page(struct page_entry* entry, int writable)
 {
-  if (entry == NULL) {
-//     printf("install_page(): Null page entry, returning false\n");
-    return false;
+  bool success = false;
+  if (entry != NULL) {
+    if (entry->status == PAGE_SWAPPED) {
+      printf("The case that should never happen?\n");
+      struct frame *fp = allocate_frame(entry);
+      success = install_frame(fp, entry->writable);
+      if (success)
+        success = pull_from_swap(entry);
+    }
+    else if (entry->status == PAGE_NOT_EXIST) {
+//        printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
+      entry->writable = writable;
+      success = install_frame(entry->frame, entry->writable);
+    }
   }
-  else {
-    entry->writable = writable;
-    bool success = install_frame(entry->frame, entry->writable);
-//     if (!success)
-//       free_page_entry(entry);    // FIXME: this causes a triple fault
-//     printf("install_page(): success is: %d\n", success);
-    return success;
-  }
+  return success;
 }
 
 /** Called by page_table_destroy for each page entry to free it. */
 void free_page(void* uaddr)
 {
-//   printf("In free_page\n");
-//   printf("Freeing page\n");
-//   struct thread *t = thread_current();
-//   struct page_table *pt = &t->pages;
   struct page_entry *entry = get_page_entry(uaddr);
-  if (entry) {
+  enum intr_level old_level = intr_disable();
+  if (entry != NULL) {
     list_remove(&entry->elem);
     free_page_entry(entry);
   }
+  intr_set_level(old_level);
 }
 
 /**
@@ -188,11 +193,10 @@ _Bool load_page(void* uaddr)
   if (entry != NULL) {
     struct thread *t = thread_current();
 //     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d)\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid);
-  //   printf("Page status: %d\n", entry->status);
+//     printf("Page status: %d\n", entry->status);
 
     // If it's swapped, let's go get it
     if (entry->status == PAGE_SWAPPED) {
-//       enum intr_level old_level = intr_disable();
       // First need to get a free frame to put it in
       struct frame * fp = allocate_frame(entry);
 
@@ -224,14 +228,17 @@ struct page_entry* get_page_entry(void* uaddr)
 
   uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages);
        e = list_next(e)) {
     struct page_entry *entry = list_entry(e, struct page_entry, elem);
     if (entry->uaddr == uaddr) {
 //       printf("get_page_entry(): Get thread %x(%d)| page %x @ %x(%d) \n", t, t->tid, uaddr, entry, entry->tid);
+      intr_set_level(old_level);
       return entry;
     }
   }
+  intr_set_level(old_level);
 
 //   printf("get_page_entry(): Get thread %x(%d) | page %x @ NULL \n", t, t->tid, uaddr);
   return NULL;

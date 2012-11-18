@@ -184,7 +184,7 @@ void read_swap(struct swap_slot* slot)
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
 void write_swap(struct swap_slot* slot)
 {
-//printf("Write swap: %d\n", slot->sector);
+// printf("Write swap: %d\n", slot->sector);
   void *kpage = slot->upage->frame->kpage;
 //  printf("%x, %d, %d ",kpage,slot->tid,thread_current()->tid);
   int i;
@@ -197,7 +197,7 @@ void write_swap(struct swap_slot* slot)
 
 bool clean_swap(int tid)
 {
-//printf("Cleaning all mentions of process %d from swap file\n", tid);
+//   printf("Start clean_swap(%d)\n", tid);
   struct list_elem *e;
   enum intr_level old_level = intr_disable();
 
@@ -223,6 +223,7 @@ bool clean_swap(int tid)
   }
 
   intr_set_level(old_level);
+//   printf("End clean_swap(%d)\n", tid);
   return true;
 }
 

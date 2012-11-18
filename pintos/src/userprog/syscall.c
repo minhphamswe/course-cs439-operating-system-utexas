@@ -32,7 +32,18 @@ void sysclose_handler (struct intr_frame *f);
 struct fileHandle* get_handle (int fd);
 void terminate_thread();
 
-static struct semaphore filesys_sema;
+static struct semaphore create_sema;
+static struct semaphore remove_sema;
+
+static struct semaphore open_sema;
+static struct semaphore close_sema;
+
+static struct semaphore write_sema;
+static struct semaphore read_sema;
+static struct semaphore seek_sema;
+
+static struct semaphore tell_sema;
+static struct semaphore size_sema;
 
 /* Read 4 bytes at the user virtual address UADDR
 * UADDR must be below PHYS_BASE
@@ -90,7 +101,19 @@ void
 syscall_init (void)
 {
   // Initialize semaphore(s)
-  sema_init(&filesys_sema, 1);
+  sema_init(&create_sema, 1);
+  sema_init(&remove_sema, 1);
+
+  sema_init(&open_sema, 1);
+  sema_init(&close_sema, 1);
+
+  sema_init(&write_sema, 1);
+  sema_init(&seek_sema, 1);
+
+  sema_init(&tell_sema, 1);
+  sema_init(&size_sema, 1);
+
+  sema_init(&read_sema, 1);
 
   // Register handler
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -270,9 +293,10 @@ void syscreate_handler(struct intr_frame *f)
   if (filename == NULL || filesize < 0)
     terminate_thread();
 
-  sema_down(&filesys_sema);
+  printf("Thread %x(%d) ATTEMPTing to create file %s\n", thread_current(), thread_current()->tid, filename);
+  sema_down(&create_sema);
   f->eax = filesys_create(filename, filesize);
-  sema_up(&filesys_sema);
+  sema_up(&create_sema);
 }
 
 /**
@@ -288,9 +312,10 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = pop_stack(f);
 
-  sema_down(&filesys_sema);
+  printf("Thread %x(%d) ATTEMPTing to remove a file\n", thread_current(), thread_current()->tid);
+  sema_down(&remove_sema);
   f->eax = filesys_remove(filename);
-  sema_up(&filesys_sema);
+  sema_up(&remove_sema);
 }
 
 /** Thread calls sysopen
@@ -317,30 +342,37 @@ void sysopen_handler(struct intr_frame *f)
   char *file_name = pop_stack(f);
 
   if(file_name == NULL) {
+    printf("File name is a null pointer.\n");
     terminate_thread();
   }
 
   // Open file
-  sema_down(&filesys_sema);
+  printf("Thread %x(%d) ATTEMPTing to opening file %s\n", thread_current(), thread_current()->tid, file_name);
+  sema_down(&open_sema);
+//   printf("Thread %x(%d) opening file %s\n", thread_current(), thread_current()->tid, file_name);
   struct file *file = filesys_open(file_name);
-  sema_up(&filesys_sema);
+  sema_up(&open_sema);
+//   printf("Thread %x(%d) DONE opening file %s\n", thread_current(), thread_current()->tid, file_name);
 
   // File cannot be opened: return -1
   if (file == NULL) {
+    printf("File %s failed to open\n", file_name);
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
   else {
     struct thread *t = thread_current();
 
+    enum intr_level old_level = intr_disable();
     struct fileHandle *newHandle = malloc(sizeof(struct fileHandle));
     newHandle->file = file;
     newHandle->fd = t->nextFD++;
-
     list_push_back(&t->handles, &newHandle->fileElem);
+    intr_set_level(old_level);
 
     // return the file descriptor
     f->eax = newHandle->fd;
+    printf("File %s opened successfully\n", file_name);
   }
 }
 
@@ -356,9 +388,10 @@ void sysfilesize_handler(struct intr_frame *f)
 
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-    sema_down(&filesys_sema);
+    printf("Thread %x(%d) ATTEMPTing to size a file\n", thread_current(), thread_current()->tid);
+    sema_down(&size_sema);
     f->eax = file_length(fhp->file);
-    sema_up(&filesys_sema);
+    sema_up(&size_sema);
   }
   else {
     f->eax -1;
@@ -406,7 +439,10 @@ void sysread_handler(struct intr_frame *f)
 
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
+      sema_down(&read_sema);
+//       printf("Thread ATTEMPTing to read %d bytes from file %d to %x\n", size, fd, buffer);
       f->eax = file_read(fhp->file, buffer, size);
+      sema_up(&read_sema);
      }
     else {
       // File descriptor not found: return -1
@@ -452,15 +488,19 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
-      sema_down(&filesys_sema);
+      printf("Thread %x(%d) ATTEMPTing to write a file\n", thread_current(), thread_current()->tid);
+      sema_down(&write_sema);
       f->eax = file_write(fhp->file, buffer, bufferSize);
-      sema_up(&filesys_sema);
+      sema_up(&write_sema);
+      printf("syswrite_handler(): Thread DONE writing file\n");
      }
     else {
+      printf("syswrite_handler(): Write to file failed: Null handler\n");
       f->eax = -1;
     }
   }
   else {
+    printf("syswrite_handler(): Write to file failed: Invalid file descriptor\n");
     f->eax = -1;
   }
 }
@@ -488,9 +528,10 @@ void sysseek_handler(struct intr_frame *f)
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-    sema_down(&filesys_sema);
+    printf("Thread %x(%d) ATTEMPTing to seek a file\n", thread_current(), thread_current()->tid);
+    sema_down(&seek_sema);
     file_seek(fhp->file, newpos);
-    sema_up(&filesys_sema);
+    sema_up(&seek_sema);
   }
 
 }
@@ -510,9 +551,10 @@ void systell_handler(struct intr_frame *f)
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
     // File descriptor found: read file
-    sema_down(&filesys_sema);
+    printf("Thread %x(%d) ATTEMPTing to tell a file\n", thread_current(), thread_current()->tid);
+    sema_down(&tell_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
-    sema_up(&filesys_sema);
+    sema_up(&tell_sema);
   }
   else {
     f->eax = -1;
@@ -540,10 +582,14 @@ void sysclose_handler(struct intr_frame *f)
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
-      sema_down(&filesys_sema);
+
+      printf("Thread %x(%d) ATTEMPTing to close file %d\n", thread_current(), thread_current()->tid, fhp->fd);
+      sema_down(&close_sema);
       file_close(fhp->file);
+//       printf("Thread %x(%d) closing file\n", thread_current(), thread_current()->tid);
       list_remove(e);
-      sema_up(&filesys_sema);
+      sema_up(&close_sema);
+//       printf("Thread %x(%d) DONE closing file\n", thread_current(), thread_current()->tid);
       return;
     }
   }

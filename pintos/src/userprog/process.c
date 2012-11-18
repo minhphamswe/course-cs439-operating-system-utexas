@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "lib/kernel/list.h"
+#include <lib/user/syscall.h>
 
 #include "vm/page.h"
 #include "vm/frame.h"
@@ -113,8 +114,10 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL) {
+    printf("process_execute(%s): Cannot get page for fn_copy\n", file_name);
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
 
   // See if the file exists before trying to execute it
@@ -144,6 +147,7 @@ process_execute (const char *file_name)
   struct thread *child = thread_by_tid(tid);
   if (child) {
     // Thread has not yet exited: wait for status of load
+    printf("Thread is waiting for thread %d to report execution status\n", tid);
     sema_down(&child->exec_sema);
 
     if(thread_get_exit_status(tid)->status == -1) {
@@ -203,6 +207,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+//   printf("Starting process_wait(%d)\n", child_tid);
   // Check that the tid is a child of the requesting thread
   if (!thread_is_child(child_tid)) {
     // This thread is not your child, so you can't wait for it.
@@ -217,13 +222,16 @@ process_wait (tid_t child_tid)
 
   // Wait until the thread with that tid exits
   struct thread *tp = thread_by_tid(child_tid);
-  if (tp != NULL)
+  if (tp != NULL) {
+    printf("Thread is waiting for thread %d to exit\n", child_tid);
     sema_down(&tp->wait_sema);
+  }
 
   struct exit_status *es = thread_get_exit_status(child_tid);
   // Move the thread to the already-waited list
   thread_mark_waited(es);
   // Return exit status
+//   printf("End process_wait(%d)\n", child_tid);
   return es->status;
 }
 
@@ -231,6 +239,7 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
+//   printf("Start process_exit()\n");
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
@@ -261,7 +270,9 @@ process_exit (void)
 
   // Destroy the supplemental page table, which frees all pages and frames
   // in the process
-//   page_table_destroy(&cur->pages);   // FIXME: This causes a triple fault
+  printf("Start page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+  page_table_destroy(&cur->pages);   // FIXME: This causes a triple fault
+  printf("End page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -281,6 +292,7 @@ process_exit (void)
     }
 
   thread_clear_child_exit_status(cur);
+//   printf("End process_exit()\n");
 }
 
 /* Sets up the CPU for running user code in the current
@@ -306,6 +318,7 @@ process_activate (void)
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
+//   printf("Starting load(%x, %x, %x)\n", file_name, eip, esp);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -327,8 +340,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Copy commandline to avoid modification by strtok_r */
   char* fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL) {
+    printf("load(%s, %x, %x): Could not get space for fn_copy\n", file_name, eip, esp);
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Parse arguments into tokens */
@@ -505,6 +520,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
   if (fn_copy != NULL)
     palloc_free_page(fn_copy);
+
+  printf("load(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("End load(%x, %x, %x)\n", file_name, eip, esp);
   return success;
 }
 
@@ -513,6 +531,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 static bool
 validate_segment (const struct Elf32_Phdr *phdr, struct file *file) 
 {
+//   printf("Start validate_segment(%x, %x)\n", phdr, file);
   /* p_offset and p_vaddr must have the same page offset. */
   if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK)) {
     printf("Test failed: p_offset and p_vaddr must have the same page offset\n");
@@ -591,7 +610,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  //  printf("Running load_segment\n");
+//   printf("Start load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
@@ -604,21 +623,25 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       struct page_entry *entry = allocate_page(upage);
-      void* kpage = entry->frame->kpage;
       if (entry != NULL) {
-        if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
+        void* kpage = entry->frame->kpage;
+        if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
           free_page_entry(entry);
+//           printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
           return false;
         }
         memset (kpage + page_read_bytes, 0, page_zero_bytes);
       }
       else {
+//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
         return false;
       }
 
-      if (!install_page(entry, writable))
+      if (!install_page(entry, writable)) {
+        free_page_entry(entry);
+//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
         return false;
+      }
 //       uint8_t *kpage = palloc_get_page (PAL_USER);
 //       if (kpage == NULL)
 //         return false;
@@ -643,6 +666,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
     }
+//   printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
   return true;
 }
 
@@ -651,6 +675,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
+//   printf("Start setup_stack(%x)\n", esp);
+  printf("Start setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   bool success = false;
   struct page_entry *entry = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
   success = install_page(entry, true);
@@ -660,5 +686,7 @@ setup_stack (void **esp)
   else
     printf("Setting up of the stack failed. In process.c/setup_stack()\n");
 
+//   printf("End setup_stack(%x)\n", esp);
+  printf("End setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   return success;
 }

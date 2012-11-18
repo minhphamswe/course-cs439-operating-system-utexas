@@ -399,6 +399,7 @@ void
 thread_exit (void)
 {
   ASSERT (!intr_context ());
+//   printf("Start thread_exit()\n");
 
 #ifdef USERPROG
   process_exit ();
@@ -410,6 +411,7 @@ thread_exit (void)
   intr_disable ();
   clean_swap(thread_current()->tid);          // Clean out any left swaps
   list_remove (&thread_current()->allelem);   // disappear before dying
+//   printf("End thread_exit()\n");
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();

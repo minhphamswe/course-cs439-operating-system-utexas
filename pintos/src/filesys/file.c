@@ -20,6 +20,8 @@ file_open (struct inode *inode)
     }
   else
     {
+      if (inode == NULL) printf("No such file exists.\n");
+      if (file == NULL) printf("Memory allocation error.\n");
       inode_close (inode);
       free (file);
       return NULL; 

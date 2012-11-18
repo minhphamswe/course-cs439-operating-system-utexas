@@ -94,7 +94,6 @@ struct frame* allocate_frame(struct page_entry* upage) {
 
   // Update page entry attributes
   upage->frame = fp;
-  upage->status = PAGE_PRESENT;
 
 //   printf("End allocate_frame()\n");
   return fp;
@@ -112,16 +111,22 @@ bool install_frame(struct frame* fp, int writable) {
     void *kpage = fp->kpage;
     bool success = false;
 
-    if (pagedir_get_page(t->pagedir, uaddr) == NULL
-        && pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
+    if (pagedir_get_page(t->pagedir, uaddr) == NULL)
+    {
+      if (pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
 //       printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
       list_push_back(&all_frames, &fp->elem);
+      fp->upage->status = PAGE_PRESENT;
       success = true;
+      }
+//       else printf("page_set_page failed\n");
     }
     else {
+//       printf("pagedir_get_page failed\n");
       // Physical address is already allocated to some process:
       // For now free frame & return false
-//       free_frame(fp);   // FIXME: this may cause a PANIC
+//       printf("install_frame(): Mapping thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d) FAILED!\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+//       free_frame(fp);   // FIXME: this may cause a PANIC;
       success = false;
     }
     intr_set_level(old_level);
@@ -133,19 +138,25 @@ bool install_frame(struct frame* fp, int writable) {
 
 void free_frame(struct frame* fp)
 {
-  enum intr_level old_level = intr_disable();
-
   // Remove page->frame mapping from the CPU-based page directory
   struct thread *t = thread_by_tid(fp->tid);
   void *uaddr = fp->upage->uaddr;
-//   printf("free_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", t, t->tid, uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-  pagedir_clear_page(t->pagedir, uaddr);
+
+  enum intr_level old_level = intr_disable();
+  if (pagedir_get_page(t->pagedir, uaddr) != NULL) {
+    // Page is in memory and registered to this thread
+    printf("free_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", t, t->tid, uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+    pagedir_clear_page(t->pagedir, uaddr);
+    palloc_free_page(fp->kpage);
+  }
+//   else {   TODO
+//     // Page is registered to this thread but may be swapped out
+//   }
+  intr_set_level(old_level);
 
   // Remove page<->frame mapping from our supplemental structures
   fp->upage->frame = NULL;
   fp->upage = NULL;
-  palloc_free_page(fp->kpage);
-  intr_set_level(old_level);
 }
 
 struct frame* evict_frame(void)
