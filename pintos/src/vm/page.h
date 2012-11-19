@@ -37,10 +37,11 @@ void page_table_print(struct page_table *pt);
 
 // Page operations (for user and kernel processes)
 struct page_entry* allocate_page(void* uaddr);
-bool install_page(struct page_entry *entry, int writable);
+bool load_page(void *uaddr);
+bool load_page_entry(struct page_entry *entry);
+
 
 void free_page(void *uaddr);
-bool load_page(void *uaddr);
 
 // Page status query
 bool is_pinned(struct page_entry *entry);

@@ -6,7 +6,7 @@
 #include "vm/swap.h"
 
 /// Initialize all VM subsystems that need initialization
-void vm_init(void)
+inline void vm_init(void)
 {
   page_init();
   frame_init();

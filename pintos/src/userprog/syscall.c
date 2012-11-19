@@ -8,6 +8,7 @@
 #include "threads/malloc.h"
 
 #include "lib/kernel/list.h"
+#include "lib/string.h"
 #include "devices/shutdown.h"
 #include "userprog/process.h"
 #include "filesys/filesys.h"
@@ -28,6 +29,8 @@ void syswrite_handler (struct intr_frame *f);
 void sysseek_handler (struct intr_frame *f);
 void systell_handler (struct intr_frame *f);
 void sysclose_handler (struct intr_frame *f);
+
+uint32_t pop_stack(struct intr_frame *f);
 
 struct fileHandle* get_handle (int fd);
 void terminate_thread(void);
@@ -290,7 +293,7 @@ void syscreate_handler(struct intr_frame *f)
   if (get_user(filename) == -1) 
     terminate_thread();
 
-  if (filename == NULL || filesize < 0)
+  if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
     terminate_thread();
 
 //   printf("Thread %x(%d) ATTEMPTing to create file %s\n", thread_current(), thread_current()->tid, filename);
@@ -342,7 +345,7 @@ void sysopen_handler(struct intr_frame *f)
   char *file_name = pop_stack(f);
 
   if(file_name == NULL) {
-    printf("File name is a null pointer.\n");
+//     printf("File name is a null pointer.\n");
     terminate_thread();
   }
 
@@ -490,7 +493,7 @@ void syswrite_handler(struct intr_frame *f)
     if (fhp != NULL) {
 //       printf("Thread %x(%d) ATTEMPTing to write a file\n", thread_current(), thread_current()->tid);
       sema_down(&write_sema);
-      f->eax = file_write(fhp->file, buffer, bufferSize);
+      f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
       sema_up(&write_sema);
 //       printf("syswrite_handler(): Thread DONE writing file\n");
      }

@@ -162,36 +162,12 @@ struct page_entry* allocate_page(void* uaddr)
     intr_set_level(old_level);
   }
 
-//   printf("allocate_page() returning is: %x\n", entry);
+//   printf("allocate_page() page %x @ %x\n", entry->uaddr, entry);
 //   printf("End allocate_page(%x)\n", uaddr);
   return entry;
 }
 
-bool install_page(struct page_entry* entry, int writable)
-{
-  bool success = false;
-
-  if (entry != NULL) {
-    ASSERT(!is_present(entry));
-    struct frame *fp = allocate_frame(entry);
-
-    if (is_swapped(entry)) {
-      printf("The case that should never happen?\n");
-      success = install_frame(fp, entry->writable);
-      if (success)
-        success = pull_from_swap(entry);
-    }
-
-    else {
-//        printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
-      entry->writable = writable;
-      success = install_frame(entry->frame, entry->writable);
-    }
-  }
-  return success;
-}
-
-/** Called by page_table_destroy for each page entry to free it. */
+/// Called by page_table_destroy for each page entry to free it.
 void free_page(void* uaddr)
 {
   struct page_entry *entry = get_page_entry(uaddr);
@@ -203,32 +179,17 @@ void free_page(void* uaddr)
   intr_set_level(old_level);
 }
 
-
-/// Bring a page belonging to this process into main memory from wherever
-/// it is (e.g. swap). Return false if the address does not belong to the
-/// process.
-_Bool load_page(void* uaddr)
-{
-//   printf("Start load_page(%x)\n", uaddr);
-  // Make sure it's supposed to be there
+bool load_page_entry(struct page_entry* entry) {
   bool success = false;
-  struct page_entry *entry = get_page_entry(uaddr);
 
   if (entry != NULL) {
     ASSERT(!is_present(entry));
-
-    struct thread *t = thread_current();
-
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
-
-//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
-//     printf("Page status: %d\n", entry->status);
 
     if (is_swapped(entry)) {
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
-
       success = install_frame(fp, entry->writable);
     }
 
@@ -236,25 +197,47 @@ _Bool load_page(void* uaddr)
 //       printf("File %x, bytes %d, offset %d\n", entry->file, entry->read_bytes, entry->offset);
       // Page is in the file system: read it in
       if (entry->read_bytes > 0) {
-        sema_down(&filesys_sema);
         file_seek(entry->file, entry->offset);
+        sema_down(&filesys_sema);
         int bytes_read = file_read(entry->file, entry->frame->kpage,
                                    entry->read_bytes);
+        sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
           free_page_entry(entry);
         }
         else {
           success = install_frame(fp, entry->writable);
         }
-        sema_up(&filesys_sema);
       }
       else {
         success = install_frame(fp, entry->writable);
       }
     }
+
+    else {
+//       printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
+      success = install_frame(entry->frame, entry->writable);
+    }
+  }
+  return success;
+}
+
+
+/// Bring a page belonging to this process into main memory from wherever
+/// it is (e.g. swap). Return false if the address does not belong to the
+/// process.
+_Bool load_page(void* uaddr) {
+//   printf("Start load_page(%x)\n", uaddr);
+  // Make sure it's supposed to be there
+  bool success = false;
+  struct page_entry *entry = get_page_entry(uaddr);
+
+  if (entry != NULL) {
+    struct thread *t = thread_current();
+//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
+    success = load_page_entry(entry);
   }
 
-//   printf("End load_page(%x)\n", uaddr);
   return success;
 }
 

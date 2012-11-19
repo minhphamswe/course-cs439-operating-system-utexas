@@ -220,7 +220,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 
   uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
   uint32_t top = (((uint32_t) f->frame_pointer) / PGSIZE) * PGSIZE;
-  void *addr;
+  uint32_t addr;
   bool once = false;
 
 //   printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
@@ -245,23 +245,12 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 
   sema_down(&extend_sema);
   for (addr = top - PGSIZE; addr >= bottom ; addr -= PGSIZE) {
-    struct page_entry *entry = allocate_page(addr);
-    if (entry != NULL) {
-      void* kpage = entry->frame->kpage;
-      if (kpage == NULL) {
-        break;
-      }
-    }
-    else {
-      break;
-    }
-
-    if (!install_page(entry, true)) {
-//       free_page_entry(entry);    FIXME: leads to a triple fault
+    struct page_entry *entry = allocate_page((void*) addr);
+    if (!load_page_entry(entry)) {
+//       free_page_entry(entry);    // FIXME: leads to a triple fault
 //         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
       break;
     }
-
     once = true;
   }
   sema_up(&extend_sema);
@@ -276,7 +265,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 //     }
 //   }
   
-  page_table_print(&thread_current()->pages);
+//   page_table_print(&thread_current()->pages);
   if (!once) {
 //     printf("Allocation of stack frame unsuccessful.\n");
 //     printf("End extend_stack(*f, %x)\n", addr);

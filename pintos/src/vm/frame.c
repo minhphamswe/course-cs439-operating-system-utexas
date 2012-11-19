@@ -73,7 +73,7 @@ struct frame* allocate_frame(struct page_entry* upage) {
 
   // Compute a page-aligned user page address
   uaddr = upage->uaddr;
-  uaddr = (((uint32_t) uaddr) / PGSIZE) * PGSIZE;
+  uaddr = (void*)((((uint32_t) uaddr) / PGSIZE) * PGSIZE);
 
   // Attempt to allocate a new frame
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
@@ -163,36 +163,39 @@ struct frame* evict_frame(void)
 {
 //  printf("Start evict_frame()\n");
   // Remove the oldest frame from frame table
-  struct list_elem *e = list_pop_front(&all_frames);
-  struct frame *fp = list_entry(e, struct frame, elem);
+  enum intr_level old_level = intr_disable();
 
-//   while(!fp->upage->w) {
-//     list_push_back(&all_frames, &fp->elem);
-//     e = list_pop_front(&all_frames);
-//     fp = list_entry(e, struct frame, elem);
-//   }
+  bool found = false;
+  struct frame *fp = NULL;
+  struct list_elem *e = list_begin(&all_frames);
+  while (!list_empty(&all_frames) && e != list_end(&all_frames) && !found) {
+    e = list_next(e);
+    fp = list_entry(e, struct frame, elem);
+    found = (fp->upage == NULL) || (fp->upage->pinned == false);
+  }
+  intr_set_level(old_level);
 //  printf("Kpage: %x  Upage: %x Writable: %d\n", fp->kpage, fp->upage->uaddr, fp->writable);
 
   // Write it to swap space
-  push_to_swap(fp);
+  if (fp != NULL) {
+    push_to_swap(fp);
 
-  enum intr_level old_level = intr_disable();
+    old_level = intr_disable();
+    // Remove page->frame mapping from the CPU-based page directory
+  //   struct thread *t = thread_current();
+    struct thread *victim = thread_by_tid(fp->tid);
+  //   printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+    pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
 
-  // Remove page->frame mapping from the CPU-based page directory
-  struct thread *t = thread_current();
-  struct thread *victim = thread_by_tid(fp->tid);
-//   printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-  pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+    // Remove page<->frame mapping from our supplemental structures
+    fp->upage->frame = NULL;
+    fp->upage = NULL;
 
-  // Remove page<->frame mapping from our supplemental structures
-  fp->upage->frame = NULL;
-  fp->upage = NULL;
+    list_push_back(&all_frames, &fp->elem);
+    intr_set_level(old_level);
 
-  intr_set_level(old_level);
-
-  list_push_back(&all_frames, &fp->elem);
-
-//   printf("End evict_frame()\n");
+  //   printf("End evict_frame()\n");
+  }
   return fp;
 }
 

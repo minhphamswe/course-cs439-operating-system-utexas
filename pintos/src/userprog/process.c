@@ -108,7 +108,7 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
   struct file *file;
-  char *tmpfilename[16];
+  char tmpfilename[16];
   char *saveptr;
 
   /* Make a copy of FILE_NAME.
@@ -121,12 +121,12 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   // See if the file exists before trying to execute it
-  strlcpy(tmpfilename, file_name, 16);
+  strlcpy((char*)tmpfilename, file_name, 16);
 
   struct semaphore s;
   sema_init(&s, 1);
   sema_down(&s);
-  file = filesys_open (strtok_r(tmpfilename, " ", &saveptr));
+  file = filesys_open (strtok_r((char*)tmpfilename, " ", &saveptr));
   sema_up(&s);
 
   if (file == NULL) 
@@ -191,7 +191,7 @@ start_process (void *file_name_)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
   sema_up(&thread_current()->exec_sema);
-  page_table_print_safe(&thread_current()->pages);
+//   page_table_print_safe(&thread_current()->pages);
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -224,7 +224,7 @@ process_wait (tid_t child_tid)
   // Wait until the thread with that tid exits
   struct thread *tp = thread_by_tid(child_tid);
   if (tp != NULL) {
-    printf("Thread is waiting for thread %d to exit\n", child_tid);
+//     printf("Thread is waiting for thread %d to exit\n", child_tid);
     sema_down(&tp->wait_sema);
   }
 
@@ -653,7 +653,7 @@ setup_stack (void **esp)
 //   printf("Start setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   bool success = false;
   struct page_entry *entry = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
-  success = install_page(entry, true);
+  success = load_page_entry(entry);
 
   if (success)
     *esp = PHYS_BASE;

@@ -1,7 +1,10 @@
 #ifndef VM_SWAP_H
 #define VM_SWAP_H
 
-#include "vm/frame.h"
+#include "lib/kernel/list.h"
+
+struct frame;
+struct page_entry;
 
 struct swap_slot {
   int tid;
