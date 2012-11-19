@@ -13,6 +13,8 @@
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
+static struct semaphore extend_sema;
+
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 static void extend_stack (struct intr_frame *, void *fault_addr);
@@ -65,6 +67,8 @@ exception_init (void)
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+
+  sema_init(&extend_sema, 1);
 }
 
 /* Prints exception statistics. */
@@ -212,35 +216,74 @@ page_fault (struct intr_frame *f)
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
 //   printf("Start extend_stack(*f, %x)\n", fault_addr);
-  printf("Start extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("Start extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 
-  uint32_t addr = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;;
+  uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
+  uint32_t top = (((uint32_t) f->frame_pointer) / PGSIZE) * PGSIZE;
+  void *addr;
   bool once = false;
 
 //   printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
-  for (; addr <= (int) f->frame_pointer; addr += PGSIZE) {
-//     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n", addr, fault_addr, f->frame_pointer);
-    struct page_entry *entry = allocate_page((void *) addr);
+//   sema_down(&extend_sema);
+//   for (; addr <= (int) f->frame_pointer; addr += PGSIZE) {
+// //     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n", addr, fault_addr, f->frame_pointer);
+//     struct page_entry *entry = allocate_page((void *) addr);
+// 
+//     // EXP CODE!
+//     struct thread *t = thread_current();
+// //     printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
+//     f->esp = fault_addr;
+// 
+//     int success = 0;
+//     if (entry->status == PAGE_NOT_EXIST)
+//       success = install_page(entry, true);
+//     once = once || success;
+//     if (!success)
+//       break;
+//   }
+//   sema_up(&extend_sema);
 
-    // EXP CODE!
-    struct thread *t = thread_current();
-    printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
-    f->esp = fault_addr;
-
-    int success = 0;
-    if (entry->status == PAGE_NOT_EXIST)
-      success = install_page(entry, true);
-    once = once || success;
-    if (!success)
+  sema_down(&extend_sema);
+  for (addr = top - PGSIZE; addr >= bottom ; addr -= PGSIZE) {
+    struct page_entry *entry = allocate_page(addr);
+    if (entry != NULL) {
+      void* kpage = entry->frame->kpage;
+      if (kpage == NULL) {
+        break;
+      }
+    }
+    else {
       break;
+    }
+
+    if (!install_page(entry, true)) {
+//       free_page_entry(entry);    FIXME: leads to a triple fault
+//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
+      break;
+    }
+
+    once = true;
   }
+  sema_up(&extend_sema);
+
+//   struct page_entry *entry = allocate_page(addr);
+//   if (entry != NULL) {
+//     void* kpage = entry->frame->kpage;
+//     if (install_page(entry, true)) {
+// //       free_page_entry(entry);    FIXME: leads to a triple fault
+// //         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
+//       once = true;
+//     }
+//   }
+  
+  page_table_print(&thread_current()->pages);
   if (!once) {
 //     printf("Allocation of stack frame unsuccessful.\n");
 //     printf("End extend_stack(*f, %x)\n", addr);
-    printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//     printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
     kill_process(f);
   }
-  printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 //   printf("Allocation of stack frame successful.\n");
 //   printf("End extend_stack(*f, %x)\n", addr);
 }

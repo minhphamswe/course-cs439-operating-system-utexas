@@ -90,6 +90,27 @@ void page_table_destroy(struct page_table *pt)
   intr_set_level(old_level);
 }
 
+void page_table_print_safe(struct page_table* pt)
+{
+  struct list_elem *e;
+  struct page_entry *entry;
+  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
+    entry = list_entry(e, struct page_entry, elem);
+    printf("Address %x @ %x -> %x writable %d\n", entry->uaddr, entry, entry->frame, entry->writable);
+  }
+}
+
+void page_table_print(struct page_table* pt)
+{
+  struct list_elem *e;
+  struct page_entry *entry;
+  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
+    entry = list_entry(e, struct page_entry, elem);
+    printf("Address %x -> %x @ %x(%d) -> %x(%d) writable %d\n", entry->uaddr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid, entry->writable);
+  }
+}
+
+
 /**
  * Obtain a page to track a user page (specified by an address).
  * If the address already belong to another address, and the address is not
@@ -119,25 +140,20 @@ struct page_entry* allocate_page(void* uaddr)
 
     // This address is free: make a new page entry to track it
     entry = malloc(sizeof(struct page_entry));
-    entry->uaddr = uaddr;
     entry->tid = t->tid;
+    entry->uaddr = uaddr;
     entry->writable = true;
     entry->status = PAGE_NOT_EXIST;
 
-    // Map it the new page entry to a frame
-    struct frame* fp = allocate_frame(entry);
+    entry->frame = NULL;
+    entry->swap = NULL;
+    entry->file = NULL;
+
+    entry->offset = 0;
+    entry->read_bytes = 0;
 
     enum intr_level old_level = intr_disable();
-    if (fp) {
-//       printf("Got here.\n");
-      // if frame was successfully allocated, track page
-      list_push_back(&(t->pages.pages), &entry->elem);
-    }
-    else {
-      // otherwise free it and don't bother
-      free_page_entry(entry);
-      entry = NULL;
-    }
+    list_push_back(&(t->pages.pages), &entry->elem);
     intr_set_level(old_level);
   }
 
@@ -149,6 +165,7 @@ struct page_entry* allocate_page(void* uaddr)
 bool install_page(struct page_entry* entry, int writable)
 {
   bool success = false;
+
   if (entry != NULL) {
     if (entry->status == PAGE_SWAPPED) {
       printf("The case that should never happen?\n");
@@ -157,7 +174,7 @@ bool install_page(struct page_entry* entry, int writable)
       if (success)
         success = pull_from_swap(entry);
     }
-    else if (entry->status == PAGE_NOT_EXIST) {
+    else if (entry->status & PAGE_NOT_EXIST) {
 //        printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
       entry->writable = writable;
       success = install_frame(entry->frame, entry->writable);
@@ -192,7 +209,7 @@ _Bool load_page(void* uaddr)
 
   if (entry != NULL) {
     struct thread *t = thread_current();
-//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d)\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid);
+    printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
 //     printf("Page status: %d\n", entry->status);
 
     // If it's swapped, let's go get it
@@ -204,10 +221,13 @@ _Bool load_page(void* uaddr)
       pull_from_swap(entry);
 
       success = install_frame(fp, entry->writable);
-//       if (success) {
-//         ASSERT(pagedir_get_page(thread_current()->pagedir, entry->uaddr) != NULL);
-//       }
-//       intr_set_level(old_level);
+    }
+    if (entry->status == PAGE_IN_FILESYS) {
+      if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
+          free_page_entry(entry);
+//           printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
+          return false;
+      }
     }
   }
 
@@ -252,7 +272,6 @@ void free_page_entry(struct page_entry* entry)
   if (entry != NULL) {
     if (entry->frame != NULL) {
       free_frame(entry->frame);
-      free(entry->frame);
     }
     free(entry);
   }

@@ -191,6 +191,7 @@ start_process (void *file_name_)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
   sema_up(&thread_current()->exec_sema);
+  page_table_print_safe(&thread_current()->pages);
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -521,7 +522,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (fn_copy != NULL)
     palloc_free_page(fn_copy);
 
-  printf("load(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("load(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   page_table_print(&t->pages);
 //   printf("End load(%x, %x, %x)\n", file_name, eip, esp);
   return success;
 }
@@ -621,27 +623,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
+      // Register a page under the current thread
       struct page_entry *entry = allocate_page(upage);
-      if (entry != NULL) {
-        void* kpage = entry->frame->kpage;
-        if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-          free_page_entry(entry);
-//           printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
-          return false;
-        }
-        memset (kpage + page_read_bytes, 0, page_zero_bytes);
-      }
-      else {
-//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
+      if (entry == NULL)
         return false;
-      }
 
-      if (!install_page(entry, writable)) {
-        free_page_entry(entry);
-//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
-        return false;
-      }
+      entry->file = file;
+      entry->offset = ofs;
+      entry->read_bytes = page_read_bytes;
+      entry->writable = writable;
+
+      entry->status |= PAGE_IN_FILESYS;
 //       uint8_t *kpage = palloc_get_page (PAL_USER);
 //       if (kpage == NULL)
 //         return false;

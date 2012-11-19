@@ -30,7 +30,7 @@ void systell_handler (struct intr_frame *f);
 void sysclose_handler (struct intr_frame *f);
 
 struct fileHandle* get_handle (int fd);
-void terminate_thread();
+void terminate_thread(void);
 
 static struct semaphore create_sema;
 static struct semaphore remove_sema;
@@ -620,7 +620,7 @@ struct fileHandle* get_handle(int fd)
 
 
 // Fails gracefully whenever a program does something bad
-void terminate_thread()
+void terminate_thread(void)
 {
 //   printf("Terminating thread ...\n");
   thread_set_exit_status(thread_current()->tid, -1);

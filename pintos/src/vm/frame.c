@@ -114,7 +114,7 @@ bool install_frame(struct frame* fp, int writable) {
     if (pagedir_get_page(t->pagedir, uaddr) == NULL)
     {
       if (pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
-//       printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+      printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
       list_push_back(&all_frames, &fp->elem);
       fp->upage->status = PAGE_PRESENT;
       success = true;
@@ -125,7 +125,7 @@ bool install_frame(struct frame* fp, int writable) {
 //       printf("pagedir_get_page failed\n");
       // Physical address is already allocated to some process:
       // For now free frame & return false
-//       printf("install_frame(): Mapping thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d) FAILED!\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+      printf("install_frame(): Mapping thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d) FAILED!\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
 //       free_frame(fp);   // FIXME: this may cause a PANIC;
       success = false;
     }
@@ -157,6 +157,7 @@ void free_frame(struct frame* fp)
   // Remove page<->frame mapping from our supplemental structures
   fp->upage->frame = NULL;
   fp->upage = NULL;
+  free(fp);
 }
 
 struct frame* evict_frame(void)
@@ -181,7 +182,7 @@ struct frame* evict_frame(void)
   // Remove page->frame mapping from the CPU-based page directory
   struct thread *t = thread_current();
   struct thread *victim = thread_by_tid(fp->tid);
-//   printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+  printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
   pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
 
   // Remove page<->frame mapping from our supplemental structures

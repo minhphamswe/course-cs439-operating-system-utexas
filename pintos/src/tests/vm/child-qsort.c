@@ -10,6 +10,7 @@
 #include "tests/vm/qsort.h"
 
 const char *test_name = "child-qsort";
+// unsigned char buf[128 * 1024];
 
 int
 main (int argc UNUSED, char *argv[]) 

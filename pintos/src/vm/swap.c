@@ -38,13 +38,6 @@ static uint32_t next_sector;
 
 struct list swap_list;
 
-struct swap_slot {
-  tid_t tid;
-  uint32_t sector;
-  struct page_entry *upage;
-  struct list_elem elem;
-};
-
 /* Forward declaration for internal uses */
 struct swap_slot* get_free_slot(void);
 
