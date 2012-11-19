@@ -7,14 +7,6 @@
 #include "lib/kernel/list.h"
 #include "filesys/filesys.h"
 
-typedef enum {
-  PAGE_NOT_EXIST = 0x01,
-  PAGE_PRESENT = 0x02,
-  PAGE_SWAPPED = 0x04,
-  PAGE_IN_FILESYS = 0x08,
-  PAGE_PINNED = 0x10,
-} page_status;
-
 struct page_table {
   struct list pages;
 };
@@ -22,8 +14,8 @@ struct page_table {
 struct page_entry {
   int tid;                  // ID of the owner of the page
   void *uaddr;              // User address
-  page_status status;       // Status of the page
   bool writable;            // Whether the page is writable
+  bool pinned;              // A pinned page cannot be evicted from main memory
 
   // Possible locations of the page
   struct frame *frame;      // Address of physical memory entry
@@ -34,6 +26,8 @@ struct page_entry {
 
   struct list_elem elem;    // List element for thread-based page table
 };
+
+void page_init(void);
 
 // Page table operations
 void page_table_init(struct page_table *pt);
@@ -47,6 +41,12 @@ bool install_page(struct page_entry *entry, int writable);
 
 void free_page(void *uaddr);
 bool load_page(void *uaddr);
+
+// Page status query
+bool is_pinned(struct page_entry *entry);
+bool is_in_fs(struct page_entry *entry);
+bool is_present(struct page_entry *entry);
+bool is_swapped(struct page_entry *entry);
 
 // Page entry operations (for VM internal operations)
 struct page_entry* get_page_entry(void *uaddr);

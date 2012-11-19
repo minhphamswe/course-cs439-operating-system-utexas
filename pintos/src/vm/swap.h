@@ -4,7 +4,7 @@
 #include "vm/frame.h"
 
 struct swap_slot {
-  tid_t tid;
+  int tid;
   uint32_t sector;
   struct page_entry *upage;
   struct list_elem elem;

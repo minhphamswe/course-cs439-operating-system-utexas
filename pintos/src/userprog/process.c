@@ -147,7 +147,7 @@ process_execute (const char *file_name)
   struct thread *child = thread_by_tid(tid);
   if (child) {
     // Thread has not yet exited: wait for status of load
-    printf("Thread is waiting for thread %d to report execution status\n", tid);
+//     printf("Thread is waiting for thread %d to report execution status\n", tid);
     sema_down(&child->exec_sema);
 
     if(thread_get_exit_status(tid)->status == -1) {
@@ -271,9 +271,9 @@ process_exit (void)
 
   // Destroy the supplemental page table, which frees all pages and frames
   // in the process
-  printf("Start page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("Start page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   page_table_destroy(&cur->pages);   // FIXME: This causes a triple fault
-  printf("End page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("End page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -613,9 +613,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
 //   printf("Start load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
+  uint32_t pg_offset = 0;
 
   file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0) 
+  while (read_bytes > 0 || zero_bytes > 0)
     {
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
@@ -629,34 +630,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       entry->file = file;
-      entry->offset = ofs;
+      entry->offset = ofs + pg_offset;
       entry->read_bytes = page_read_bytes;
       entry->writable = writable;
-
-      entry->status |= PAGE_IN_FILESYS;
-//       uint8_t *kpage = palloc_get_page (PAL_USER);
-//       if (kpage == NULL)
-//         return false;
-// 
-//       /* Load this page. */
-//       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-//         {
-//           palloc_free_page (kpage);
-//           return false;
-//         }
-//       memset (kpage + page_read_bytes, 0, page_zero_bytes);
-// 
-//       /* Add the page to the process's address space. */
-//       if (!install_page (upage, kpage, writable))
-//         {
-//           palloc_free_page (kpage);
-//           return false;
-//         }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      pg_offset += PGSIZE;
     }
 //   printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
   return true;
@@ -668,7 +650,7 @@ static bool
 setup_stack (void **esp) 
 {
 //   printf("Start setup_stack(%x)\n", esp);
-  printf("Start setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("Start setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   bool success = false;
   struct page_entry *entry = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
   success = install_page(entry, true);
@@ -679,6 +661,6 @@ setup_stack (void **esp)
     printf("Setting up of the stack failed. In process.c/setup_stack()\n");
 
 //   printf("End setup_stack(%x)\n", esp);
-  printf("End setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
+//   printf("End setup_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   return success;
 }

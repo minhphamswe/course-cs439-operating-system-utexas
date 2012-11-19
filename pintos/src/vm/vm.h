@@ -8,6 +8,7 @@
 /// Initialize all VM subsystems that need initialization
 void vm_init(void)
 {
+  page_init();
   frame_init();
   swap_init();
 }

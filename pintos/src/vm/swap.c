@@ -63,8 +63,11 @@ bool push_to_swap(struct frame* fp)
   if (temp) {
     // Track the swap slot
     temp->upage = fp->upage;
-    temp->upage->status = PAGE_SWAPPED;
-    temp->tid = fp->tid;
+    temp->upage->frame = NULL;
+    fp->upage = NULL;
+    temp->upage->swap = temp;
+
+    temp->tid = temp->upage->tid;
 
     // Write data out onto the swap disk
     write_swap(temp);
@@ -94,10 +97,8 @@ bool pull_from_swap(struct page_entry *upage)
 
     enum intr_level old_level = intr_disable();
 
-    // Update the page
-    slot->upage->status = PAGE_PRESENT;
-
     // Update the slot
+    slot->upage->swap = NULL;
     slot->upage = NULL;
 
     // Rotate slot element

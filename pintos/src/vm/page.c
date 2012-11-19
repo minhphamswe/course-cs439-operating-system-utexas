@@ -68,6 +68,12 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 
 #include <stdio.h>
 
+static struct semaphore filesys_sema;
+
+void page_init(void ) {
+  sema_init(&filesys_sema, 1);
+}
+
 /** Initialize a page table */
 void page_table_init(struct page_table *pt)
 {
@@ -96,7 +102,7 @@ void page_table_print_safe(struct page_table* pt)
   struct page_entry *entry;
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
     entry = list_entry(e, struct page_entry, elem);
-    printf("Address %x @ %x -> %x writable %d\n", entry->uaddr, entry, entry->frame, entry->writable);
+//     printf("Address %x @ %x -> %x writable %d\n", entry->uaddr, entry, entry->frame, entry->writable);
   }
 }
 
@@ -106,7 +112,7 @@ void page_table_print(struct page_table* pt)
   struct page_entry *entry;
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
     entry = list_entry(e, struct page_entry, elem);
-    printf("Address %x -> %x @ %x(%d) -> %x(%d) writable %d\n", entry->uaddr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid, entry->writable);
+//     printf("Address %x -> %x @ %x(%d) -> %x(%d) writable %d\n", entry->uaddr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid, entry->writable);
   }
 }
 
@@ -143,7 +149,6 @@ struct page_entry* allocate_page(void* uaddr)
     entry->tid = t->tid;
     entry->uaddr = uaddr;
     entry->writable = true;
-    entry->status = PAGE_NOT_EXIST;
 
     entry->frame = NULL;
     entry->swap = NULL;
@@ -167,14 +172,17 @@ bool install_page(struct page_entry* entry, int writable)
   bool success = false;
 
   if (entry != NULL) {
-    if (entry->status == PAGE_SWAPPED) {
+    ASSERT(!is_present(entry));
+    struct frame *fp = allocate_frame(entry);
+
+    if (is_swapped(entry)) {
       printf("The case that should never happen?\n");
-      struct frame *fp = allocate_frame(entry);
       success = install_frame(fp, entry->writable);
       if (success)
         success = pull_from_swap(entry);
     }
-    else if (entry->status & PAGE_NOT_EXIST) {
+
+    else {
 //        printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
       entry->writable = writable;
       success = install_frame(entry->frame, entry->writable);
@@ -195,11 +203,10 @@ void free_page(void* uaddr)
   intr_set_level(old_level);
 }
 
-/**
- * Bring a page belonging to this process into main memory from wherever
- * it is (e.g. swap). Return false if the address does not belong to the
- * process.
- */
+
+/// Bring a page belonging to this process into main memory from wherever
+/// it is (e.g. swap). Return false if the address does not belong to the
+/// process.
 _Bool load_page(void* uaddr)
 {
 //   printf("Start load_page(%x)\n", uaddr);
@@ -208,25 +215,41 @@ _Bool load_page(void* uaddr)
   struct page_entry *entry = get_page_entry(uaddr);
 
   if (entry != NULL) {
+    ASSERT(!is_present(entry));
+
     struct thread *t = thread_current();
-    printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
+
+    // First get a free frame to put it in
+    struct frame *fp = allocate_frame(entry);
+
+//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
 //     printf("Page status: %d\n", entry->status);
 
-    // If it's swapped, let's go get it
-    if (entry->status == PAGE_SWAPPED) {
-      // First need to get a free frame to put it in
-      struct frame * fp = allocate_frame(entry);
-
-      // Now swap back into free frame
+    if (is_swapped(entry)) {
+      // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
 
       success = install_frame(fp, entry->writable);
     }
-    if (entry->status == PAGE_IN_FILESYS) {
-      if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
+
+    else if (is_in_fs(entry)) {
+//       printf("File %x, bytes %d, offset %d\n", entry->file, entry->read_bytes, entry->offset);
+      // Page is in the file system: read it in
+      if (entry->read_bytes > 0) {
+        sema_down(&filesys_sema);
+        file_seek(entry->file, entry->offset);
+        int bytes_read = file_read(entry->file, entry->frame->kpage,
+                                   entry->read_bytes);
+        if (bytes_read != entry->read_bytes) {
           free_page_entry(entry);
-//           printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
-          return false;
+        }
+        else {
+          success = install_frame(fp, entry->writable);
+        }
+        sema_up(&filesys_sema);
+      }
+      else {
+        success = install_frame(fp, entry->writable);
       }
     }
   }
@@ -235,10 +258,8 @@ _Bool load_page(void* uaddr)
   return success;
 }
 
-/**
- * Look in the current thread's page table for page containing UADDR.
- * Return NULL if there is no such page.
- */
+/// Look in the current thread's page table for page containing UADDR.
+/// Return NULL if there is no such page.
 struct page_entry* get_page_entry(void* uaddr)
 {
 //   printf("Getting page entry\n");
@@ -264,7 +285,7 @@ struct page_entry* get_page_entry(void* uaddr)
   return NULL;
 }
 
-/** Free a page, and any frame it points to. */
+/// Free a page, and any frame it points to.
 void free_page_entry(struct page_entry* entry)
 {
 //   printf("Freeing page entry\n");
@@ -276,3 +297,24 @@ void free_page_entry(struct page_entry* entry)
     free(entry);
   }
 }
+
+/// Return true if the page was loadded from the file system
+bool is_in_fs(struct page_entry* entry) {
+  return (entry->file != NULL);
+}
+
+/// Return true if the page is currently in main memory
+bool is_present(struct page_entry* entry) {
+  return (entry->frame != NULL);
+}
+
+/// Return true if the page is currently swapped out
+bool is_swapped(struct page_entry* entry) {
+  return (entry->swap != NULL);
+}
+
+/// Return true if the page is pinned, thus not evictable
+bool is_pinned(struct page_entry* entry) {
+  return entry->pinned;
+}
+
