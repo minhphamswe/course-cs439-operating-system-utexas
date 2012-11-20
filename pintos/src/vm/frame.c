@@ -53,6 +53,8 @@ of this project.
 
 #include "stdio.h"
 
+static struct list_elem *clockhand;
+
 static struct list all_frames;
 
 /** Initialize the frame table system. */
@@ -175,6 +177,66 @@ void free_frame(struct frame* fp)
 
 struct frame* evict_frame(void)
 {
+  // Clock algorithm
+
+  // If clockhand has not been initialized or otherwise screwed up, start
+  // from the beginning of the list
+  enum intr_level old_level = intr_disable();
+  if(clockhand == NULL)
+    clockhand = list_begin(&all_frames);
+
+  int success = false;
+  uint32_t *pd = thread_current()->pagedir;
+  struct frame *fp;
+
+  while(!success) {
+    fp = list_entry(clockhand, struct frame, elem);
+
+    // Hopefully unaccessed
+    if(!pagedir_is_accessed(pd, fp->kpage) && !pagedir_is_accessed(pd, fp->upage->uaddr))
+      success = true;
+    else {
+      // it's been accessed since last go around, clear the bits
+      pagedir_set_accessed(pd, fp->kpage, false);
+      pagedir_set_accessed(pd, fp->upage->uaddr, false);
+
+      // and tick the clock
+      clockhand = list_next(clockhand);
+      if(clockhand->next == NULL)
+	      clockhand = list_begin(&all_frames);
+    }
+  }
+
+  // Clear both access bits
+  pagedir_set_accessed(pd, fp->kpage, false);
+  pagedir_set_accessed(pd, fp->upage->uaddr, false);
+
+  // Send to swap, interrupts off, wait enabled
+  intr_set_level(old_level);
+  push_to_swap(fp);
+  old_level = intr_disable();
+
+  // No longer resident, clear page table for thread
+  struct thread *victim = thread_by_tid(fp->tid);
+  pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+
+  // Remove page<->frame mapping from our supplemental structures
+  fp->upage->frame = NULL;
+  fp->upage = NULL;
+
+  // Move our clock up a stroke
+  clockhand = list_next(clockhand);
+  if(clockhand->next == NULL)
+    clockhand = list_begin(&all_frames);
+
+  intr_set_level(old_level);
+
+  // Frame is now ready for a new page
+  return fp;
+
+
+
+/*
 //   printf("Start evict_frame()\n");
   // Remove the oldest frame from frame table
   enum intr_level old_level = intr_disable();
@@ -234,5 +296,6 @@ struct frame* evict_frame(void)
 
 //   printf("End evict_frame(): evicted frame %x\n", fp);
   return fp;
+  */
 }
 

@@ -10,22 +10,18 @@
 #include "tests/vm/qsort.h"
 
 const char *test_name = "child-qsort";
-// unsigned char buf[128 * 1024];
 
 int
 main (int argc UNUSED, char *argv[]) 
 {
-//   msg("Booyar!");
   int handle;
   unsigned char buf[128 * 1024];
   size_t size;
 
   quiet = true;
 
-//   msg("BARHIST");
   CHECK ((handle = open (argv[1])) > 1, "open \"%s\"", argv[1]);
-//   msg("BOOHIST");
-  
+
   size = read (handle, buf, sizeof buf);
   qsort_bytes (buf, sizeof buf);
   seek (handle, 0);
