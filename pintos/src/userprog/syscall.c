@@ -9,6 +9,7 @@
 
 #include "lib/kernel/list.h"
 #include "lib/string.h"
+#include <lib/syscall-nr.h>
 #include "devices/shutdown.h"
 #include "userprog/process.h"
 #include "filesys/filesys.h"
@@ -29,6 +30,8 @@ void syswrite_handler (struct intr_frame *f);
 void sysseek_handler (struct intr_frame *f);
 void systell_handler (struct intr_frame *f);
 void sysclose_handler (struct intr_frame *f);
+void sysmmap_handler (struct intr_frame *f);
+void sysunmmap_handler (struct intr_frame *f);
 
 uint32_t pop_stack(struct intr_frame *f);
 
@@ -170,6 +173,12 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CLOSE:
       sysclose_handler(f);
+      break;
+    case SYS_MMAP:
+      sysmmap_handler(f);
+      break;
+    case SYS_MUNMAP:
+      sysmunmap_handler(f);
       break;
   }
 
@@ -359,7 +368,7 @@ void sysopen_handler(struct intr_frame *f)
 
   // File cannot be opened: return -1
   if (file == NULL) {
-    printf("File %s failed to open\n", file_name);
+//     printf("File %s failed to open\n", file_name);
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
@@ -512,7 +521,7 @@ void syswrite_handler(struct intr_frame *f)
 }
 
 /**
- * Thread calls sysseek
+ * Thread calls seek(int fd, unsigned position)
  *
  * Changes the next byte to be read or written in open file fd to position,
  * expressed in bytes from the beginning of the file. (Thus, a position of 0
@@ -601,6 +610,61 @@ void sysclose_handler(struct intr_frame *f)
   }
 }
 
+/**
+ * Thread class mmap (int fd, void *addr).
+ *
+ * Maps the file open as fd into the process's virtual address space. The
+ * entire file is mapped into consecutive virtual pages starting at addr.
+ *
+ * Your VM system must lazily load pages in mmap regions and use the mmaped
+ * file itself as backing store for the mapping. That is, evicting a page
+ * mapped by mmap writes it back to the file it was mapped from.
+ *
+ * If the file's length is not a multiple of PGSIZE, then some bytes in the
+ * final mapped page "stick out" beyond the end of the file. Set these bytes
+ * to zero when the page is faulted in from the file system, and discard
+ * them when the page is written back to disk.
+ *
+ * If successful, this function returns a "mapping ID" that uniquely
+ * identifies the mapping within the process. On failure, it must return -1,
+ * which otherwise should not be a valid mapping id, and the process's
+ * mappings must be unchanged.
+ *
+ * A call to mmap may fail if the file open as fd has a length of zero bytes.
+ * It must fail if addr is not page-aligned or if the range of pages mapped
+ * overlaps any existing set of mapped pages, including the stack or pages
+ * mapped at executable load time.
+ * It must also fail if addr is 0, because some Pintos code assumes virtual
+ * page 0 is not mapped.
+ * Finally, file descriptors 0 and 1, representing console input and output,
+ * are not mappable.
+ */
+void sysmmap_handler(struct intr_frame* f)
+{
+  int fd = pop_stack(f);
+  void *addr = pop_stack(f);
+
+  int ret = -1;     // return value, -1 for failure
+
+  if (fd != 0 && fd != 1 && pg_ofs(addr) == 0) {
+  }
+
+  f->eax = ret;
+}
+
+/**
+ * Thread calls munmap (mapid_t mapid).
+ *
+ * Unmaps the mapping designated by mapping, which must be a mapping ID
+ * returned by a previous call to mmap by the same process that has not yet
+ * been unmapped.
+ */
+void sysmunmap_handler(struct intr_frame* f)
+{
+  int mapid = pop_stack(f);
+}
+
+
 /* Given a file descriptor, search the current thread's open-file handler list
 * and return a file handler corresponding to the file descriptor. If no such
 * handler exists, return NULL.
@@ -624,7 +688,6 @@ struct fileHandle* get_handle(int fd)
   return NULL;
 }
 
-
 // Fails gracefully whenever a program does something bad
 void terminate_thread(void)
 {
@@ -632,3 +695,4 @@ void terminate_thread(void)
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
+

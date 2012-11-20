@@ -15,7 +15,6 @@ struct page_entry {
   int tid;                  // ID of the owner of the page
   void *uaddr;              // User address
   bool writable;            // Whether the page is writable
-  bool pinned;              // A pinned page cannot be evicted from main memory
 
   // Possible locations of the page
   struct frame *frame;      // Address of physical memory entry
@@ -44,7 +43,6 @@ bool load_page_entry(struct page_entry *entry);
 void free_page(void *uaddr);
 
 // Page status query
-bool is_pinned(struct page_entry *entry);
 bool is_in_fs(struct page_entry *entry);
 bool is_present(struct page_entry *entry);
 bool is_swapped(struct page_entry *entry);

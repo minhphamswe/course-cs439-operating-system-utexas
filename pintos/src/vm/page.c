@@ -207,10 +207,10 @@ bool load_page_entry(struct page_entry* entry) {
       if (entry->read_bytes > 0) {
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
-        entry->pinned = true;
+        pin_frame(entry->frame);
         int bytes_read = file_read(entry->file, entry->frame->kpage,
                                    entry->read_bytes);
-        entry->pinned = false;
+        unpin_frame(entry->frame);
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
           free_page_entry(entry);
@@ -312,9 +312,3 @@ bool is_present(struct page_entry* entry) {
 bool is_swapped(struct page_entry* entry) {
   return (entry->swap != NULL);
 }
-
-/// Return true if the page is pinned, thus not evictable
-bool is_pinned(struct page_entry* entry) {
-  return entry->pinned;
-}
-
