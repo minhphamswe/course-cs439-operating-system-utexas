@@ -59,12 +59,15 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include "vm/page.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
-#include <threads/malloc.h>
-#include <threads/thread.h>
 
+#include "userprog/pagedir.h"
+
+#include "threads/malloc.h"
+#include "threads/thread.h"
 #include "threads/vaddr.h"
-#include <threads/interrupt.h>
-#include <userprog/pagedir.h>
+#include "threads/interrupt.h"
+
+#include "lib/debug.h"
 
 #include <stdio.h>
 
@@ -180,27 +183,34 @@ void free_page(void* uaddr)
 }
 
 bool load_page_entry(struct page_entry* entry) {
+//   printf("Start load_page_entry(%x)\n", entry);
+//   printf("Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
   bool success = false;
 
   if (entry != NULL) {
     ASSERT(!is_present(entry));
+    ASSERT(!(is_present(entry) && is_swapped(entry)));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
 
     if (is_swapped(entry)) {
+//       printf("A\n");
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
       success = install_frame(fp, entry->writable);
     }
 
     else if (is_in_fs(entry)) {
+//       printf("B\n");
 //       printf("File %x, bytes %d, offset %d\n", entry->file, entry->read_bytes, entry->offset);
       // Page is in the file system: read it in
       if (entry->read_bytes > 0) {
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
+        entry->pinned = true;
         int bytes_read = file_read(entry->file, entry->frame->kpage,
                                    entry->read_bytes);
+        entry->pinned = false;
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
           free_page_entry(entry);
@@ -215,10 +225,11 @@ bool load_page_entry(struct page_entry* entry) {
     }
 
     else {
-//       printf("install_page(): Installing thread %x(%d) | page %x @ %x(%d)\n", thread_current(), thread_current()->tid, entry->uaddr, entry, entry->tid);
-      success = install_frame(entry->frame, entry->writable);
+//       printf("C\n");
+      success = install_frame(fp, entry->writable);
     }
   }
+//   printf("End load_page_entry(%x)\n", entry);
   return success;
 }
 
@@ -273,12 +284,18 @@ void free_page_entry(struct page_entry* entry)
 {
 //   printf("Freeing page entry\n");
   // TODO: free the frame the entry points to
+  enum intr_level old_level = intr_disable();
+
   if (entry != NULL) {
     if (entry->frame != NULL) {
       free_frame(entry->frame);
     }
+    if (entry->swap != NULL) {
+      free_swap(entry->swap);
+    }
     free(entry);
   }
+  intr_set_level(old_level);
 }
 
 /// Return true if the page was loadded from the file system

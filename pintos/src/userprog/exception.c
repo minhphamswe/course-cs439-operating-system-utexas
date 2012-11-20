@@ -160,7 +160,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
+//    printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
 
 //   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
@@ -215,7 +215,7 @@ page_fault (struct intr_frame *f)
 
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
-//   printf("Start extend_stack(*f, %x)\n", fault_addr);
+//    printf("Start extend_stack(*f, %x)\n", fault_addr);
 //   printf("Start extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 
   uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
@@ -223,29 +223,11 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
   uint32_t addr;
   bool once = false;
 
-//   printf("fault_addr is: %x\t ebp: %x\n", fault_addr, f->frame_pointer);
-//   sema_down(&extend_sema);
-//   for (; addr <= (int) f->frame_pointer; addr += PGSIZE) {
-// //     printf("frame_addr is: %x\t fault_addr is: %x\t ebp: %x\n", addr, fault_addr, f->frame_pointer);
-//     struct page_entry *entry = allocate_page((void *) addr);
-// 
-//     // EXP CODE!
-//     struct thread *t = thread_current();
-// //     printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
-//     f->esp = fault_addr;
-// 
-//     int success = 0;
-//     if (entry->status == PAGE_NOT_EXIST)
-//       success = install_page(entry, true);
-//     once = once || success;
-//     if (!success)
-//       break;
-//   }
-//   sema_up(&extend_sema);
-
   sema_down(&extend_sema);
-  for (addr = top - PGSIZE; addr >= bottom ; addr -= PGSIZE) {
+  for (addr = bottom; addr < top ; addr += PGSIZE) {
     struct page_entry *entry = allocate_page((void*) addr);
+    //printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
+
     if (!load_page_entry(entry)) {
 //       free_page_entry(entry);    // FIXME: leads to a triple fault
 //         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
@@ -254,27 +236,9 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     once = true;
   }
   sema_up(&extend_sema);
-
-//   struct page_entry *entry = allocate_page(addr);
-//   if (entry != NULL) {
-//     void* kpage = entry->frame->kpage;
-//     if (install_page(entry, true)) {
-// //       free_page_entry(entry);    FIXME: leads to a triple fault
-// //         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
-//       once = true;
-//     }
-//   }
-  
-//   page_table_print(&thread_current()->pages);
   if (!once) {
-//     printf("Allocation of stack frame unsuccessful.\n");
-//     printf("End extend_stack(*f, %x)\n", addr);
-//     printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
     kill_process(f);
   }
-//   printf("End extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
-//   printf("Allocation of stack frame successful.\n");
-//   printf("End extend_stack(*f, %x)\n", addr);
 }
 
 static void

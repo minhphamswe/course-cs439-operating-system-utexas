@@ -111,9 +111,11 @@ process_execute (const char *file_name)
   char tmpfilename[16];
   char *saveptr;
 
+//   printf("process_execute(%s): Trace 1\n", file_name);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+//   printf("process_execute(%s): Trace 2\n", file_name);
   if (fn_copy == NULL) {
     printf("process_execute(%s): Cannot get page for fn_copy\n", file_name);
     return TID_ERROR;
@@ -123,9 +125,11 @@ process_execute (const char *file_name)
   // See if the file exists before trying to execute it
   strlcpy((char*)tmpfilename, file_name, 16);
 
+//   printf("process_execute(%s): Trace 3\n", file_name);
   struct semaphore s;
   sema_init(&s, 1);
   sema_down(&s);
+//   printf("process_execute(%s): Trace 4\n", file_name);
   file = filesys_open (strtok_r((char*)tmpfilename, " ", &saveptr));
   sema_up(&s);
 
@@ -134,29 +138,40 @@ process_execute (const char *file_name)
       printf ("load: %s: open failed\n", file_name);
       return TID_ERROR;
     }
+//   printf("process_execute(%s): Trace 5\n", file_name);
   file_close(file);
+//   printf("process_execute(%s): Trace 6\n", file_name);
 
   // Create a new thread to execute FILE_NAME.
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+//   printf("process_execute(%s): Trace 7\n", file_name);
   if (tid == TID_ERROR) {
+//     printf("process_execute(%s): Trace 8\n", file_name);
     palloc_free_page (fn_copy);
     return TID_ERROR;
   }
 
+//   printf("process_execute(%s): Trace 9\n", file_name);
   // Check if the thread loaded properly
   struct thread *child = thread_by_tid(tid);
+//   printf("process_execute(%s): Trace 10\n", file_name);
   if (child) {
+//     printf("process_execute(%s): Trace 11\n", file_name);
     // Thread has not yet exited: wait for status of load
 //     printf("Thread is waiting for thread %d to report execution status\n", tid);
     sema_down(&child->exec_sema);
 
+//     printf("process_execute(%s): Trace 12\n", file_name);
     if(thread_get_exit_status(tid)->status == -1) {
+//       printf("process_execute(%s): Trace 13\n", file_name);
       return TID_ERROR;
     }
     else {
+//       printf("process_execute(%s): Trace 14\n", file_name);
       return tid;
     }
   }
+//   printf("process_execute(%s): Trace 15\n", file_name);
   return tid;
 }
 
@@ -210,27 +225,35 @@ process_wait (tid_t child_tid)
 {
 //   printf("Starting process_wait(%d)\n", child_tid);
   // Check that the tid is a child of the requesting thread
+//   printf("process_wait(%d): Trace 1\n", child_tid);
   if (!thread_is_child(child_tid)) {
     // This thread is not your child, so you can't wait for it.
+//     printf("process_wait(%d): Trace 2\n", child_tid);
     return -1;
   }
 
+//   printf("process_wait(%d): Trace 3\n", child_tid);
   // Check that the tid has not been waited for by the requesting thread
   if (thread_has_waited(child_tid)) {
+//     printf("process_wait(%d): Trace 4\n", child_tid);
     // You have already waited for this tid, so go away!
     return -1;
   }
 
   // Wait until the thread with that tid exits
+//   printf("process_wait(%d): Trace 5\n", child_tid);
   struct thread *tp = thread_by_tid(child_tid);
   if (tp != NULL) {
-//     printf("Thread is waiting for thread %d to exit\n", child_tid);
+//     printf("process_wait(%d): Trace 6\n", child_tid);
+//     printf("Thread %x(%d) is waiting for thread %d to exit\n", thread_current(), thread_current()->tid, child_tid);
     sema_down(&tp->wait_sema);
   }
 
+//   printf("process_wait(%d): Trace 7\n", child_tid);
   struct exit_status *es = thread_get_exit_status(child_tid);
   // Move the thread to the already-waited list
   thread_mark_waited(es);
+//   printf("process_wait(%d): Trace 8\n", child_tid);
   // Return exit status
 //   printf("End process_wait(%d)\n", child_tid);
   return es->status;
@@ -250,6 +273,8 @@ process_exit (void)
          thread_get_exit_status(cur->tid)->status);
 
   // Close open files
+//   printf("process_exit(): Trace 1\n");
+  enum intr_level old_level = intr_disable();
   file_close(cur->ownfile);
   struct list_elem *e;
   while (!list_empty (&cur->handles)) {
@@ -258,23 +283,30 @@ process_exit (void)
     file_close(s->file);
     free(s);
   }
-  
+  intr_set_level(old_level);
+//   printf("process_exit(): Trace 2\n");
+
   // Clear out our wait list
+  old_level = intr_disable();
   while (!list_empty (&cur->wait_list)) {
     e = list_pop_front (&cur->wait_list);
     struct exit_status *s = list_entry (e, struct exit_status, wait_elem);
     free(s);
   }
+  intr_set_level(old_level);
 
-  // Signal any waiting thread
-  sema_up(&cur->wait_sema);      // signal before dying
-
+//   printf("process_exit(): Trace 3\n");
   // Destroy the supplemental page table, which frees all pages and frames
   // in the process
 //   printf("Start page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
   page_table_destroy(&cur->pages);   // FIXME: This causes a triple fault
 //   printf("End page_table_destroy(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
 
+//   printf("process_exit(): Trace 4\n");
+  // Signal any waiting thread
+  sema_up(&cur->wait_sema);      // signal before dying
+
+//   printf("process_exit(): Trace 5\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -292,7 +324,9 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
+//   printf("process_exit(): Trace 6\n");
   thread_clear_child_exit_status(cur);
+//   printf("process_exit(): Trace 7\n");
 //   printf("End process_exit()\n");
 }
 
@@ -612,34 +646,34 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-//   printf("Start load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
-  uint32_t pg_offset = 0;
+  uint64_t page_offset = 0;
 
   file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0)
-    {
-      /* Calculate how to fill this page.
-         We will read PAGE_READ_BYTES bytes from FILE
-         and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+  while (read_bytes > 0 || zero_bytes > 0) {
+    /* Calculate how to fill this page.
+        We will read PAGE_READ_BYTES bytes from FILE
+        and zero the final PAGE_ZERO_BYTES bytes. */
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      // Register a page under the current thread
-      struct page_entry *entry = allocate_page(upage);
-      if (entry == NULL)
-        return false;
+    // Register a page under the current thread
+    struct page_entry *entry = allocate_page(upage);
+    if (entry == NULL)
+      return false;
 
-      entry->file = file;
-      entry->offset = ofs + pg_offset;
-      entry->read_bytes = page_read_bytes;
-      entry->writable = writable;
+    entry->file = file;
+    entry->offset = ofs + page_offset;
+    entry->read_bytes = page_read_bytes;
+    entry->writable = writable;
 
-      /* Advance. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
-      pg_offset += PGSIZE;
-    }
+//     printf("Page loaded: %x\n", entry);
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    upage += PGSIZE;
+    page_offset += PGSIZE;
+  }
 //   printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
   return true;
 }

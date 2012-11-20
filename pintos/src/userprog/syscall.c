@@ -359,7 +359,7 @@ void sysopen_handler(struct intr_frame *f)
 
   // File cannot be opened: return -1
   if (file == NULL) {
-//     printf("File %s failed to open\n", file_name);
+    printf("File %s failed to open\n", file_name);
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
@@ -375,7 +375,7 @@ void sysopen_handler(struct intr_frame *f)
 
     // return the file descriptor
     f->eax = newHandle->fd;
-//     printf("File %s opened successfully\n", file_name);
+//     printf("Thread %x(%d) SUCCESSFULLY opened file %s as file %d\n", thread_current(), thread_current()->tid, file_name, newHandle->fd);
   }
 }
 
@@ -443,9 +443,10 @@ void sysread_handler(struct intr_frame *f)
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
       sema_down(&read_sema);
-//       printf("Thread ATTEMPTing to read %d bytes from file %d to %x\n", size, fd, buffer);
+//       printf("Thread %x(%d) ATTEMPTing to read %d bytes from file %d to %x\n", thread_current(), thread_current()->tid, size, fd, buffer);
       f->eax = file_read(fhp->file, buffer, size);
       sema_up(&read_sema);
+//       printf("Thread %x(%d) DONE reading %d bytes from file %d to %x\n", thread_current(), thread_current()->tid, size, fd, buffer);
      }
     else {
       // File descriptor not found: return -1
@@ -491,19 +492,21 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
-//       printf("Thread %x(%d) ATTEMPTing to write a file\n", thread_current(), thread_current()->tid);
-      sema_down(&write_sema);
+//       printf("Thread %x(%d) ATTEMPTing to write %d bytes from %x to file %d\n", thread_current(), thread_current()->tid, bufferSize, buffer, fhp->fd);
+//      sema_down(&read_sema);
+     sema_down(&write_sema);
       f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
-      sema_up(&write_sema);
-//       printf("syswrite_handler(): Thread DONE writing file\n");
+     sema_up(&write_sema);
+//      sema_up(&read_sema);
+//       printf("Thread %x(%d) DONE writing %d bytes from %x to file %d\n", thread_current(), thread_current()->tid, bufferSize, buffer, fhp->fd);
      }
     else {
-//       printf("syswrite_handler(): Write to file failed: Null handler\n");
+//       printf("Write to file failed: Null handler\n");
       f->eax = -1;
     }
   }
   else {
-//     printf("syswrite_handler(): Write to file failed: Invalid file descriptor\n");
+//     printf("Write to file failed: Invalid file descriptor\n");
     f->eax = -1;
   }
 }
@@ -589,7 +592,7 @@ void sysclose_handler(struct intr_frame *f)
 //       printf("Thread %x(%d) ATTEMPTing to close file %d\n", thread_current(), thread_current()->tid, fhp->fd);
       sema_down(&close_sema);
       file_close(fhp->file);
-//       printf("Thread %x(%d) closing file\n", thread_current(), thread_current()->tid);
+//      printf("Thread %x(%d) closing file\n", thread_current(), thread_current()->tid);
       list_remove(e);
       sema_up(&close_sema);
 //       printf("Thread %x(%d) DONE closing file\n", thread_current(), thread_current()->tid);

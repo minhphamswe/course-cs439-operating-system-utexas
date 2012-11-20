@@ -142,7 +142,7 @@ sema_up (struct semaphore *sema)
   intr_set_level (old_level);
 
   // Yield if we woke up a higher priority thread
-  if(highestPriority > thread_current()->priority)
+  if(highestPriority >= thread_current()->priority)
     thread_yield();
 }
 

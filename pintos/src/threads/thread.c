@@ -409,9 +409,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  clean_swap(thread_current()->tid);          // Clean out any left swaps
+//   clean_swap(thread_current()->tid);          // Clean out any left swaps
   list_remove (&thread_current()->allelem);   // disappear before dying
-//   printf("End thread_exit()\n");
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();
@@ -551,8 +550,7 @@ thread_by_tid(tid_t tid)
   struct thread *tp;
 
   // Disable interrupts before going through the thread list
-  enum intr_level old_level;
-  old_level = intr_disable ();
+  enum intr_level old_level = intr_disable ();
 
   for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
   {
@@ -675,6 +673,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* Initialize list and index for open files */
   t->nextFD = 2;
+  enum intr_level old_level = intr_disable();
   list_init(&t->handles);
 
   /* Initialize wait-on and child list for WAIT system call */
@@ -685,6 +684,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* When done, add thread to all-thread list */
   list_push_back(&all_list, &(t->allelem));
+  intr_set_level(old_level);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -833,12 +833,16 @@ bool thread_is_child(tid_t tid)
   struct exit_status *es;
   struct list_elem *e;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
        e = list_next(e)) {
     es = list_entry(e, struct exit_status, child_elem);
-      if (es->tid == tid)
-       return true;
-   }
+      if (es->tid == tid) {
+        intr_set_level(old_level);
+        return true;
+      }
+  }
+  intr_set_level(old_level);
   return false;
 }
 
@@ -849,14 +853,17 @@ bool thread_has_waited(tid_t tid)
   struct exit_status *es;
   struct list_elem *e;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
        e = list_next(e)) {
     es = list_entry(e, struct exit_status, wait_elem);
     if (es->tid == tid) {
+      intr_set_level(old_level);
       return true;
     }
   }
 
+  intr_set_level(old_level);
   return false;
 }
 
@@ -867,14 +874,17 @@ struct exit_status* thread_get_exit_status(tid_t tid)
   struct exit_status *es;
   struct list_elem *e;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&exit_list); e != list_end(&exit_list);
        e = list_next(e)) {
     es = list_entry(e, struct exit_status, exit_elem);
     if (es->tid == tid) {
       // The pid supplied is of a thread that has run
+      intr_set_level(old_level);
       return es;
     }
   }
+  intr_set_level(old_level);
   return NULL;
 }
 
@@ -895,18 +905,16 @@ void thread_set_exit_status(tid_t tid, int status)
  */
 void thread_clear_child_exit_status(struct thread* t)
 {
-  enum intr_level old_level = intr_disable();
-
   struct list_elem *e;
   struct exit_status *es;
 
+  enum intr_level old_level = intr_disable();
   for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
        e = list_remove(e)) {
     es = list_entry(e, struct exit_status, wait_elem);
     list_remove(&es->exit_elem);
     list_remove(&es->child_elem);
   }
-
   intr_set_level(old_level);
 }
 
@@ -916,6 +924,8 @@ void thread_clear_child_exit_status(struct thread* t)
 void thread_mark_waited(struct exit_status* es)
 {
   struct thread *t = thread_current();
+  enum intr_level old_level = intr_disable();
   list_remove(&es->exit_elem);
   list_push_front(&t->wait_list, &es->wait_elem);
+  intr_set_level(old_level);
 }

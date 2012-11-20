@@ -66,7 +66,7 @@ void frame_init(void) {
  */
 struct frame* allocate_frame(struct page_entry* upage) {
   // Allocate frame and get its kernel page address
-//   printf("Start allocate_frame()\n");
+//  printf("Start allocate_frame(%x)\n", upage);
   struct frame *fp;
   uint8_t *kpage;
   void * uaddr;
@@ -76,36 +76,46 @@ struct frame* allocate_frame(struct page_entry* upage) {
   uaddr = (void*)((((uint32_t) uaddr) / PGSIZE) * PGSIZE);
 
   // Attempt to allocate a new frame
+//   printf("allocate_frame(%x): Trace 1\n", upage);
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+//   printf("allocate_frame(%x): Trace 2\n", upage);
   if (kpage == NULL) {
     // All physical addresses are used: evict a frame
+//     printf("allocate_frame(%x): Trace 3\n", upage);
     fp = evict_frame();
+//     printf("allocate_frame(%x): Trace 4\n", upage);
     kpage = fp->kpage;
+    memset(kpage, 0, PGSIZE);
   }
   else {
+//     printf("allocate_frame(%x): Trace 5\n", upage);
     // We have space: register a new frame to track the address
     fp = malloc(sizeof(struct frame));
+//     printf("allocate_frame(%x): Trace 6\n", upage);
   }
 
+//   printf("allocate_frame(%x): Trace 7\n", upage);
   // Set frame attributes
   fp->upage = upage;
   fp->kpage = kpage;
   fp->tid = upage->tid;
+//   printf("allocate_frame(%x): Trace 8\n", upage);
 
   // Update page entry attributes
   upage->frame = fp;
+//   printf("allocate_frame(%x): Trace 9\n", upage);
 
-//   printf("End allocate_frame()\n");
+//  printf("End allocate_frame(%x): Frame: %x, Upage: %x, Kpage: %x\n", upage, fp, fp->upage, fp->kpage);
   return fp;
 }
 
 bool install_frame(struct frame* fp, int writable) {
+//   printf("Start install_frame(%x, %d)\n", fp, writable);
   if (fp == NULL) {
 //     printf("install_frame(): Null frame pointer, returning false\n");
     return false;
   }
   else {
-    enum intr_level old_level = intr_disable();
     struct thread *t = thread_current();
     void *uaddr = fp->upage->uaddr;
     void *kpage = fp->kpage;
@@ -114,9 +124,11 @@ bool install_frame(struct frame* fp, int writable) {
     if (pagedir_get_page(t->pagedir, uaddr) == NULL)
     {
       if (pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
-//       printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-      list_push_back(&all_frames, &fp->elem);
-      success = true;
+//         printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+        enum intr_level old_level = intr_disable();
+        list_push_back(&all_frames, &fp->elem);
+        intr_set_level(old_level);
+        success = true;
       }
 //       else printf("page_set_page failed\n");
     }
@@ -128,9 +140,9 @@ bool install_frame(struct frame* fp, int writable) {
 //       free_frame(fp);   // FIXME: this may cause a PANIC;
       success = false;
     }
-    intr_set_level(old_level);
 
 //     printf("install_frame(): success is: %d\n", success);
+//     printf("End install_frame(%x, %d)\n", fp, writable);
     return success;
   }
 }
@@ -146,6 +158,11 @@ void free_frame(struct frame* fp)
     // Page is in memory and registered to this thread
 //     printf("free_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", t, t->tid, uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
     pagedir_clear_page(t->pagedir, uaddr);
+
+    // Remove page<->frame mapping from our supplemental structures
+    fp->upage->frame = NULL;
+    fp->upage = NULL;
+
     palloc_free_page(fp->kpage);
   }
 //   else {   TODO
@@ -153,49 +170,69 @@ void free_frame(struct frame* fp)
 //   }
   intr_set_level(old_level);
 
-  // Remove page<->frame mapping from our supplemental structures
-  fp->upage->frame = NULL;
-  fp->upage = NULL;
   free(fp);
 }
 
 struct frame* evict_frame(void)
 {
-//  printf("Start evict_frame()\n");
+//   printf("Start evict_frame()\n");
   // Remove the oldest frame from frame table
   enum intr_level old_level = intr_disable();
+
+//    printf("evict_frame(): Trace 1\n");
 
   bool found = false;
   struct frame *fp = NULL;
   struct list_elem *e = list_begin(&all_frames);
+
+//   printf("evict_frame(): list_size(&all_frames) = %d\n", list_size(&all_frames));
+//   printf("evict_frame(): Trace 2\n");
   while (!list_empty(&all_frames) && e != list_end(&all_frames) && !found) {
     e = list_next(e);
     fp = list_entry(e, struct frame, elem);
-    found = (fp->upage == NULL) || (fp->upage->pinned == false);
+    found = ((fp->upage != NULL && fp->upage->pinned == false) ||
+             (fp->upage == NULL));
   }
+//   printf("evict_frame(): Trace 3\n");
   intr_set_level(old_level);
 //  printf("Kpage: %x  Upage: %x Writable: %d\n", fp->kpage, fp->upage->uaddr, fp->writable);
 
   // Write it to swap space
+//    printf("evict_frame(): Trace 4\n");
   if (fp != NULL) {
-    push_to_swap(fp);
-
     old_level = intr_disable();
-    // Remove page->frame mapping from the CPU-based page directory
-  //   struct thread *t = thread_current();
-    struct thread *victim = thread_by_tid(fp->tid);
-  //   printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-    pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
-
-    // Remove page<->frame mapping from our supplemental structures
-    fp->upage->frame = NULL;
-    fp->upage = NULL;
-
-    list_push_back(&all_frames, &fp->elem);
+    list_remove(&fp->elem);
     intr_set_level(old_level);
 
-  //   printf("End evict_frame()\n");
+//     printf("evict_frame(): Trace 5\n");
+    if (fp->upage != NULL) {
+    // Remove page->frame mapping from the CPU-based page directory
+  //   struct thread *t = thread_current();
+
+//       printf("evict_frame(): Trace 7\n");
+      if (fp->upage->writable == true) {
+//           printf("evict_frame(): Trace 8\n");
+        push_to_swap(fp);
+      }
+
+      struct thread *victim = thread_by_tid(fp->tid);
+//     printf("Victim is: %x(%d)\n", victim, victim->tid);
+//       printf("evict_frame(): Trace 6\n");
+//     printf("evict_frame(): Unmapping thread %x(%d) | page %x =/=> %x @ %x(%d) =/=> %x(%d)\n", t, t->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
+      pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+
+//       printf("evict_frame(): Trace 9\n");
+      fp->upage->frame = NULL;
+      fp->upage = NULL;
+    }
+
+    old_level = intr_disable();
+//      printf("evict_frame(): Trace 10\n");
+    list_push_back(&all_frames, &fp->elem);
+    intr_set_level(old_level);
   }
+
+//   printf("End evict_frame(): evicted frame %x\n", fp);
   return fp;
 }
 
