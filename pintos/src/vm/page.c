@@ -127,21 +127,16 @@ void page_table_print(struct page_table* pt)
  */
 struct page_entry* allocate_page(void* uaddr)
 {
-//   printf("Start allocate_page(%x)\n", uaddr);
+  ASSERT(uaddr != NULL);
+
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
 
   if (entry != NULL) {
     // This page is allocated: check if it is ours 
-    // TODO: or our ancestor's code segment
     ASSERT(entry->tid == t->tid);
-//     if (entry->tid != t->tid) {
-//       printf("Page does not belong to the running process. TODO: check if it's parent's code segment.\n");
-//       entry = NULL;
-//     }
   }
   else if (!is_user_vaddr(uaddr) || uaddr == NULL) {
-//     printf("Address is not user address\n");
     entry = NULL;
   }
   else {
@@ -150,6 +145,8 @@ struct page_entry* allocate_page(void* uaddr)
 
     // This address is free: make a new page entry to track it
     entry = malloc(sizeof(struct page_entry));
+    ASSERT(entry != NULL);
+
     entry->tid = t->tid;
     entry->uaddr = uaddr;
     entry->writable = true;
@@ -166,8 +163,6 @@ struct page_entry* allocate_page(void* uaddr)
     intr_set_level(old_level);
   }
 
-//   printf("allocate_page() page %x @ %x\n", entry->uaddr, entry);
-//   printf("End allocate_page(%x)\n", uaddr);
   return entry;
 }
 
@@ -175,18 +170,16 @@ struct page_entry* allocate_page(void* uaddr)
 void free_page(void* uaddr)
 {
   struct page_entry *entry = get_page_entry(uaddr);
-  enum intr_level old_level = intr_disable();
   if (entry != NULL) {
+    enum intr_level old_level = intr_disable();
     list_remove(&entry->elem);
     free_page_entry(entry);
+    intr_set_level(old_level);
   }
-  intr_set_level(old_level);
 }
 
 bool load_page_entry(struct page_entry* entry) {
   sema_down(&paging_sema);
-//   printf("Start load_page_entry(%x)\n", entry);
-//   printf("load_page_entry(%x): Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry, entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
   bool success = false;
 
   if (entry != NULL) {
@@ -194,6 +187,7 @@ bool load_page_entry(struct page_entry* entry) {
     ASSERT(!is_present(entry));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
+    ASSERT(fp != NULL);
 
     // Pin the frame while loading data
     enum intr_level old_level = intr_disable();

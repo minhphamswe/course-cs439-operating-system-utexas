@@ -45,6 +45,7 @@ of this project.
 
 #include "lib/kernel/list.h"
 #include "lib/debug.h"
+#include "lib/string.h"
 
 #include "threads/thread.h"
 #include "threads/malloc.h"
@@ -56,6 +57,8 @@ of this project.
 
 static struct list all_frames;          // all allocated frames in the system
 static struct list_elem *clockhand;     // the eviction clock hand
+
+static struct semaphore clock_sema;
 
 struct frame* evict_frame(void);
 
@@ -136,11 +139,16 @@ void unpin_frame(struct frame* fp) {
 /// Initialize the frame table system
 void frame_init(void) {
   list_init(&all_frames);
+  sema_init(&clock_sema, 1);
 }
 
 /// Obtain a new frame to hold the page pointed to by UPAGE
 /// If there is no more space in memory, evict a frame
 struct frame* allocate_frame(struct page_entry* upage) {
+  ASSERT(upage != NULL);
+  ASSERT(upage->uaddr != NULL);
+  ASSERT(pg_ofs(upage->uaddr) == 0);
+  ASSERT(upage->frame == NULL);
   // Allocate frame and get its kernel page address
 //  printf("Start allocate_frame(%x)\n", upage);
   struct frame *fp;
@@ -197,10 +205,21 @@ struct frame* allocate_frame(struct page_entry* upage) {
 //   printf("allocate_frame(%x): Trace 9\n", upage);
 
 //  printf("End allocate_frame(%x): Frame: %x, Upage: %x, Kpage: %x\n", upage, fp, fp->upage, fp->kpage);
+  ASSERT(fp != NULL);
+  ASSERT(fp->async_write == false);
+  ASSERT(fp->upage != NULL);
+  ASSERT(fp->kpage != NULL);
+  ASSERT(upage->frame != NULL);
+  ASSERT(!is_pinned(fp));
   return fp;
 }
 
-bool install_frame(struct frame* fp, int writable) {
+bool install_frame(struct frame* fp, int writable)
+{
+  ASSERT(fp != NULL);
+  ASSERT(fp->upage != NULL);
+  ASSERT(fp->upage->uaddr != NULL);
+  ASSERT(fp->tid == thread_current()->tid);
 //   printf("Start install_frame(%x, %d)\n", fp, writable);
 //   printf("install_frame(%x, %d): Frame: %x, Page: %x\n", fp, writable, fp, fp->upage);
   bool success = false;
@@ -235,10 +254,16 @@ bool install_frame(struct frame* fp, int writable) {
 
 void free_frame(struct frame* fp)
 {
+  ASSERT(fp != NULL);
+  ASSERT(fp->upage != NULL);
+  ASSERT(fp->upage->frame != NULL);
+  ASSERT(fp->upage->uaddr != NULL);
+
   // Remove page->frame mapping from the CPU-based page directory
   if (fp != NULL) {
     if (fp->upage != NULL) {
       struct thread *t = thread_by_tid(fp->tid);
+      ASSERT(t != NULL);
       void *uaddr = fp->upage->uaddr;
 
 //       if (pagedir_get_page(t->pagedir, uaddr) != NULL) {
@@ -250,7 +275,7 @@ void free_frame(struct frame* fp)
       // Remove page<->frame mapping from our supplemental structures
       struct page_entry *entry = fp->upage;
       ASSERT(entry != NULL);
-      
+
       fp->upage->frame = NULL;
       fp->upage = NULL;
 
@@ -267,6 +292,7 @@ void free_frame(struct frame* fp)
 
 struct frame* evict_frame(void)
 {
+  sema_down(&clock_sema);
 //   printf("Start evict_frame()\n");
 //   printf("evict_frame(): Trace 1\n");
   enum intr_level old_level = intr_disable();
@@ -280,14 +306,17 @@ struct frame* evict_frame(void)
   bool found = false;   // true if we have found an eviction target
   struct frame *fp = NULL;
   struct list_elem *old_clockhand = clockhand;  // saved clockhand position
-  
+
 //   printf("evict_frame(): Trace 3\n");
   while (revolution < 3 && !found) {
     ASSERT(clockhand->next != clockhand);
     ASSERT(clockhand != list_end(&all_frames));
+    ASSERT(clockhand != NULL);
+
     // Get the frame structure
     old_level = intr_disable();
     fp = list_entry(clockhand, struct frame, elem);
+    ASSERT(fp != NULL);
     intr_set_level(old_level);
 
     // Check if the frame is suitable for eviction
@@ -344,6 +373,8 @@ struct frame* evict_frame(void)
   ASSERT(!is_pinned(fp));
 //   printf("evict_frame(): Trace 7\n");
 
+  pin_frame(fp);
+
   // Write to swap space if the frame is dirty
   if (fp->upage != NULL) {
 //     printf("evict_frame(): Trace 8\n");
@@ -353,16 +384,14 @@ struct frame* evict_frame(void)
       fp->async_write = false;
     }
 
-    // Clear frame out to zero
-    memset(fp->kpage, 0, PGSIZE);
-
     // Unmap frame if the frame is being used
 //     printf("evict_frame(): Trace 10\n");
     old_level = intr_disable();
     struct thread *victim = thread_by_tid(fp->tid);
     ASSERT(victim != NULL);
 //     printf("evict_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", thread_current(), thread_current()->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-    pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+    if (pagedir_get_page(victim->pagedir, fp->upage->uaddr) != NULL)
+      pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
 //     printf("evict_frame(): Trace 11\n");
 
     struct page_entry *entry = fp->upage;
@@ -371,11 +400,16 @@ struct frame* evict_frame(void)
     fp->upage = NULL;
 //     printf("evict_frame(): Trace 12\n");
 
-    ASSERT(pagedir_get_page(thread_current()->pagedir, entry->uaddr) == NULL);
+    // Clear frame out to zero
+    memset(fp->kpage, 0, PGSIZE);
+
+    ASSERT(pagedir_get_page(victim->pagedir, entry->uaddr) == NULL);
     ASSERT(!is_present(entry));
     intr_set_level(old_level);
 //     printf("evict_frame(): Trace 13\n");
   }
+
+  unpin_frame(fp);
 
 //   printf("evict_frame(): Trace 14\n");
   //printf("evict_frame(): Returning thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", thread_current(), thread_current()->tid, fp->upage->uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
@@ -385,6 +419,7 @@ struct frame* evict_frame(void)
   ASSERT(fp->kpage != NULL);
   ASSERT(fp->upage == NULL);
   ASSERT(!is_pinned(fp));
+  sema_up(&clock_sema);
   return fp;
 }
 

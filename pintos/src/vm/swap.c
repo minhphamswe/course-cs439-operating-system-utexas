@@ -24,6 +24,7 @@
 
 #include "devices/block.h"
 #include "lib/kernel/list.h"
+#include "lib/debug.h"
 
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
@@ -57,6 +58,7 @@ bool push_to_swap(struct frame* fp)
 {
 //   printf("Start push_to_swap(%x)\n", fp);
   ASSERT(fp != NULL);
+  ASSERT(fp->upage != NULL);
 
 //   printf("Next sector: %d\n", next_sector);
 //    printf("push_to_swap(%x): Trace 1\n", fp);
@@ -95,7 +97,7 @@ bool pull_from_swap(struct page_entry *upage)
   ASSERT(upage != NULL);
 
   struct swap_slot *slot = get_swapped_page(upage);
-  if (slot) {
+  if (slot != NULL) {
 //     printf("Frame pull address: %x\n", slot->frame->kpage);
     // Read data in the swap slot into memory
     read_swap(slot);
@@ -118,6 +120,10 @@ bool pull_from_swap(struct page_entry *upage)
 
 void free_swap(struct swap_slot* slot)
 {
+  ASSERT(slot != NULL);
+  ASSERT(slot->upage != NULL);
+  ASSERT(slot->upage->swap != NULL);
+
   if (slot != NULL) {
     if (slot->upage != NULL) {
       slot->upage->swap = NULL;

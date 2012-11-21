@@ -162,7 +162,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
+  printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
 //   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
@@ -230,7 +230,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     //printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
 
     if (!load_page_entry(entry)) {
-//       free_page_entry(entry);    // FIXME: leads to a triple fault
+      free_page_entry(entry);    // FIXME: leads to a triple fault
 //         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
       break;
     }
