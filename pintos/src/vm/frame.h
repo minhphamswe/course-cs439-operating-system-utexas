@@ -23,6 +23,4 @@ void free_frame(struct frame *fp);
 void pin_frame(struct frame *fp);
 void unpin_frame(struct frame *fp);
 
-struct frame* evict_frame(void);
-
 #endif /* vm/frame.h */

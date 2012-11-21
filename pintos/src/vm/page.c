@@ -60,8 +60,6 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include "vm/frame.h"
 #include "vm/swap.h"
 
-#include "userprog/pagedir.h"
-
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -72,9 +70,11 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include <stdio.h>
 
 static struct semaphore filesys_sema;
+static struct semaphore paging_sema;
 
 void page_init(void ) {
   sema_init(&filesys_sema, 1);
+  sema_init(&paging_sema, 1);
 }
 
 /** Initialize a page table */
@@ -183,54 +183,72 @@ void free_page(void* uaddr)
 }
 
 bool load_page_entry(struct page_entry* entry) {
-//   printf("Start load_page_entry(%x)\n", entry);
-//   printf("Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
+  sema_down(&paging_sema);
+  printf("Start load_page_entry(%x)\n", entry);
+  printf("load_page_entry(%x): Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry, entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
   bool success = false;
 
   if (entry != NULL) {
+    printf("load_page_entry(%x): Trace 1\n", entry);
     ASSERT(!is_present(entry));
-    ASSERT(!(is_present(entry) && is_swapped(entry)));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
 
+    // Pin the frame while loading data
+    enum intr_level old_level = intr_disable();
+    pin_frame(fp);
+    intr_set_level(old_level);
+
     ASSERT(fp != NULL);
+
+    // Page is in swap: Read it in
     if (is_swapped(entry)) {
-//       printf("A\n");
+      printf("load_page_entry(%x): Trace 2\n", entry);
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
       success = install_frame(fp, entry->writable);
     }
 
     else if (is_in_fs(entry)) {
-//       printf("B\n");
-//       printf("File %x, bytes %d, offset %d\n", entry->file, entry->read_bytes, entry->offset);
-      // Page is in the file system: read it in
+      // Page is in file system (probably code segment)
+      printf("load_page_entry(%x): Trace 3\n", entry);
+
       if (entry->read_bytes > 0) {
+        // Page must be read in
+        printf("load_page_entry(%x): Trace 4\n", entry);
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
-        pin_frame(entry->frame);
-        int bytes_read = file_read(entry->file, entry->frame->kpage,
+        int bytes_read = file_read(entry->file, fp->kpage,
                                    entry->read_bytes);
-        unpin_frame(entry->frame);
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
-          free_page_entry(entry);
+          printf("load_page_entry(%x): Trace 5\n", entry);
+          free_frame(fp);
         }
         else {
+          printf("load_page_entry(%x): Trace 6\n", entry);
           success = install_frame(fp, entry->writable);
         }
       }
       else {
+        // Page doesn't need to be read in
+        printf("load_page_entry(%x): Trace 7\n", entry);
         success = install_frame(fp, entry->writable);
       }
     }
 
+    // Otherwise page was allocated by extending the stack: just install it
     else {
-//       printf("C\n");
+      printf("load_page_entry(%x): Trace 8\n", entry);
       success = install_frame(fp, entry->writable);
     }
+
+    old_level = intr_disable();
+    unpin_frame(fp);
+    intr_set_level(old_level);
   }
-//   printf("End load_page_entry(%x)\n", entry);
+  printf("load_page_entry(%x): Trace 9\n", entry);
+  sema_up(&paging_sema);
   return success;
 }
 
@@ -301,15 +319,18 @@ void free_page_entry(struct page_entry* entry)
 
 /// Return true if the page was loadded from the file system
 bool is_in_fs(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->file != NULL);
 }
 
 /// Return true if the page is currently in main memory
 bool is_present(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->frame != NULL);
 }
 
 /// Return true if the page is currently swapped out
 bool is_swapped(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->swap != NULL);
 }

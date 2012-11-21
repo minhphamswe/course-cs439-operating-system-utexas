@@ -14,6 +14,7 @@
 static long long page_fault_cnt;
 
 static struct semaphore extend_sema;
+static struct semaphore fault_sema;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
@@ -69,6 +70,7 @@ exception_init (void)
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
 
   sema_init(&extend_sema, 1);
+  sema_init(&fault_sema, 1);
 }
 
 /* Prints exception statistics. */
@@ -133,7 +135,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
-//   printf("Handling a page fault\n");
+  printf("Handling a page fault\n");
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -160,8 +162,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
-
+  printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
 //   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
@@ -223,7 +224,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
   uint32_t addr;
   bool once = false;
 
-  sema_down(&extend_sema);
+//   sema_down(&extend_sema);
   for (addr = bottom; addr < top ; addr += PGSIZE) {
     struct page_entry *entry = allocate_page((void*) addr);
     //printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
@@ -235,8 +236,9 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     }
     once = true;
   }
-  sema_up(&extend_sema);
+//   sema_up(&extend_sema);
   if (!once) {
+    printf("Extend stack failed\n");
     kill_process(f);
   }
 }
@@ -244,7 +246,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 static void
 kill_process (struct intr_frame *f)
 {
-  printf("Killing process...\n");
+//   printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
