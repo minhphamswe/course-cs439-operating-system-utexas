@@ -244,7 +244,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 static void
 kill_process (struct intr_frame *f)
 {
-  printf("Killing process...\n");
+//  printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }

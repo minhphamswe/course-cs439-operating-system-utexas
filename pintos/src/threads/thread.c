@@ -399,7 +399,6 @@ void
 thread_exit (void)
 {
   ASSERT (!intr_context ());
-//   printf("Start thread_exit()\n");
 
 #ifdef USERPROG
   process_exit ();
