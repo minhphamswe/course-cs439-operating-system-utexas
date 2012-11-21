@@ -60,8 +60,6 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include "vm/frame.h"
 #include "vm/swap.h"
 
-#include "userprog/pagedir.h"
-
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -72,9 +70,11 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 #include <stdio.h>
 
 static struct semaphore filesys_sema;
+static struct semaphore paging_sema;
 
 void page_init(void ) {
   sema_init(&filesys_sema, 1);
+  sema_init(&paging_sema, 1);
 }
 
 /** Initialize a page table */
@@ -154,6 +154,7 @@ void free_page(void* uaddr)
 }
 
 bool load_page_entry(struct page_entry* entry) {
+//   sema_down(&paging_sema);
   bool success = false;
 
   if (entry != NULL) {
@@ -161,6 +162,11 @@ bool load_page_entry(struct page_entry* entry) {
     ASSERT(!(is_present(entry) && is_swapped(entry)));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
+
+    // Pin the frame while loading data
+    enum intr_level old_level = intr_disable();
+    pin_frame(fp);
+    intr_set_level(old_level);
 
     ASSERT(fp != NULL);
     if (is_swapped(entry)) {
@@ -174,13 +180,11 @@ bool load_page_entry(struct page_entry* entry) {
       if (entry->read_bytes > 0) {
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
-        pin_frame(entry->frame);
         int bytes_read = file_read(entry->file, entry->frame->kpage,
                                    entry->read_bytes);
-        unpin_frame(entry->frame);
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
-          free_page_entry(entry);
+          free_frame(fp);
         }
         else {
           success = install_frame(fp, entry->writable);
@@ -194,7 +198,14 @@ bool load_page_entry(struct page_entry* entry) {
     else {
       success = install_frame(fp, entry->writable);
     }
+
+    // Done, unpin frame
+    old_level = intr_disable();
+    if (fp != NULL)
+      unpin_frame(fp);
+    intr_set_level(old_level);
   }
+//   sema_up(&paging_sema);
   return success;
 }
 
@@ -260,15 +271,18 @@ void free_page_entry(struct page_entry* entry)
 
 /// Return true if the page was loadded from the file system
 bool is_in_fs(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->file != NULL);
 }
 
 /// Return true if the page is currently in main memory
 bool is_present(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->frame != NULL);
 }
 
 /// Return true if the page is currently swapped out
 bool is_swapped(struct page_entry* entry) {
+  ASSERT(entry != NULL);
   return (entry->swap != NULL);
 }

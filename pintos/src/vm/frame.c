@@ -45,6 +45,7 @@ of this project.
 
 #include "lib/kernel/list.h"
 #include "lib/debug.h"
+#include "lib/string.h"
 
 #include "threads/thread.h"
 #include "threads/malloc.h"
@@ -56,6 +57,8 @@ of this project.
 
 static struct list all_frames;          // all allocated frames in the system
 static struct list_elem *clockhand;     // the eviction clock hand
+
+struct frame* evict_frame(void);
 
 /*================== METHODS TO QUERY/SET STATUS OF FRAME =================*/
 inline bool is_free(struct frame *fp);
@@ -150,21 +153,25 @@ struct frame* allocate_frame(struct page_entry* upage) {
   if (kpage == NULL) {
     // All physical addresses are used: evict a frame
     fp = evict_frame();
-    kpage = fp->kpage;
-    memset(kpage, 0, PGSIZE);
   }
   else {
     // We have space: register a new frame to track the address
-    fp = malloc(sizeof(struct frame));
+    fp->kpage = kpage;
+    fp->pinned = false;
+    fp->async_write = false;
+
+    ASSERT(fp != NULL);
+    ASSERT(!is_pinned(fp));
+
+    enum intr_level old_level = intr_disable();
     list_push_back(&all_frames, &fp->elem);
+    intr_set_level(old_level);
+
   }
 
   // Set frame attributes
   fp->upage = upage;
-  fp->kpage = kpage;
   fp->tid = upage->tid;
-  fp->pinned = false;
-  fp->async_write = false;
 
   set_dirty(fp, false);
 
@@ -178,16 +185,21 @@ struct frame* allocate_frame(struct page_entry* upage) {
 bool install_frame(struct frame* fp, int writable)
 {
   bool success = false;
-  if (fp != NULL) {
+  if (fp != NULL && fp->upage != NULL) {
     struct thread *t = thread_current();
     void *uaddr = fp->upage->uaddr;
     void *kpage = fp->kpage;
 
-    if (pagedir_get_page(t->pagedir, uaddr) == NULL)
-    {
-      if (pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
+    if ((pagedir_get_page(t->pagedir, uaddr) == NULL) &&
+        (pagedir_set_page(t->pagedir, uaddr, kpage, writable))) {
         success = true;
-      }
+        ASSERT(pagedir_get_page(t->pagedir, uaddr) != NULL);
+        ASSERT(is_present(fp->upage));
+    }
+    else {
+      free_frame(fp);
+      ASSERT(pagedir_get_page(t->pagedir, uaddr) == NULL);
+      ASSERT(!is_present(fp->upage));
     }
   }
   return success;
@@ -212,8 +224,8 @@ void free_frame(struct frame* fp)
       fp->upage = NULL;
     }
     enum intr_level old_level = intr_disable();
-    list_remove(&fp->elem);
     palloc_free_page(fp->kpage);
+    list_remove(&fp->elem);
     free(fp);
     intr_set_level(old_level);
   }
@@ -277,7 +289,7 @@ struct frame* evict_frame(void)
     // Advance clockhand
     old_level = intr_disable();
     clockhand = list_next(clockhand);
-    if (clockhand == list_end(&all_frames))
+    if (clockhand == list_end(&all_frames) || clockhand == NULL)
       clockhand = list_begin(&all_frames);
     intr_set_level(old_level);
 
@@ -289,13 +301,17 @@ struct frame* evict_frame(void)
   ASSERT(fp != NULL);
   ASSERT(!is_pinned(fp));
 
-  // Write to swap space if the frame is dirty
-  if (is_dirty(fp) || fp->async_write) {
-    push_to_swap(fp);
-  }
+  if (fp->upage != NULL) {
+    // Write to swap space if the frame is dirty
+    if (is_dirty(fp) || fp->async_write) {
+      push_to_swap(fp);
+      fp->async_write = false;
+    }
 
-  // Unmap frame if the frame is being used
-  if (!is_free(fp)) {
+    // Clear frame out to zero
+    memset(fp->kpage, 0, PGSIZE);
+
+    // Unmap frame if the frame is being used
     struct thread *victim = thread_by_tid(fp->tid);
     pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
 
@@ -303,6 +319,11 @@ struct frame* evict_frame(void)
     fp->upage = NULL;
   }
 
+  ASSERT(found);
+  ASSERT(fp != NULL);
+  ASSERT(fp->kpage != NULL);
+  ASSERT(fp->upage == NULL);
+  ASSERT(!is_pinned(fp));
   return fp;
 }
 

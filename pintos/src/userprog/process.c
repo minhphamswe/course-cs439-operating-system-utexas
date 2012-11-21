@@ -1,5 +1,5 @@
 #include "userprog/process.h"
-#include <debug.h>
+#include "lib/debug.h"
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>

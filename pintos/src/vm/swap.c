@@ -24,6 +24,7 @@
 
 #include "devices/block.h"
 #include "lib/kernel/list.h"
+#include "lib/debug.h"
 
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
@@ -56,6 +57,7 @@ void swap_init(void) {
 bool push_to_swap(struct frame* fp)
 {
   ASSERT(fp != NULL);
+  ASSERT(fp->upage != NULL);
 
   // Try to get a free slot (will PANIC if no free slot)
   struct swap_slot *slot = get_free_slot();
