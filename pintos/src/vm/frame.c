@@ -137,7 +137,6 @@ void frame_init(void) {
 /// If there is no more space in memory, evict a frame
 struct frame* allocate_frame(struct page_entry* upage) {
   // Allocate frame and get its kernel page address
-//  printf("Start allocate_frame(%x)\n", upage);
   struct frame *fp;
   uint8_t *kpage;
   void * uaddr;
@@ -147,26 +146,19 @@ struct frame* allocate_frame(struct page_entry* upage) {
   uaddr = (void*)((((uint32_t) uaddr) / PGSIZE) * PGSIZE);
 
   // Attempt to allocate a new frame
-//   printf("allocate_frame(%x): Trace 1\n", upage);
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-//   printf("allocate_frame(%x): Trace 2\n", upage);
   if (kpage == NULL) {
     // All physical addresses are used: evict a frame
-//     printf("allocate_frame(%x): Trace 3\n", upage);
     fp = evict_frame();
-//     printf("allocate_frame(%x): Trace 4\n", upage);
     kpage = fp->kpage;
     memset(kpage, 0, PGSIZE);
   }
   else {
-//     printf("allocate_frame(%x): Trace 5\n", upage);
     // We have space: register a new frame to track the address
     fp = malloc(sizeof(struct frame));
     list_push_back(&all_frames, &fp->elem);
-//     printf("allocate_frame(%x): Trace 6\n", upage);
   }
 
-//   printf("allocate_frame(%x): Trace 7\n", upage);
   // Set frame attributes
   fp->upage = upage;
   fp->kpage = kpage;
@@ -175,18 +167,16 @@ struct frame* allocate_frame(struct page_entry* upage) {
   fp->async_write = false;
 
   set_dirty(fp, false);
-//   printf("allocate_frame(%x): Trace 8\n", upage);
 
   // Update page entry attributes
   upage->frame = fp;
-//   printf("allocate_frame(%x): Trace 9\n", upage);
 
-//  printf("End allocate_frame(%x): Frame: %x, Upage: %x, Kpage: %x\n", upage, fp, fp->upage, fp->kpage);
   return fp;
 }
 
-bool install_frame(struct frame* fp, int writable) {
-//   printf("Start install_frame(%x, %d)\n", fp, writable);
+/// Map frame to process' page table
+bool install_frame(struct frame* fp, int writable)
+{
   bool success = false;
   if (fp != NULL) {
     struct thread *t = thread_current();
@@ -196,18 +186,14 @@ bool install_frame(struct frame* fp, int writable) {
     if (pagedir_get_page(t->pagedir, uaddr) == NULL)
     {
       if (pagedir_set_page(t->pagedir, uaddr, kpage, writable)) {
-//         printf("install_frame(): Mapped thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
         success = true;
       }
-//       else printf("page_set_page failed\n");
     }
-
-//     printf("install_frame(): success is: %d\n", success);
-//     printf("End install_frame(%x, %d)\n", fp, writable);
   }
   return success;
 }
 
+/// Remove frame from process' page table
 void free_frame(struct frame* fp)
 {
   // Remove page->frame mapping from the CPU-based page directory
@@ -218,7 +204,6 @@ void free_frame(struct frame* fp)
 
       if (pagedir_get_page(t->pagedir, uaddr) != NULL) {
         // Page is in memory and registered to this thread
-//         printf("free_frame(): Unmapping thread %x(%d) | page %x -/-> %x @ %x(%d) -/-> %x(%d)\n", t, t->tid, uaddr, fp->kpage, fp->upage, fp->upage->tid, fp, fp->tid);
         pagedir_clear_page(t->pagedir, uaddr);
       }
 
@@ -236,6 +221,13 @@ void free_frame(struct frame* fp)
 
 struct frame* evict_frame(void)
 {
+
+  /*************************************
+  **                                  **
+  **  USING SECOND CHANCE ALGORITHM   **
+  **                                  **
+  *************************************/
+
   enum intr_level old_level = intr_disable();
   if (clockhand == NULL || clockhand == list_end(&all_frames))
     clockhand = list_begin(&all_frames);
@@ -282,9 +274,6 @@ struct frame* evict_frame(void)
       fp->async_write = true;
     }
 
-//     printf("\nclockhand: %x, free: %d, readonly: %d, accessed: %d, dirty: %d, pinned: %d, revolution: %d, found: %d", clockhand, is_free(fp), is_readonly(fp), is_accessed(fp), is_dirty(fp), is_pinned(fp), revolution, found);
-//     printf("\nclockhand: %x, clockhand->next: %x, frame: %x, old_clockhand: %x, revolution: %d, found: %d", clockhand, clockhand->next, fp, old_clockhand, revolution, found);
-
     // Advance clockhand
     old_level = intr_disable();
     clockhand = list_next(clockhand);
@@ -314,7 +303,6 @@ struct frame* evict_frame(void)
     fp->upage = NULL;
   }
 
-//   printf("\tFRAME: %x", fp);
   return fp;
 }
 
