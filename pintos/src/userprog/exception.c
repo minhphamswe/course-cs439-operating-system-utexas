@@ -133,7 +133,6 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
-//   printf("Handling a page fault\n");
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -160,91 +159,80 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
-
-//   struct thread *t = thread_current();
-//   printf("page_fault: Thread %x(%d)\n", t, t->tid);
-//  printf("esp: %x\n", (uint32_t) f);
-
   if (not_present && write && !user) {
-//     printf("Handling page fault while loading.\n");
-    // Try to allocate more space
+    // System write: try to allocate more space if page not owned
     if (!load_page(fault_addr)) {
-//       printf("Failed to load page\n");
       extend_stack(f, fault_addr);
     }
   }
   else if (not_present && write && user) {
-//     printf("Handling page fault while allocating memory on stack.\n");
+    // User write: try to allocate more space if page not owned
     if (!load_page(fault_addr)) {
-//       printf("Failed to load page\n");
       extend_stack(f, fault_addr);
     }
   }
   else if (not_present && !write && !user) {
+    // System read: kill if page not owned
     if (!load_page(fault_addr)) {
-//       printf("%x does not belong to system process -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (not_present && !write && user) {
-    // Swap if available, crash otherwise
+    // User read: kill if page not owned
     if (!load_page(fault_addr)) {
-//       printf("%x does not belong to user thread %x(%d) -> KILL\n", fault_addr, thread_current(), thread_current()->tid);
       kill_process(f);
     }
   }
   else if (!not_present && !write && user) {
+    // User read access violation: kill if page not owned
     if (!load_page(fault_addr)) {
-//       printf("Attempted to read from address of another thread: %x -> KILL\n", fault_addr);
       kill_process(f);
     }
   }
   else if (!not_present && write && user) {
-//     printf("Attempted to write to address of another thread: %x -> KILL\n", fault_addr);
+    // User write access violation: kill unconditionally
     kill_process(f);
   }
   else {
-//     printf("Illegal access -> KILL\n");
+    // Illegal access: kill process
     kill_process(f);
   }
-//   printf("Returning to process\n");
-//   thread_yield();
   return;
 }
 
+/// Extend the stack from the faulting addres up to the base pointer of the faulting thread
+/// Called by page_fault
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
-//    printf("Start extend_stack(*f, %x)\n", fault_addr);
-//   printf("Start extend_stack(): Thread %x(%d) has %d pages\n", thread_current(), thread_current()->tid, list_size(&(thread_current()->pages)));
-
   uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
   uint32_t top = (((uint32_t) f->frame_pointer) / PGSIZE) * PGSIZE;
   uint32_t addr;
-  bool once = false;
+  bool success = false;
 
+  // Only one process should extend the stack at a time
   sema_down(&extend_sema);
+
   for (addr = bottom; addr < top ; addr += PGSIZE) {
+    // Obtain the page associated with the faulting address
     struct page_entry *entry = allocate_page((void*) addr);
-    //printf("extend_stack(): Thread %x(%d) with esp %x | page %x(%x) -> %x @ %x(%d) -> %x(%d)\n", t, t->tid, f->esp, entry->uaddr, fault_addr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid);
 
     if (!load_page_entry(entry)) {
-//       free_page_entry(entry);    // FIXME: leads to a triple fault
-//         printf("End load_segment(%x, %d, %x, %d, %d, %d)\n", file, ofs, upage, read_bytes, zero_bytes, writable);
       break;
     }
-    once = true;
+    success = true;
   }
   sema_up(&extend_sema);
-  if (!once) {
+
+  // If the extension fails, this is an access violation: kill process
+  if (!success) {
     kill_process(f);
   }
 }
 
+/// Kill a process
 static void
 kill_process (struct intr_frame *f)
 {
-  printf("Killing process...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
