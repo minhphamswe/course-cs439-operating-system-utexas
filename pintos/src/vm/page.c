@@ -193,6 +193,7 @@ bool load_page_entry(struct page_entry* entry) {
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
 
+    ASSERT(fp != NULL);
     if (is_swapped(entry)) {
 //       printf("A\n");
       // Page is swapped: swap it back into the free frame

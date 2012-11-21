@@ -187,15 +187,11 @@ struct frame* allocate_frame(struct page_entry* upage) {
 
 bool install_frame(struct frame* fp, int writable) {
 //   printf("Start install_frame(%x, %d)\n", fp, writable);
-  if (fp == NULL) {
-//     printf("install_frame(): Null frame pointer, returning false\n");
-    return false;
-  }
-  else {
+  bool success = false;
+  if (fp != NULL) {
     struct thread *t = thread_current();
     void *uaddr = fp->upage->uaddr;
     void *kpage = fp->kpage;
-    bool success = false;
 
     if (pagedir_get_page(t->pagedir, uaddr) == NULL)
     {
@@ -205,19 +201,11 @@ bool install_frame(struct frame* fp, int writable) {
       }
 //       else printf("page_set_page failed\n");
     }
-    else {
-//       printf("pagedir_get_page failed\n");
-      // Physical address is already allocated to some process:
-      // For now free frame & return false
-//       printf("install_frame(): Mapping thread %x(%d) | page %x -> %x @ %x(%d) -> %x(%d) FAILED!\n", t, t->tid, uaddr, kpage, fp->upage, fp->upage->tid, fp, fp->tid);
-//       free_frame(fp);   // FIXME: this may cause a PANIC;
-      success = false;
-    }
 
 //     printf("install_frame(): success is: %d\n", success);
 //     printf("End install_frame(%x, %d)\n", fp, writable);
-    return success;
   }
+  return success;
 }
 
 void free_frame(struct frame* fp)
