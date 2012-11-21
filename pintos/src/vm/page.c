@@ -98,25 +98,6 @@ void page_table_destroy(struct page_table *pt)
   intr_set_level(old_level);
 }
 
-void page_table_print_safe(struct page_table* pt)
-{
-  struct list_elem *e;
-  struct page_entry *entry;
-  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
-    entry = list_entry(e, struct page_entry, elem);
-  }
-}
-
-void page_table_print(struct page_table* pt)
-{
-  struct list_elem *e;
-  struct page_entry *entry;
-  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
-    entry = list_entry(e, struct page_entry, elem);
-  }
-}
-
-
 /**
  * Obtain a page to track a user page (specified by an address).
  * If the address already belong to another address, and the address is not
