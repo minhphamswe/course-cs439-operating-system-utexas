@@ -134,10 +134,11 @@ struct page_entry* allocate_page(void* uaddr)
   if (entry != NULL) {
     // This page is allocated: check if it is ours 
     // TODO: or our ancestor's code segment
-    if (entry->tid != t->tid) {
+    ASSERT(entry->tid == t->tid);
+//     if (entry->tid != t->tid) {
 //       printf("Page does not belong to the running process. TODO: check if it's parent's code segment.\n");
-      entry = NULL;
-    }
+//       entry = NULL;
+//     }
   }
   else if (!is_user_vaddr(uaddr) || uaddr == NULL) {
 //     printf("Address is not user address\n");
@@ -184,12 +185,12 @@ void free_page(void* uaddr)
 
 bool load_page_entry(struct page_entry* entry) {
   sema_down(&paging_sema);
-  printf("Start load_page_entry(%x)\n", entry);
-  printf("load_page_entry(%x): Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry, entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
+//   printf("Start load_page_entry(%x)\n", entry);
+//   printf("load_page_entry(%x): Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry, entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
   bool success = false;
 
   if (entry != NULL) {
-    printf("load_page_entry(%x): Trace 1\n", entry);
+//     printf("load_page_entry(%x): Trace 1\n", entry);
     ASSERT(!is_present(entry));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
@@ -203,7 +204,7 @@ bool load_page_entry(struct page_entry* entry) {
 
     // Page is in swap: Read it in
     if (is_swapped(entry)) {
-      printf("load_page_entry(%x): Trace 2\n", entry);
+//       printf("load_page_entry(%x): Trace 2\n", entry);
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
       success = install_frame(fp, entry->writable);
@@ -211,35 +212,35 @@ bool load_page_entry(struct page_entry* entry) {
 
     else if (is_in_fs(entry)) {
       // Page is in file system (probably code segment)
-      printf("load_page_entry(%x): Trace 3\n", entry);
+//       printf("load_page_entry(%x): Trace 3\n", entry);
 
       if (entry->read_bytes > 0) {
         // Page must be read in
-        printf("load_page_entry(%x): Trace 4\n", entry);
+//         printf("load_page_entry(%x): Trace 4\n", entry);
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
         int bytes_read = file_read(entry->file, fp->kpage,
                                    entry->read_bytes);
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
-          printf("load_page_entry(%x): Trace 5\n", entry);
+//           printf("load_page_entry(%x): Trace 5\n", entry);
           free_frame(fp);
         }
         else {
-          printf("load_page_entry(%x): Trace 6\n", entry);
+//           printf("load_page_entry(%x): Trace 6\n", entry);
           success = install_frame(fp, entry->writable);
         }
       }
       else {
         // Page doesn't need to be read in
-        printf("load_page_entry(%x): Trace 7\n", entry);
+//         printf("load_page_entry(%x): Trace 7\n", entry);
         success = install_frame(fp, entry->writable);
       }
     }
 
     // Otherwise page was allocated by extending the stack: just install it
     else {
-      printf("load_page_entry(%x): Trace 8\n", entry);
+//       printf("load_page_entry(%x): Trace 8\n", entry);
       success = install_frame(fp, entry->writable);
     }
 
@@ -247,7 +248,7 @@ bool load_page_entry(struct page_entry* entry) {
     unpin_frame(fp);
     intr_set_level(old_level);
   }
-  printf("load_page_entry(%x): Trace 9\n", entry);
+//   printf("load_page_entry(%x): Trace 9\n", entry);
   sema_up(&paging_sema);
   return success;
 }
@@ -261,11 +262,14 @@ _Bool load_page(void* uaddr) {
   // Make sure it's supposed to be there
   bool success = false;
   struct page_entry *entry = get_page_entry(uaddr);
+  struct thread *t = thread_current();
 
   if (entry != NULL) {
-    struct thread *t = thread_current();
 //     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
     success = load_page_entry(entry);
+  }
+  else {
+//     printf("load_page(): Loading thread %x(%d) | page (%x) NOT FOUND!\n", t, t->tid, uaddr);
   }
 
   return success;

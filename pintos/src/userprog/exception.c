@@ -135,7 +135,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
-  printf("Handling a page fault\n");
+//   printf("Handling a page fault\n");
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -162,7 +162,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
+//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
 //   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
@@ -238,7 +238,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
   }
 //   sema_up(&extend_sema);
   if (!once) {
-    printf("Extend stack failed\n");
+//     printf("Extend stack failed\n");
     kill_process(f);
   }
 }
