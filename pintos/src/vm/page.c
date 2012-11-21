@@ -86,7 +86,6 @@ void page_table_init(struct page_table *pt)
 /** Free all pages the page table points to. */
 void page_table_destroy(struct page_table *pt)
 {
-//   printf("Destroying page table\n");
   struct page_entry *entry;
   struct list_elem *e;
 
@@ -105,7 +104,6 @@ void page_table_print_safe(struct page_table* pt)
   struct page_entry *entry;
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
     entry = list_entry(e, struct page_entry, elem);
-//     printf("Address %x @ %x -> %x writable %d\n", entry->uaddr, entry, entry->frame, entry->writable);
   }
 }
 
@@ -115,7 +113,6 @@ void page_table_print(struct page_table* pt)
   struct page_entry *entry;
   for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
     entry = list_entry(e, struct page_entry, elem);
-//     printf("Address %x -> %x @ %x(%d) -> %x(%d) writable %d\n", entry->uaddr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid, entry->writable);
   }
 }
 
@@ -127,20 +124,16 @@ void page_table_print(struct page_table* pt)
  */
 struct page_entry* allocate_page(void* uaddr)
 {
-//   printf("Start allocate_page(%x)\n", uaddr);
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
 
   if (entry != NULL) {
     // This page is allocated: check if it is ours 
-    // TODO: or our ancestor's code segment
     if (entry->tid != t->tid) {
-//       printf("Page does not belong to the running process. TODO: check if it's parent's code segment.\n");
       entry = NULL;
     }
   }
   else if (!is_user_vaddr(uaddr) || uaddr == NULL) {
-//     printf("Address is not user address\n");
     entry = NULL;
   }
   else {
@@ -164,9 +157,6 @@ struct page_entry* allocate_page(void* uaddr)
     list_push_back(&(t->pages.pages), &entry->elem);
     intr_set_level(old_level);
   }
-
-//   printf("allocate_page() page %x @ %x\n", entry->uaddr, entry);
-//   printf("End allocate_page(%x)\n", uaddr);
   return entry;
 }
 
@@ -183,8 +173,6 @@ void free_page(void* uaddr)
 }
 
 bool load_page_entry(struct page_entry* entry) {
-//   printf("Start load_page_entry(%x)\n", entry);
-//   printf("Frame: %x, Swap: %x, File: %x, Offset: %x, Bytes: %d\n", entry->frame, entry->swap, entry->file, entry->offset, entry->read_bytes);
   bool success = false;
 
   if (entry != NULL) {
@@ -195,15 +183,12 @@ bool load_page_entry(struct page_entry* entry) {
 
     ASSERT(fp != NULL);
     if (is_swapped(entry)) {
-//       printf("A\n");
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
       success = install_frame(fp, entry->writable);
     }
 
     else if (is_in_fs(entry)) {
-//       printf("B\n");
-//       printf("File %x, bytes %d, offset %d\n", entry->file, entry->read_bytes, entry->offset);
       // Page is in the file system: read it in
       if (entry->read_bytes > 0) {
         file_seek(entry->file, entry->offset);
@@ -226,11 +211,9 @@ bool load_page_entry(struct page_entry* entry) {
     }
 
     else {
-//       printf("C\n");
       success = install_frame(fp, entry->writable);
     }
   }
-//   printf("End load_page_entry(%x)\n", entry);
   return success;
 }
 
@@ -239,14 +222,12 @@ bool load_page_entry(struct page_entry* entry) {
 /// it is (e.g. swap). Return false if the address does not belong to the
 /// process.
 _Bool load_page(void* uaddr) {
-//   printf("Start load_page(%x)\n", uaddr);
   // Make sure it's supposed to be there
   bool success = false;
   struct page_entry *entry = get_page_entry(uaddr);
 
   if (entry != NULL) {
     struct thread *t = thread_current();
-//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
     success = load_page_entry(entry);
   }
 
@@ -257,7 +238,6 @@ _Bool load_page(void* uaddr) {
 /// Return NULL if there is no such page.
 struct page_entry* get_page_entry(void* uaddr)
 {
-//   printf("Getting page entry\n");
   struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
   struct list_elem *e;
@@ -269,29 +249,27 @@ struct page_entry* get_page_entry(void* uaddr)
        e = list_next(e)) {
     struct page_entry *entry = list_entry(e, struct page_entry, elem);
     if (entry->uaddr == uaddr) {
-//       printf("get_page_entry(): Get thread %x(%d)| page %x @ %x(%d) \n", t, t->tid, uaddr, entry, entry->tid);
       intr_set_level(old_level);
       return entry;
     }
   }
   intr_set_level(old_level);
 
-//   printf("get_page_entry(): Get thread %x(%d) | page %x @ NULL \n", t, t->tid, uaddr);
   return NULL;
 }
 
 /// Free a page, and any frame it points to.
 void free_page_entry(struct page_entry* entry)
 {
-//   printf("Freeing page entry\n");
-  // TODO: free the frame the entry points to
   enum intr_level old_level = intr_disable();
 
   if (entry != NULL) {
     if (entry->frame != NULL) {
+      // free the frames the entry points to
       free_frame(entry->frame);
     }
     if (entry->swap != NULL) {
+      // free the swap slots the entry points to
       free_swap(entry->swap);
     }
     free(entry);
