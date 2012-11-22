@@ -335,6 +335,10 @@ struct frame* evict_frame(void)
 
   pin_frame(fp);
   if (fp->upage != NULL) {
+    // Unmap frame if the frame is being used
+    struct thread *victim = thread_by_tid(fp->tid);
+    pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
+
     // Write to swap space if the frame is dirty
     if (is_dirty(fp) || fp->async_write) {
       push_to_swap(fp);
@@ -343,10 +347,6 @@ struct frame* evict_frame(void)
 
     // Clear frame out to zero
     memset(fp->kpage, 0, PGSIZE);
-
-    // Unmap frame if the frame is being used
-    struct thread *victim = thread_by_tid(fp->tid);
-    pagedir_clear_page(victim->pagedir, fp->upage->uaddr);
 
     fp->upage->frame = NULL;
     fp->upage = NULL;
