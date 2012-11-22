@@ -69,8 +69,8 @@ page_fault() in "userprog/exception.c", needs to do roughly the following:
 
 #include <stdio.h>
 
-static struct semaphore filesys_sema;
-static struct semaphore paging_sema;
+static struct semaphore filesys_sema;   // Protect access to disks
+static struct semaphore paging_sema;    // Protect page loading
 
 void page_init(void ) {
   sema_init(&filesys_sema, 1);
@@ -86,7 +86,6 @@ void page_table_init(struct page_table *pt)
 /** Free all pages the page table points to. */
 void page_table_destroy(struct page_table *pt)
 {
-//   printf("Destroying page table\n");
   struct page_entry *entry;
   struct list_elem *e;
 
@@ -98,27 +97,6 @@ void page_table_destroy(struct page_table *pt)
   }
   intr_set_level(old_level);
 }
-
-void page_table_print_safe(struct page_table* pt)
-{
-  struct list_elem *e;
-  struct page_entry *entry;
-  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
-    entry = list_entry(e, struct page_entry, elem);
-//     printf("Address %x @ %x -> %x writable %d\n", entry->uaddr, entry, entry->frame, entry->writable);
-  }
-}
-
-void page_table_print(struct page_table* pt)
-{
-  struct list_elem *e;
-  struct page_entry *entry;
-  for (e = list_begin(&pt->pages); e != list_end(&pt->pages); e = list_next(e)) {
-    entry = list_entry(e, struct page_entry, elem);
-//     printf("Address %x -> %x @ %x(%d) -> %x(%d) writable %d\n", entry->uaddr, entry->frame->kpage, entry, entry->tid, entry->frame, entry->frame->tid, entry->writable);
-  }
-}
-
 
 /**
  * Obtain a page to track a user page (specified by an address).
@@ -132,7 +110,9 @@ struct page_entry* allocate_page(void* uaddr)
 
   if (entry != NULL) {
     // This page is allocated: check if it is ours 
-    ASSERT(entry->tid == t->tid);
+    if (entry->tid != t->tid) {
+      entry = NULL;
+    }
   }
   else if (!is_user_vaddr(uaddr) || uaddr == NULL) {
     entry = NULL;
@@ -160,7 +140,6 @@ struct page_entry* allocate_page(void* uaddr)
     list_push_back(&(t->pages.pages), &entry->elem);
     intr_set_level(old_level);
   }
-
   return entry;
 }
 
@@ -181,7 +160,6 @@ bool load_page_entry(struct page_entry* entry) {
   bool success = false;
 
   if (entry != NULL) {
-//     printf("load_page_entry(%x): Trace 1\n", entry);
     ASSERT(!is_present(entry));
     // First get a free frame to put it in
     struct frame *fp = allocate_frame(entry);
@@ -192,55 +170,47 @@ bool load_page_entry(struct page_entry* entry) {
     pin_frame(fp);
     intr_set_level(old_level);
 
-    ASSERT(fp != NULL);
-
     // Page is in swap: Read it in
     if (is_swapped(entry)) {
-//       printf("load_page_entry(%x): Trace 2\n", entry);
       // Page is swapped: swap it back into the free frame
       pull_from_swap(entry);
       success = install_frame(fp, entry->writable);
     }
 
     else if (is_in_fs(entry)) {
-      // Page is in file system (probably code segment)
-//       printf("load_page_entry(%x): Trace 3\n", entry);
-
+      // Page is in the file system: read it in
       if (entry->read_bytes > 0) {
         // Page must be read in
-//         printf("load_page_entry(%x): Trace 4\n", entry);
         file_seek(entry->file, entry->offset);
         sema_down(&filesys_sema);
         int bytes_read = file_read(entry->file, fp->kpage,
                                    entry->read_bytes);
         sema_up(&filesys_sema);
         if (bytes_read != entry->read_bytes) {
-//           printf("load_page_entry(%x): Trace 5\n", entry);
           free_frame(fp);
         }
         else {
-//           printf("load_page_entry(%x): Trace 6\n", entry);
           success = install_frame(fp, entry->writable);
         }
       }
       else {
         // Page doesn't need to be read in
-//         printf("load_page_entry(%x): Trace 7\n", entry);
         success = install_frame(fp, entry->writable);
       }
     }
 
     // Otherwise page was allocated by extending the stack: just install it
     else {
-//       printf("load_page_entry(%x): Trace 8\n", entry);
       success = install_frame(fp, entry->writable);
     }
 
+    // Done, unpin frame
     old_level = intr_disable();
-    unpin_frame(fp);
+    if (fp != NULL)
+      unpin_frame(fp);
     intr_set_level(old_level);
   }
-//   printf("load_page_entry(%x): Trace 9\n", entry);
+
   sema_up(&paging_sema);
   return success;
 }
@@ -250,18 +220,13 @@ bool load_page_entry(struct page_entry* entry) {
 /// it is (e.g. swap). Return false if the address does not belong to the
 /// process.
 _Bool load_page(void* uaddr) {
-//   printf("Start load_page(%x)\n", uaddr);
   // Make sure it's supposed to be there
   bool success = false;
   struct page_entry *entry = get_page_entry(uaddr);
   struct thread *t = thread_current();
 
   if (entry != NULL) {
-//     printf("load_page(): Loading thread %x(%d) | page %x (%x) @ %x(%d), writable: %d\n", t, t->tid, entry->uaddr, uaddr, entry, entry->tid, entry->writable);
     success = load_page_entry(entry);
-  }
-  else {
-//     printf("load_page(): Loading thread %x(%d) | page (%x) NOT FOUND!\n", t, t->tid, uaddr);
   }
 
   return success;
@@ -271,7 +236,6 @@ _Bool load_page(void* uaddr) {
 /// Return NULL if there is no such page.
 struct page_entry* get_page_entry(void* uaddr)
 {
-//   printf("Getting page entry\n");
   struct thread *t = thread_current();
   struct page_table *pt = &t->pages;
   struct list_elem *e;
@@ -283,29 +247,27 @@ struct page_entry* get_page_entry(void* uaddr)
        e = list_next(e)) {
     struct page_entry *entry = list_entry(e, struct page_entry, elem);
     if (entry->uaddr == uaddr) {
-//       printf("get_page_entry(): Get thread %x(%d)| page %x @ %x(%d) \n", t, t->tid, uaddr, entry, entry->tid);
       intr_set_level(old_level);
       return entry;
     }
   }
   intr_set_level(old_level);
 
-//   printf("get_page_entry(): Get thread %x(%d) | page %x @ NULL \n", t, t->tid, uaddr);
   return NULL;
 }
 
 /// Free a page, and any frame it points to.
 void free_page_entry(struct page_entry* entry)
 {
-//   printf("Freeing page entry\n");
-  // TODO: free the frame the entry points to
   enum intr_level old_level = intr_disable();
 
   if (entry != NULL) {
     if (entry->frame != NULL) {
+      // free the frames the entry points to
       free_frame(entry->frame);
     }
     if (entry->swap != NULL) {
+      // free the swap slots the entry points to
       free_swap(entry->swap);
     }
     free(entry);

@@ -37,7 +37,7 @@ static struct block* swap_block;
 static uint32_t swap_size;
 static uint32_t next_sector;
 
-struct list swap_list;
+static struct list swap_list;                      /// list of swap blocks
 
 /* Forward declaration for internal uses */
 struct swap_slot* get_free_slot(void);
@@ -47,58 +47,46 @@ void write_swap(struct swap_slot *slot);
 
 /** Initalize the swap system */
 void swap_init(void) {
-//   printf("Initializing swap\n");
   swap_block = block_get_role(BLOCK_SWAP);
   swap_size = (swap_block) ? block_size(swap_block) : 0;
   next_sector = 0;
   list_init(&swap_list);
 }
 
+/// Get a swap slot and write a frame to it
 bool push_to_swap(struct frame* fp)
 {
-//   printf("Start push_to_swap(%x)\n", fp);
   ASSERT(fp != NULL);
   ASSERT(fp->upage != NULL);
 
-//   printf("Next sector: %d\n", next_sector);
-//    printf("push_to_swap(%x): Trace 1\n", fp);
+  // Try to get a free slot (will PANIC if no free slot)
   struct swap_slot *slot = get_free_slot();
-//   printf("push_to_swap(%x): Trace 2\n", fp);
   if (slot) {
-//     printf("push_to_swap(%x): Trace 3\n", fp);
-
     // Track the swap slot
     slot->upage = fp->upage;
     slot->upage->swap = slot;
     slot->tid = slot->upage->tid;
 
     // Write data out onto the swap disk
-//      printf("push_to_swap(%x): Trace 4\n", fp);
     write_swap(slot);
-//      printf("push_to_swap(%x): Trace 5\n", fp);
 
     // Update the CPU-based page directory
     enum intr_level old_level = intr_disable();
     list_push_front(&swap_list, &slot->elem);
     intr_set_level(old_level);
-//      printf("push_to_swap(%x): Trace 6\n", fp);
   }
-//   printf("End push_to_swap(%x)\n", fp);
   return (slot != NULL);
 }
 
-/**
- * Read a frame from the swap space into main memory. Return false if the
- * frame cannot be found from the swap slots.
- */
+/// Read a frame from the swap space into main memory. Return false if the
+/// frame cannot be found from the swap slots.
 bool pull_from_swap(struct page_entry *upage)
 {
-//   printf("Start pull_from_swap(%x)\n", upage);
   ASSERT(upage != NULL);
 
+  // Obtain the slot associated with this page
   struct swap_slot *slot = get_swapped_page(upage);
   if (slot != NULL) {
-//     printf("Frame pull address: %x\n", slot->frame->kpage);
     // Read data in the swap slot into memory
     read_swap(slot);
 
@@ -114,10 +102,10 @@ bool pull_from_swap(struct page_entry *upage)
 
     intr_set_level(old_level);
   }
-//   printf("End pull_from_swap(%x)\n", upage);
   return (slot != NULL);
 }
 
+/// Discard the data in the swap slot, set the slot to free
 void free_swap(struct swap_slot* slot)
 {
   ASSERT(slot != NULL);
@@ -126,6 +114,7 @@ void free_swap(struct swap_slot* slot)
 
   if (slot != NULL) {
     if (slot->upage != NULL) {
+      // Remove the page <-> swap slot link
       slot->upage->swap = NULL;
       slot->upage = NULL;
 
@@ -141,10 +130,8 @@ void free_swap(struct swap_slot* slot)
 }
 
 
-/**
- * Return the pointer to a free swap slot. Return NULL if the swap disk is
- * full.
- */
+/// Return the pointer to a free swap slot. Return NULL if the swap disk is
+/// full.
 struct swap_slot* get_free_slot(void)
 {
   struct swap_slot *slot;
@@ -152,6 +139,7 @@ struct swap_slot* get_free_slot(void)
 
   enum intr_level old_level = intr_disable();
 
+  // Start from the end where free slots are more likely to be present
   e = list_tail(&swap_list)->prev;
 
   if (e != list_head(&swap_list) &&
@@ -176,6 +164,7 @@ struct swap_slot* get_free_slot(void)
   return slot;
 }
 
+/// Return a swap slot associated with a page. Return NULL if no such swap slot exists
 struct swap_slot* get_swapped_page(struct page_entry *upage)
 {
   struct list_elem *e;
@@ -185,6 +174,7 @@ struct swap_slot* get_swapped_page(struct page_entry *upage)
        e = list_next(e))
   {
     struct swap_slot *slot = list_entry(e, struct swap_slot, elem);
+    // Compare page pointers
     if (slot->upage && slot->upage == upage) {
       intr_set_level(old_level);
       return slot;
@@ -197,33 +187,26 @@ struct swap_slot* get_swapped_page(struct page_entry *upage)
 /** Read the disk sector into the frame; both are pointed to by SLOT.*/
 void read_swap(struct swap_slot* slot)
 {
-//printf("Read swap: %d\n", slot->sector);
   void *kpage = slot->upage->frame->kpage;
   int i;
-//   enum intr_level old_level = intr_disable();
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++)
     block_read(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
-//   intr_set_level*/(old_level);
 }
 
 /** Write the frame out into the disk sector; both are pointed to by SLOT.*/
 void write_swap(struct swap_slot* slot)
 {
-//   printf("Start write_swap(%x)\n", slot);
-//   printf("Upage: %x, Upage->UAddr: %x, Upage->Frame: %x, Upage->Frame->Kpage: %x\n", slot->upage, slot->upage->uaddr, slot->upage->frame, slot->upage->frame->kpage);
   void *kpage = slot->upage->frame->kpage;
   int i;
 
   for (i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
     block_write(swap_block, slot->sector + i, kpage + i * BLOCK_SECTOR_SIZE);
   }
-
-//    printf("End write_swap(%x)\n", slot);
 }
 
+/// Removing all swap slots belonging to the process id
 bool clean_swap(int tid)
 {
-//   printf("Start clean_swap(%d)\n", tid);
   struct list_elem *e;
   enum intr_level old_level = intr_disable();
 
@@ -234,7 +217,6 @@ bool clean_swap(int tid)
 
     // Check to see if we're done with the active slots
     if (slot->upage != NULL && slot->tid == tid) {
-//printf("Slot %d cleaned\n", slot->sector);
       // Clear the slot
       slot->tid = 0;
       slot->upage = NULL;
@@ -246,6 +228,5 @@ bool clean_swap(int tid)
   }
 
   intr_set_level(old_level);
-//   printf("End clean_swap(%d)\n", tid);
   return true;
 }

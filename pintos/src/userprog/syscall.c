@@ -57,7 +57,6 @@ static struct semaphore size_sema;
 */
 static int
 get_user (const uint32_t *uaddr) {
-  //  printf("Reading user address: %x\n", uaddr);
   if (uaddr < PHYS_BASE) {
     int result;
     asm ( "movl $1f, %0; movl %1, %0; 1:"
@@ -74,7 +73,6 @@ get_user (const uint32_t *uaddr) {
 */
 static bool
 put_user (uint8_t *udst, uint8_t byte) {
-  //  printf("Putting user address: %x\n", udst);
   if (udst < PHYS_BASE) {
     int error_code;
     asm ( "movl $1f, %0; movb %b2, %1; 1:"
@@ -305,7 +303,6 @@ void syscreate_handler(struct intr_frame *f)
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
     terminate_thread();
 
-//   printf("Thread %x(%d) ATTEMPTing to create file %s\n", thread_current(), thread_current()->tid, filename);
   sema_down(&create_sema);
   f->eax = filesys_create(filename, filesize);
   sema_up(&create_sema);
@@ -324,7 +321,6 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = pop_stack(f);
 
-//   printf("Thread %x(%d) ATTEMPTing to remove a file\n", thread_current(), thread_current()->tid);
   sema_down(&remove_sema);
   f->eax = filesys_remove(filename);
   sema_up(&remove_sema);
@@ -354,21 +350,16 @@ void sysopen_handler(struct intr_frame *f)
   char *file_name = pop_stack(f);
 
   if(file_name == NULL) {
-//     printf("File name is a null pointer.\n");
     terminate_thread();
   }
 
   // Open file
-//   printf("Thread %x(%d) ATTEMPTing to opening file %s\n", thread_current(), thread_current()->tid, file_name);
   sema_down(&open_sema);
-//   printf("Thread %x(%d) opening file %s\n", thread_current(), thread_current()->tid, file_name);
   struct file *file = filesys_open(file_name);
   sema_up(&open_sema);
-//   printf("Thread %x(%d) DONE opening file %s\n", thread_current(), thread_current()->tid, file_name);
 
   // File cannot be opened: return -1
   if (file == NULL) {
-//     printf("File %s failed to open\n", file_name);
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
@@ -384,7 +375,6 @@ void sysopen_handler(struct intr_frame *f)
 
     // return the file descriptor
     f->eax = newHandle->fd;
-//     printf("Thread %x(%d) SUCCESSFULLY opened file %s as file %d\n", thread_current(), thread_current()->tid, file_name, newHandle->fd);
   }
 }
 
@@ -400,7 +390,6 @@ void sysfilesize_handler(struct intr_frame *f)
 
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-//     printf("Thread %x(%d) ATTEMPTing to size a file\n", thread_current(), thread_current()->tid);
     sema_down(&size_sema);
     f->eax = file_length(fhp->file);
     sema_up(&size_sema);
@@ -452,10 +441,8 @@ void sysread_handler(struct intr_frame *f)
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
       sema_down(&read_sema);
-//       printf("Thread %x(%d) ATTEMPTing to read %d bytes from file %d to %x\n", thread_current(), thread_current()->tid, size, fd, buffer);
       f->eax = file_read(fhp->file, buffer, size);
       sema_up(&read_sema);
-//       printf("Thread %x(%d) DONE reading %d bytes from file %d to %x\n", thread_current(), thread_current()->tid, size, fd, buffer);
      }
     else {
       // File descriptor not found: return -1
@@ -501,21 +488,15 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
-//       printf("Thread %x(%d) ATTEMPTing to write %d bytes from %x to file %d\n", thread_current(), thread_current()->tid, bufferSize, buffer, fhp->fd);
-//      sema_down(&read_sema);
      sema_down(&write_sema);
       f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
      sema_up(&write_sema);
-//      sema_up(&read_sema);
-//       printf("Thread %x(%d) DONE writing %d bytes from %x to file %d\n", thread_current(), thread_current()->tid, bufferSize, buffer, fhp->fd);
      }
     else {
-//       printf("Write to file failed: Null handler\n");
       f->eax = -1;
     }
   }
   else {
-//     printf("Write to file failed: Invalid file descriptor\n");
     f->eax = -1;
   }
 }
@@ -543,7 +524,6 @@ void sysseek_handler(struct intr_frame *f)
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-//     printf("Thread %x(%d) ATTEMPTing to seek a file\n", thread_current(), thread_current()->tid);
     sema_down(&seek_sema);
     file_seek(fhp->file, newpos);
     sema_up(&seek_sema);
@@ -566,7 +546,6 @@ void systell_handler(struct intr_frame *f)
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
     // File descriptor found: read file
-//     printf("Thread %x(%d) ATTEMPTing to tell a file\n", thread_current(), thread_current()->tid);
     sema_down(&tell_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
     sema_up(&tell_sema);
@@ -597,14 +576,10 @@ void sysclose_handler(struct intr_frame *f)
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
-
-//       printf("Thread %x(%d) ATTEMPTing to close file %d\n", thread_current(), thread_current()->tid, fhp->fd);
       sema_down(&close_sema);
       file_close(fhp->file);
-//      printf("Thread %x(%d) closing file\n", thread_current(), thread_current()->tid);
       list_remove(e);
       sema_up(&close_sema);
-//       printf("Thread %x(%d) DONE closing file\n", thread_current(), thread_current()->tid);
       return;
     }
   }
@@ -691,7 +666,6 @@ struct fileHandle* get_handle(int fd)
 // Fails gracefully whenever a program does something bad
 void terminate_thread(void)
 {
-//   printf("Terminating thread ...\n");
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
