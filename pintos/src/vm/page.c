@@ -127,8 +127,6 @@ void page_table_print(struct page_table* pt)
  */
 struct page_entry* allocate_page(void* uaddr)
 {
-  ASSERT(uaddr != NULL);
-
   struct thread *t = thread_current();
   struct page_entry *entry = get_page_entry(uaddr);
 

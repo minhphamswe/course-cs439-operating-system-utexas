@@ -162,7 +162,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
+//   printf("not_present: %d\twrite: %d\tuser: %d\tfault_addr: %x\n", not_present, write, user, fault_addr);
 //   struct thread *t = thread_current();
 //   printf("page_fault: Thread %x(%d)\n", t, t->tid);
 //  printf("esp: %x\n", (uint32_t) f);
