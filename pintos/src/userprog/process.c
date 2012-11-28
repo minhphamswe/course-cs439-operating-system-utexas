@@ -21,13 +21,19 @@
 #include "threads/synch.h"
 #include "lib/kernel/list.h"
 #include <lib/user/syscall.h>
-
-#include "vm/page.h"
-#include "vm/frame.h"
-#include "vm/swap.h"
+#ifdef VM
+  #include "vm/page.h"
+  #include "vm/frame.h"
+  #include "vm/swap.h"
+#endif
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+
+#ifndef VM
+/* load() helpers. */
+static bool install_page (void *upage, void *kpage, bool writable);
+#endif
 
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
@@ -270,10 +276,11 @@ process_exit (void)
   }
   intr_set_level(old_level);
 
+#ifdef VM
   // Destroy the supplemental page table, which frees all pages and frames
   // in the process
-
   page_table_destroy(&cur->pages);
+#endif
 
   // Signal any waiting thread
   sema_up(&cur->wait_sema);      // signal before dying
@@ -609,10 +616,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+#ifdef VM
   uint64_t page_offset = 0;
 
-  file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0) {
+  file_seek(file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0)
+  {
     /* Calculate how to fill this page.
         We will read PAGE_READ_BYTES bytes from FILE
         and zero the final PAGE_ZERO_BYTES bytes. */
@@ -621,6 +630,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
     // Register a page under the current thread
     struct page_entry *entry = allocate_page(upage);
+
     if (entry == NULL)
       return false;
 
@@ -635,6 +645,45 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     upage += PGSIZE;
     page_offset += PGSIZE;
   }
+#else
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0)
+  {
+    /* Calculate how to fill this page.
+       We will read PAGE_READ_BYTES bytes from FILE
+       and zero the final PAGE_ZERO_BYTES bytes. */
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    /* Get a page of memory. */
+    uint8_t *kpage = palloc_get_page(PAL_USER);
+
+    if (kpage == NULL)
+      return false;
+
+    /* Load this page. */
+    if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes)
+    {
+      palloc_free_page(kpage);
+      return false;
+    }
+
+    memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+    /* Add the page to the process's address space. */
+    if (!install_page(upage, kpage, writable))
+    {
+      palloc_free_page(kpage);
+      return false;
+    }
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    upage += PGSIZE;
+  }
+#endif
+
   return true;
 }
 
@@ -644,6 +693,8 @@ static bool
 setup_stack (void **esp) 
 {
   bool success = false;
+
+#ifdef VM
   struct page_entry *entry = allocate_page(((uint8_t *) PHYS_BASE) - PGSIZE);
   success = load_page_entry(entry);
 
@@ -651,6 +702,39 @@ setup_stack (void **esp)
     *esp = PHYS_BASE;
   else
     printf("Setting up of the stack failed. In process.c/setup_stack()\n");
-
+#else
+  uint8_t *kpage;
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL)
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else
+        palloc_free_page (kpage);
+    }
+#endif
   return success;
 }
+
+#ifndef VM
+/* Adds a mapping from user virtual address UPAGE to kernel
+   virtual address KPAGE to the page table.
+   If WRITABLE is true, the user process may modify the page;
+   otherwise, it is read-only.
+   UPAGE must not already be mapped.
+   KPAGE should probably be a page obtained from the user pool
+   with palloc_get_page().
+   Returns true on success, false if UPAGE is already mapped or
+   if memory allocation fails. */
+static bool
+install_page (void *upage, void *kpage, bool writable)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+#endif

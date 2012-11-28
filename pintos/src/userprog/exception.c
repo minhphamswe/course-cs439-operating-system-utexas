@@ -5,10 +5,12 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-
-#include "vm/frame.h"
-#include "vm/page.h"
-#include "vm/swap.h"
+#include "lib/debug.h"
+#ifdef VM
+  #include "vm/frame.h"
+  #include "vm/page.h"
+  #include "vm/swap.h"
+#endif
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -156,6 +158,7 @@ page_fault (struct intr_frame *f)
   /* Count page faults. */
   page_fault_cnt++;
 
+#ifdef VM
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
@@ -199,13 +202,18 @@ page_fault (struct intr_frame *f)
     // Illegal access: kill process
     kill_process(f);
   }
-  return;
+#else
+  kill_process(f);
+#endif
 }
 
+#ifdef VM
 /// Extend the stack from the faulting addres up to the base pointer of the faulting thread
 /// Called by page_fault
 static void
 extend_stack (struct intr_frame *f, void *fault_addr) {
+  ASSERT(f != NULL);
+  ASSERT(f->frame_pointer != NULL);
   uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
   uint32_t top = (((uint32_t) f->frame_pointer) / PGSIZE) * PGSIZE;
   uint32_t addr;
@@ -230,6 +238,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
     kill_process(f);
   }
 }
+#endif
 
 /// Kill a process
 static void

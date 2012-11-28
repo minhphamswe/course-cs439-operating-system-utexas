@@ -17,10 +17,12 @@
 #include "threads/synch.h"
 #include <devices/timer.h>
 #ifdef USERPROG
-#include "userprog/process.h"
+  #include "userprog/process.h"
 #endif
 
-#include "vm/swap.h"
+#ifdef VM
+  #include "vm/swap.h"
+#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -296,7 +298,9 @@ thread_create (const char *name, int priority,
   es->status = 0;
   list_push_back(&exit_list, &es->exit_elem);
   list_push_back(&thread_current()->child_list, &es->child_elem);
+#ifdef VM
   page_table_init(&t->pages);
+#endif
 
   /* Re-enable interrupt */
   intr_set_level (old_level);
