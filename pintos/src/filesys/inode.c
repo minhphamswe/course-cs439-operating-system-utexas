@@ -62,7 +62,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
   if (pos < inode->data.length) {
-    uint16_t next_addr = inode.sector;
+    uint16_t next_addr = inode->sector;
     struct inode_disk data = inode->data;
     ASSERT(&data != &inode->data);
 
