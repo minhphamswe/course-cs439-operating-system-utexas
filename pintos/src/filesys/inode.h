@@ -21,8 +21,12 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
-uint16_t get_sector_address(inode_ptr ptr);
-bool block_exists(inode_ptr ptr);
+
+
+inode_ptr ptr_create(block_sector_t sector);
+block_sector_t ptr_get_address(inode_ptr *ptr);
+void ptr_set_exist(inode_ptr *ptr);
+bool ptr_exists(inode_ptr *ptr);
 
 
 #endif /* filesys/inode.h */

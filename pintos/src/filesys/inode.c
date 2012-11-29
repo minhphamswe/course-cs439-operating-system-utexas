@@ -16,22 +16,32 @@
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
 {
-  off_t length;                        /* File size in bytes. */
+  off_t length;                         /* File size in bytes. */
   unsigned magic;                       /* Magic number. */
 	inode_ptr blockptrs[NUM_SECTORS];	    /* Index of data pointers */
 	inode_ptr doubleptr;                  /* Pointer to next indirect inode */
 };
 
-// Whether or not the meta data says the pointer exists on disk
-bool block_exists(inode_ptr ptr)
+inode_ptr ptr_create(block_sector_t sector)
 {
-	return (ptr >> 15);
+  return (inode_ptr)(sector & 0x3FFF);
 }
 
 // Get disk sector address from inode ptr
-uint16_t get_sector_address(inode_ptr ptr)
+block_sector_t ptr_get_address(inode_ptr *ptr)
 {
-	return (ptr & 0x3FFF);
+  return (block_sector_t)((*ptr) & 0x3FFF);
+}
+
+void ptr_set_exist(inode_ptr *ptr)
+{
+  (*ptr) = (*ptr) | 0x8000;
+}
+
+// Whether or not the meta data says the pointer exists on disk
+bool ptr_exists(inode_ptr *ptr)
+{
+  return ((*ptr) >> 15);
 }
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -67,13 +77,13 @@ byte_to_sector (const struct inode *inode, off_t pos)
     ASSERT(&data != &inode->data);
 
     while (pos / BLOCK_SECTOR_SIZE > NUM_SECTORS) {
-      next_addr = get_sector_address(data.doubleptr);
+      next_addr = ptr_get_address(&data.doubleptr);
       block_read(fs_device, next_addr, &data);
       pos -= BLOCK_SECTOR_SIZE * NUM_SECTORS;
     }
 
     next_addr = data.blockptrs[pos/BLOCK_SECTOR_SIZE];
-    return (block_sector_t) get_sector_address(next_addr);
+    return (block_sector_t) ptr_get_address(&next_addr);
   }
   else
     return -1;
@@ -98,39 +108,117 @@ inode_init (void)
 bool
 inode_create (block_sector_t sector, off_t length)
 {
-  struct inode_disk *disk_inode = NULL;
-  bool success = false;
+  // Structure we will write to disk for main inode
+  printf("inode_create(%d, %d): Trace 1\n", sector, length);
+  struct inode_disk *main_inode = NULL;
 
   ASSERT (length >= 0);
 
-  /* If this assertion fails, the inode structure is not exactly
-     one sector in size, and you should fix that. */
-  ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
+  // If this assertion fails, the inode structure is not exactly
+  //   one sector in size, and you should fix that.
+  ASSERT (sizeof *main_inode == BLOCK_SECTOR_SIZE);
 
-  disk_inode = calloc (1, sizeof *disk_inode);
-  if (disk_inode != NULL)
+  main_inode = calloc (1, sizeof *main_inode);
+  printf("inode_create(%d, %d): Trace 2\n", sector, length);
+  if (main_inode != NULL)
+  {
+    printf("inode_create(%d, %d): Trace 3\n", sector, length);
+    size_t numSectors = bytes_to_sectors (length);
+    size_t numIndirects = numSectors / NUM_SECTORS;
+    size_t sectorsInBlock;  // Number of sectors left in this data block
+    
+    main_inode->length = length;
+    main_inode->magic = INODE_MAGIC;
+
+    block_sector_t mainAddress;
+    block_sector_t indirectAddress;
+    block_sector_t dataAddress;
+    block_sector_t currentAddress;
+    
+    struct inode_disk *current_inode = main_inode;
+    
+    block_write (fs_device, sector, main_inode);
+    
+    printf("inode_create(%d, %d): Trace 4\n", sector, length);
+    // First get the main inode for the file
+    if (free_map_allocate (1, &mainAddress))
     {
-      size_t sectors = bytes_to_sectors (length);
-      disk_inode->length = length;
-      disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start)) 
+      printf("inode_create(%d, %d): Trace 5\n", sector, length);
+      currentAddress = mainAddress;
+      
+      // If we will have indirects, go through those first.  All will be
+      // NUM_SECTORS in length
+      while (numIndirects > 0)
+      {
+        printf("inode_create(%d, %d): Trace 6\n", sector, length);
+        sectorsInBlock = 0;
+        numSectors -= NUM_SECTORS;
+        if (free_map_allocate(1, &indirectAddress))
         {
-          block_write (fs_device, sector, disk_inode);
-          if (sectors > 0) 
+          printf("inode_create(%d, %d): Trace 7\n", sector, length);
+          current_inode->doubleptr = ptr_create(indirectAddress);
+          ptr_set_exist(&current_inode->doubleptr);
+          while (sectorsInBlock < NUM_SECTORS)
+          {
+            printf("inode_create(%d, %d): Trace 8\n", sector, length);
+            if (free_map_allocate(1, &dataAddress))
             {
-              static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
-              
-              for (i = 0; i < sectors; i++) 
-                block_write (fs_device, disk_inode->start + i, zeros);
+              printf("inode_create(%d, %d): Trace 9\n", sector, length);
+              current_inode->blockptrs[sectorsInBlock] = ptr_create(dataAddress);
+              current_inode->blockptrs[sectorsInBlock] = ptr_create(dataAddress);
+              ptr_set_exist(&current_inode->blockptrs[sectorsInBlock]);
+              sectorsInBlock++;
             }
-          success = true; 
-        } 
-      free (disk_inode);
+            else
+            {
+              printf("inode_create(%d, %d): Trace 10\n", sector, length);
+              // Free all allocated pages
+              free (main_inode);
+              return false;
+            }
+          }
+        }
+        else
+        {
+          printf("inode_create(%d, %d): Trace 11\n", sector, length);
+          // Free all allocated pages
+          free (main_inode);
+          return false;
+        }
+        printf("inode_create(%d, %d): Trace 12\n", sector, length);
+        numIndirects--;
+        block_write (fs_device, currentAddress, current_inode);
+        currentAddress = indirectAddress;
+        printf("inode_create(%d, %d): Trace 13\n", sector, length);
+      }
+      // Have to go through one more time for the blocks in the last inode
+      sectorsInBlock = (numSectors < NUM_SECTORS) ? numSectors : NUM_SECTORS;
+      printf("inode_create(%d, %d): Trace 14\n", sector, length);
+      while (sectorsInBlock > 0)
+      {
+        printf("inode_create(%d, %d): Trace 15\n", sector, length);
+        if (free_map_allocate(1, &dataAddress))
+        {
+          printf("inode_create(%d, %d): Trace 16\n", sector, length);
+          current_inode->blockptrs[NUM_SECTORS - sectorsInBlock] = ptr_create(dataAddress);
+          ptr_set_exist(&current_inode->blockptrs[NUM_SECTORS - sectorsInBlock]);
+          sectorsInBlock--;
+        }
+        else
+        {
+          printf("inode_create(%d, %d): Trace 17\n", sector, length);
+          // Free all allocated pages
+          free (main_inode);
+          return false;
+        }
+      }
+      printf("inode_create(%d, %d): Trace 18\n", sector, length);
+      block_write (fs_device, currentAddress, current_inode);
     }
-  return success;
+  }
+  return true;
 }
-
+  
 /* Reads an inode from SECTOR
    and returns a `struct inode' that contains it.
    Returns a null pointer if memory allocation fails. */
@@ -195,20 +283,28 @@ inode_close (struct inode *inode)
 
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
-    {
-      /* Remove from inode list and release lock. */
-      list_remove (&inode->elem);
- 
-      /* Deallocate blocks if removed. */
-      if (inode->removed) 
-        {
-          free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
-        }
+  {
+    /* Remove from inode list and release lock. */
+    list_remove (&inode->elem);
 
-      free (inode); 
+    /* Deallocate blocks if removed. */
+    if (inode->removed) 
+    {
+      struct inode_disk current_data = inode->data;
+      block_sector_t current_addr = inode->sector;
+      inode_ptr next = current_data.doubleptr;
+
+      while (ptr_exists(&next)) {
+        free_map_release(current_addr, 1);
+
+        current_addr = ptr_get_address(&next);
+        block_read(fs_device, current_addr, &current_data);
+        next = current_data.doubleptr;
+      }
     }
+
+    free (inode); 
+  }
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -284,60 +380,79 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset) 
 {
+  printf("inode_write_at(%x, %x, %d, %d): Trace 1\n", inode, buffer_, size, offset);
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
   uint8_t *bounce = NULL;
 
-  if (inode->deny_write_cnt)
+  printf("inode_write_at(%x, %x, %d, %d): Trace 2\n", inode, buffer_, size, offset);
+  if (inode->deny_write_cnt) {
+    printf("inode_write_at(%x, %x, %d, %d): Trace 3\n", inode, buffer_, size, offset);
     return 0;
+  }
 
+  printf("inode_write_at(%x, %x, %d, %d): Trace 4\n", inode, buffer_, size, offset);
   while (size > 0) 
-    {
-      /* Sector to write, starting byte offset within sector. */
-      block_sector_t sector_idx = byte_to_sector (inode, offset);
-      int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+  {
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5\n", inode, buffer_, size, offset);
+    /* Sector to write, starting byte offset within sector. */
+    block_sector_t sector_idx = byte_to_sector (inode, offset);
+    int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
-      off_t inode_left = inode_length (inode) - offset;
-      int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
-      int min_left = inode_left < sector_left ? inode_left : sector_left;
+    /* Bytes left in inode, bytes left in sector, lesser of the two. */
+    off_t inode_left = inode_length (inode) - offset;
+    int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
+    int min_left = inode_left < sector_left ? inode_left : sector_left;
 
-      /* Number of bytes to actually write into this sector. */
-      int chunk_size = size < min_left ? size : min_left;
-      if (chunk_size <= 0)
-        break;
-
-      if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-        {
-          /* Write full sector directly to disk. */
-          block_write (fs_device, sector_idx, buffer + bytes_written);
-        }
-      else 
-        {
-          /* We need a bounce buffer. */
-          if (bounce == NULL) 
-            {
-              bounce = malloc (BLOCK_SECTOR_SIZE);
-              if (bounce == NULL)
-                break;
-            }
-
-          /* If the sector contains data before or after the chunk
-             we're writing, then we need to read in the sector
-             first.  Otherwise we start with a sector of all zeros. */
-          if (sector_ofs > 0 || chunk_size < sector_left) 
-            block_read (fs_device, sector_idx, bounce);
-          else
-            memset (bounce, 0, BLOCK_SECTOR_SIZE);
-          memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-          block_write (fs_device, sector_idx, bounce);
-        }
-
-      /* Advance. */
-      size -= chunk_size;
-      offset += chunk_size;
-      bytes_written += chunk_size;
+    /* Number of bytes to actually write into this sector. */
+    int chunk_size = size < min_left ? size : min_left;
+    if (chunk_size <= 0) {
+      printf("inode_write_at(%x, %x, %d, %d): Trace 6\n", inode, buffer_, size, offset);
+      break;
     }
+    if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
+    {
+      printf("inode_write_at(%x, %x, %d, %d): Trace 7\n", inode, buffer_, size, offset);
+      /* Write full sector directly to disk. */
+      block_write (fs_device, sector_idx, buffer + bytes_written);
+    }
+    else 
+    {
+      /* We need a bounce buffer. */
+      printf("inode_write_at(%x, %x, %d, %d): Trace 8\n", inode, buffer_, size, offset);
+      if (bounce == NULL) 
+      {
+        printf("inode_write_at(%x, %x, %d, %d): Trace 9\n", inode, buffer_, size, offset);
+        bounce = malloc (BLOCK_SECTOR_SIZE);
+        if (bounce == NULL) {
+          printf("inode_write_at(%x, %x, %d, %d): Trace 10\n", inode, buffer_, size, offset);
+          break;
+        }
+      }
+
+      /* If the sector contains data before or after the chunk
+         we're writing, then we need to read in the sector
+         first.  Otherwise we start with a sector of all zeros. */
+      if (sector_ofs > 0 || chunk_size < sector_left) {
+        printf("inode_write_at(%x, %x, %d, %d): Trace 11\n", inode, buffer_, size, offset);
+        block_read (fs_device, sector_idx, bounce);
+      }
+      else {
+        printf("inode_write_at(%x, %x, %d, %d): Trace 12\n", inode, buffer_, size, offset);
+        memset (bounce, 0, BLOCK_SECTOR_SIZE);
+      }
+      printf("inode_write_at(%x, %x, %d, %d): Trace 13\n", inode, buffer_, size, offset);
+      memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
+      block_write (fs_device, sector_idx, bounce);
+    }
+
+    printf("inode_write_at(%x, %x, %d, %d): Trace 14\n", inode, buffer_, size, offset);
+    /* Advance. */
+    size -= chunk_size;
+    offset += chunk_size;
+    bytes_written += chunk_size;
+  }
+  printf("inode_write_at(%x, %x, %d, %d): Trace 15\n", inode, buffer_, size, offset);
   free (bounce);
 
   return bytes_written;
@@ -367,5 +482,7 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
+  printf("inode_length(%x): Trace 1\n", inode);
+  printf("inode_length(%x): return %d\n", inode, inode->data.length);
   return inode->data.length;
 }
