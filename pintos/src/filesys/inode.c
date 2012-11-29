@@ -10,15 +10,29 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+#define NUM_SECTORS 250
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
-  {
-    block_sector_t start;               /* First data sector. */
-    off_t length;                       /* File size in bytes. */
-    unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
-  };
+{
+  off_t length;                        /* File size in bytes. */
+  unsigned magic;                       /* Magic number. */
+	inode_ptr blockptrs[NUM_SECTORS];	    /* Index of data pointers */
+	inode_ptr doubleptr;                  /* Pointer to next indirect inode */
+};
+
+// Whether or not the meta data says the pointer exists on disk
+bool block_exists(inode_ptr ptr)
+{
+	return (ptr >> 15);
+}
+
+// Get disk sector address from inode ptr
+uint16_t get_sector_address(inode_ptr ptr)
+{
+	return (ptr & 0x3FFF);
+}
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -47,8 +61,20 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  if (pos < inode->data.length) {
+    uint16_t next_addr = inode.sector;
+    struct inode_disk data = inode->data;
+    ASSERT(&data != &inode->data);
+
+    while (pos / BLOCK_SECTOR_SIZE > NUM_SECTORS) {
+      next_addr = get_sector_address(data.doubleptr);
+      block_read(fs_device, next_addr, &data);
+      pos -= BLOCK_SECTOR_SIZE * NUM_SECTORS;
+    }
+
+    next_addr = data.blockptrs[pos/BLOCK_SECTOR_SIZE];
+    return (block_sector_t) get_sector_address(next_addr);
+  }
   else
     return -1;
 }
@@ -192,7 +218,7 @@ inode_remove (struct inode *inode)
 {
   ASSERT (inode != NULL);
   inode->removed = true;
-}
+} 
 
 /* Reads SIZE bytes from INODE into BUFFER, starting at position OFFSET.
    Returns the number of bytes actually read, which may be less

@@ -68,14 +68,10 @@ filesys_open (const char *name)
 {
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
-// printf("Filesystem tracer 1 for file %s\n", name);
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-//   else
-//     printf("Directory is null\n");
     
   dir_close (dir);
-// printf("Filesystem tracer 2 for file %s\n", name);
   return file_open (inode);
 }
 

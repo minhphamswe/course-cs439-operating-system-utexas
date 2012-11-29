@@ -38,18 +38,7 @@ uint32_t pop_stack(struct intr_frame *f);
 struct fileHandle* get_handle (int fd);
 void terminate_thread(void);
 
-static struct semaphore create_sema;
-static struct semaphore remove_sema;
-
-static struct semaphore open_sema;
-static struct semaphore close_sema;
-
-static struct semaphore write_sema;
-static struct semaphore read_sema;
-static struct semaphore seek_sema;
-
-static struct semaphore tell_sema;
-static struct semaphore size_sema;
+static struct semaphore filesys_sema;
 
 /* Read 4 bytes at the user virtual address UADDR
 * UADDR must be below PHYS_BASE
@@ -105,19 +94,7 @@ void
 syscall_init (void)
 {
   // Initialize semaphore(s)
-  sema_init(&create_sema, 1);
-  sema_init(&remove_sema, 1);
-
-  sema_init(&open_sema, 1);
-  sema_init(&close_sema, 1);
-
-  sema_init(&write_sema, 1);
-  sema_init(&seek_sema, 1);
-
-  sema_init(&tell_sema, 1);
-  sema_init(&size_sema, 1);
-
-  sema_init(&read_sema, 1);
+  sema_init(&filesys_sema, 1);
 
   // Register handler
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -303,9 +280,9 @@ void syscreate_handler(struct intr_frame *f)
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
     terminate_thread();
 
-  sema_down(&create_sema);
+  sema_down(&filesys_sema);
   f->eax = filesys_create(filename, filesize);
-  sema_up(&create_sema);
+  sema_up(&filesys_sema);
 }
 
 /**
@@ -321,9 +298,9 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = pop_stack(f);
 
-  sema_down(&remove_sema);
+  sema_down(&filesys_sema);
   f->eax = filesys_remove(filename);
-  sema_up(&remove_sema);
+  sema_up(&filesys_sema);
 }
 
 /** Thread calls sysopen
@@ -354,9 +331,9 @@ void sysopen_handler(struct intr_frame *f)
   }
 
   // Open file
-  sema_down(&open_sema);
+  sema_down(&filesys_sema);
   struct file *file = filesys_open(file_name);
-  sema_up(&open_sema);
+  sema_up(&filesys_sema);
 
   // File cannot be opened: return -1
   if (file == NULL) {
@@ -390,9 +367,9 @@ void sysfilesize_handler(struct intr_frame *f)
 
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-    sema_down(&size_sema);
+    sema_down(&filesys_sema);
     f->eax = file_length(fhp->file);
-    sema_up(&size_sema);
+    sema_up(&filesys_sema);
   }
   else {
     f->eax -1;
@@ -440,9 +417,9 @@ void sysread_handler(struct intr_frame *f)
 
     struct fileHandle *fhp = get_handle(fd);
     if (fhp) {
-      sema_down(&read_sema);
+      sema_down(&filesys_sema);
       f->eax = file_read(fhp->file, buffer, size);
-      sema_up(&read_sema);
+      sema_up(&filesys_sema);
      }
     else {
       // File descriptor not found: return -1
@@ -488,9 +465,9 @@ void syswrite_handler(struct intr_frame *f)
 
     // Is the file currently executing?
     if (fhp != NULL) {
-     sema_down(&write_sema);
+     sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
-     sema_up(&write_sema);
+     sema_up(&filesys_sema);
      }
     else {
       f->eax = -1;
@@ -524,9 +501,9 @@ void sysseek_handler(struct intr_frame *f)
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
-    sema_down(&seek_sema);
+    sema_down(&filesys_sema);
     file_seek(fhp->file, newpos);
-    sema_up(&seek_sema);
+    sema_up(&filesys_sema);
   }
 
 }
@@ -546,9 +523,9 @@ void systell_handler(struct intr_frame *f)
   struct fileHandle *fhp = get_handle(fd);
   if (fhp) {
     // File descriptor found: read file
-    sema_down(&tell_sema);
+    sema_down(&filesys_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
-    sema_up(&tell_sema);
+    sema_up(&filesys_sema);
   }
   else {
     f->eax = -1;
@@ -576,10 +553,10 @@ void sysclose_handler(struct intr_frame *f)
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
     // File descriptor found: read file
     if (fhp->fd == fd) {
-      sema_down(&close_sema);
+      sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
-      sema_up(&close_sema);
+      sema_up(&filesys_sema);
       return;
     }
   }
