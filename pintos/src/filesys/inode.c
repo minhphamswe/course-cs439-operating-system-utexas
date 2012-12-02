@@ -71,6 +71,9 @@ bool ptr_exists(const inode_ptr *ptr);
 struct inode *allocate_inode(void);
 // Return the disk address of the next inode (if it exists, otherwise -1)
 block_sector_t get_next_addr(struct inode *node);
+// Return the inode that contains byte offset POS within INODE.
+// Return NULL there is no such inode.
+static struct inode* byte_to_inode(const struct inode *inode, off_t pos);
 
 //======[ Methods to Set/Query Attributes of inode_ptr ]=====================
 
@@ -184,6 +187,44 @@ bytes_to_sectors(off_t size)
   return DIV_ROUND_UP(size, BLOCK_SECTOR_SIZE);
 }
 
+// Return the inode that contains byte offset POS within INODE.
+// Return NULL there is no such inode.
+static struct inode*
+byte_to_inode(const struct inode *inode, off_t pos)
+{
+  printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
+  ASSERT(inode != NULL);
+
+  printf("byte_to_inode(%x, %d): Trace 1.5\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
+
+  if (pos < inode->data.file_length)
+  {
+    printf("byte_to_inode(%x, %d): Trace 2\n", inode, pos);
+    // If this check failed, we passed POS at some point -> doubly-linked list?
+    ASSERT(pos >= inode->data.prev_length);
+
+    printf("byte_to_inode(%x, %d): Trace 2.5\n", inode, pos);
+    // Calculate the local byte offset position that would correspond to POS
+    off_t local_pos = pos - inode->data.prev_length;
+
+    struct inode *node;
+    if (local_pos < BYTE_CAPACITY)
+    { // This is one of ours
+      return inode;
+    }
+    else
+    { // Not ours. Go bother the next guy.
+      node = inode_open(ptr_get_address(&inode->data.doubleptr));
+      return byte_to_inode(node, pos);
+    }
+  }
+  else
+  {
+    printf("byte_to_inode(%x, %d): Trace 5 EXIT return NULL\n", inode, pos);
+    return NULL;
+  }
+}
+
 /* Returns the block device sector that contains byte offset POS within INODE.
    Returns -1 if INODE does not contain data for a byte at offset POS. */
 static block_sector_t
@@ -192,32 +233,19 @@ byte_to_sector(const struct inode *inode, off_t pos)
   printf("byte_to_sector(%x, %d): Trace 1\n", inode, pos);
   ASSERT(inode != NULL);
 
-  printf("byte_to_sector(%x, %d): Trace 1.5\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
+  struct inode *node = byte_to_inode(inode, pos);
 
-  if (pos < inode->data.file_length)
+  if (node != NULL)
   {
     printf("byte_to_sector(%x, %d): Trace 2\n", inode, pos);
-    // If this check failed, we passed POS at some point -> doubly-linked list?
-    ASSERT(pos >= inode->data.prev_length);
 
-    printf("byte_to_sector(%x, %d): Trace 2.5\n", inode, pos);
     // Calculate the local byte offset position that would correspond to POS
     off_t local_pos = pos - inode->data.prev_length;
 
-    struct inode *node;
     inode_ptr addr;
-    if (local_pos < BYTE_CAPACITY)
-    { // This is one of ours
-      addr = inode->data.blockptrs[local_pos/BLOCK_SECTOR_SIZE];
-      printf("byte_to_sector(%x, %d): Trace 4 EXIT return %d\n", inode, pos, ptr_get_address(&addr));
-      return ptr_get_address(&addr);
-    }
-    else
-    { // Not ours. Go bother the next guy.
-      addr = inode->data.doubleptr;
-      node = inode_open(ptr_get_address(&addr));
-      return byte_to_sector(node, pos);
-    }
+    addr = inode->data.blockptrs[local_pos/BLOCK_SECTOR_SIZE];
+    printf("byte_to_sector(%x, %d): Trace 4 EXIT return %d\n", inode, pos, ptr_get_address(&addr));
+    return ptr_get_address(&addr);
   }
   else
   {
