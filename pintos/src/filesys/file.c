@@ -1,8 +1,10 @@
 #include "filesys/file.h"
-#include <debug.h>
 #include "filesys/inode.h"
-#include "threads/malloc.h"
 #include "filesys/filesys.h"
+
+#include "threads/malloc.h"
+
+#include "lib/debug.h"
 
 /* Opens a file for the given INODE, of which it takes ownership,
    and returns the new file.  Returns a null pointer if an
@@ -20,8 +22,6 @@ file_open (struct inode *inode)
     }
   else
     {
-//       if (inode == NULL) printf("No such file exists.\n");
-//       if (file == NULL) printf("Memory allocation error.\n");
       inode_close (inode);
       free (file);
       return NULL; 

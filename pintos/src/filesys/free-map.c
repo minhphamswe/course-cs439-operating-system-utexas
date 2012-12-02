@@ -40,7 +40,7 @@ free_map_allocate (size_t cnt, block_sector_t *sectorp)
     }
   if (sector != BITMAP_ERROR)
     *sectorp = sector;
-  printf("free_map_allocate(%d, %x): Trace 2 EXIT\treturn %d\n", cnt, sectorp, sector != BITMAP_ERROR);
+  printf("free_map_allocate(%d, %x): Trace 2 EXIT\tsector: %d, return %d\n", cnt, sectorp, sector, sector != BITMAP_ERROR);
   return sector != BITMAP_ERROR;
 }
 
@@ -79,6 +79,7 @@ free_map_close (void)
 void
 free_map_create (void) 
 {
+  printf("free_map_create(): Trace 1\n");
   /* Create inode. */
   if (!inode_create (FREE_MAP_SECTOR, bitmap_file_size (free_map)))
     PANIC ("free map creation failed");
