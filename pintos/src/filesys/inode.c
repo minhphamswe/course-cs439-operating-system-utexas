@@ -195,6 +195,8 @@ byte_to_inode(const struct inode *inode, off_t pos)
   printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
 //   ASSERT(inode != NULL);
 
+  printf("byte_to_inode(%x, %d): Trace 1.1 \t pos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
+
   if (inode != NULL && pos < inode->data.file_length)
   {
     printf("byte_to_inode(%x, %d): Trace 2\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
@@ -611,12 +613,12 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
   while (size > 0)
   {
-    printf("inode_write_at(%x, %x, %d, %d): Trace 5\n", inode, buffer_, size, offset);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.1\n", inode, buffer_, size, offset);
     /* Sector to write, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
-    printf("inode_write_at(%x, %x, %d, %d): Trace 5.2\n", inode, buffer_, size, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-    printf("inode_write_at(%x, %x, %d, %d): Trace 5.5\n", inode, buffer_, size, offset);
+    
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.2 \t sector_idx: %d, sector_ofs: %d\n", inode, buffer_, size, offset, sector_idx, sector_ofs);
     /* Bytes left in inode, bytes left in sector, lesser of the two. */
     off_t inode_left = inode_length(inode) - offset;
     int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
@@ -625,7 +627,8 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
     /* Number of bytes to actually write into this sector. */
     int chunk_size = size < min_left ? size : min_left;
 
-    printf("inode_write_at(%x, %x, %d, %d): Trace 5.9\n", inode, buffer_, size, offset);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.3 \t inode_left: %d, sector_left: %d\n", inode, buffer_, size, offset, inode_left, sector_left);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.4 \t min_left: %d, chunk_size: %d\n", inode, buffer_, size, offset, min_left, chunk_size);
 
     if (chunk_size <= 0)
     {
@@ -635,7 +638,7 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
     if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
     {
-      printf("inode_write_at(%x, %x, %d, %d): Trace 7\n", inode, buffer_, size, offset);
+      printf("inode_write_at(%x, %x, %d, %d): Trace 7 \t sector_idx: %d, buffer + bytes_written: %x \n", inode, buffer_, size, offset, sector_idx, buffer + bytes_written);
       /* Write full sector directly to disk. */
       block_write(fs_device, sector_idx, buffer + bytes_written);
     }
