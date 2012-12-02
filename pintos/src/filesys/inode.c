@@ -193,13 +193,11 @@ static struct inode*
 byte_to_inode(const struct inode *inode, off_t pos)
 {
   printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
-  ASSERT(inode != NULL);
+//   ASSERT(inode != NULL);
 
-  printf("byte_to_inode(%x, %d): Trace 1.5\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
-
-  if (pos < inode->data.file_length)
+  if (inode != NULL && pos < inode->data.file_length)
   {
-    printf("byte_to_inode(%x, %d): Trace 2\n", inode, pos);
+    printf("byte_to_inode(%x, %d): Trace 2\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
     // If this check failed, we passed POS at some point -> doubly-linked list?
     ASSERT(pos >= inode->data.prev_length);
 
@@ -231,7 +229,7 @@ static block_sector_t
 byte_to_sector(const struct inode *inode, off_t pos)
 {
   printf("byte_to_sector(%x, %d): Trace 1\n", inode, pos);
-  ASSERT(inode != NULL);
+//   ASSERT(inode != NULL);
 
   struct inode *node = byte_to_inode(inode, pos);
 
@@ -513,12 +511,16 @@ inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset)
   while (size > 0)
   {
     printf("inode_read_at(%x, %x, %d, %d): Trace 3\tsize: %d\n", inode, buffer_, size, offset, size);
+//     struct inode *node = byte_to_inode(inode, offset);
+    
     /* Disk sector to read, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
+//     block_sector_t sector_idx = byte_to_sector(node, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
     /* Bytes left in inode, bytes left in sector, lesser of the two. */
     off_t inode_left = inode_length(inode) - offset;
+//     off_t inode_left = node->data.node_length - offset;
     int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
     int min_left = inode_left < sector_left ? inode_left : sector_left;
     printf("inode_read_at(%x, %x, %d, %d): Trace 4\tinode_left: %d, sector_left: %d\n", inode, buffer_, size, offset, inode_left, sector_left);
