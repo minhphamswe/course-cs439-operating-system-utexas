@@ -1,9 +1,11 @@
 #include "filesys/free-map.h"
-#include <bitmap.h>
-#include <debug.h>
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+
+#include "lib/kernel/bitmap.h"
+#include "lib/debug.h"
+#include "lib/stdio.h"
 
 static struct file *free_map_file;   /* Free map file. */
 static struct bitmap *free_map;      /* Free map, one bit per sector. */
@@ -27,6 +29,7 @@ free_map_init (void)
 bool
 free_map_allocate (size_t cnt, block_sector_t *sectorp)
 {
+  printf("free_map_allocate(%d, %x): Trace 1\n", cnt, sectorp);
   block_sector_t sector = bitmap_scan_and_flip (free_map, 0, cnt, false);
   if (sector != BITMAP_ERROR
       && free_map_file != NULL
@@ -37,6 +40,7 @@ free_map_allocate (size_t cnt, block_sector_t *sectorp)
     }
   if (sector != BITMAP_ERROR)
     *sectorp = sector;
+  printf("free_map_allocate(%d, %x): Trace 2 EXIT\treturn %d\n", cnt, sectorp, sector != BITMAP_ERROR);
   return sector != BITMAP_ERROR;
 }
 
@@ -44,6 +48,7 @@ free_map_allocate (size_t cnt, block_sector_t *sectorp)
 void
 free_map_release (block_sector_t sector, size_t cnt)
 {
+  printf("free_map_release(%d, %d): Trace 1\n", sector, cnt);
   ASSERT (bitmap_all (free_map, sector, cnt));
   bitmap_set_multiple (free_map, sector, cnt, false);
   bitmap_write (free_map, free_map_file);
@@ -53,6 +58,7 @@ free_map_release (block_sector_t sector, size_t cnt)
 void
 free_map_open (void) 
 {
+  printf("free_map_open(): Trace 1\tfile_open(inode_open(%d))\n", FREE_MAP_SECTOR);
   free_map_file = file_open (inode_open (FREE_MAP_SECTOR));
   if (free_map_file == NULL)
     PANIC ("can't open free map");
@@ -64,6 +70,7 @@ free_map_open (void)
 void
 free_map_close (void) 
 {
+  printf("free_map_close(): Trace 1\tfile_close(%x)\n", free_map_file);
   file_close (free_map_file);
 }
 
