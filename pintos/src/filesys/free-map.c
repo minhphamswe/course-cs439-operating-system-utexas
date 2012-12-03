@@ -12,7 +12,7 @@ static struct bitmap *free_map;      /* Free map, one bit per sector. */
 
 /* Initializes the free map. */
 void
-free_map_init (void) 
+free_map_init (void)
 {
   free_map = bitmap_create (block_size (fs_device));
   if (free_map == NULL)
@@ -29,18 +29,18 @@ free_map_init (void)
 bool
 free_map_allocate (size_t cnt, block_sector_t *sectorp)
 {
-  printf("free_map_allocate(%d, %x): Trace 1\n", cnt, sectorp);
+  // printf("free_map_allocate(%d, %x): Trace 1\n", cnt, sectorp);
   block_sector_t sector = bitmap_scan_and_flip (free_map, 0, cnt, false);
   if (sector != BITMAP_ERROR
       && free_map_file != NULL
       && !bitmap_write (free_map, free_map_file))
     {
-      bitmap_set_multiple (free_map, sector, cnt, false); 
+      bitmap_set_multiple (free_map, sector, cnt, false);
       sector = BITMAP_ERROR;
     }
   if (sector != BITMAP_ERROR)
     *sectorp = sector;
-  printf("free_map_allocate(%d, %x): Trace 2 EXIT\tsector: %d, return %d\n", cnt, sectorp, sector, sector != BITMAP_ERROR);
+  // printf("free_map_allocate(%d, %x): Trace 2 EXIT\tsector: %d, return %d\n", cnt, sectorp, sector, sector != BITMAP_ERROR);
   return sector != BITMAP_ERROR;
 }
 
@@ -48,7 +48,7 @@ free_map_allocate (size_t cnt, block_sector_t *sectorp)
 void
 free_map_release (block_sector_t sector, size_t cnt)
 {
-  printf("free_map_release(%d, %d): Trace 1\n", sector, cnt);
+  // printf("free_map_release(%d, %d): Trace 1\n", sector, cnt);
   ASSERT (bitmap_all (free_map, sector, cnt));
   bitmap_set_multiple (free_map, sector, cnt, false);
   bitmap_write (free_map, free_map_file);
@@ -56,9 +56,9 @@ free_map_release (block_sector_t sector, size_t cnt)
 
 /* Opens the free map file and reads it from disk. */
 void
-free_map_open (void) 
+free_map_open (void)
 {
-  printf("free_map_open(): Trace 1\tfile_open(inode_open(%d))\n", FREE_MAP_SECTOR);
+  // printf("free_map_open(): Trace 1\tfile_open(inode_open(%d))\n", FREE_MAP_SECTOR);
   free_map_file = file_open (inode_open (FREE_MAP_SECTOR));
   if (free_map_file == NULL)
     PANIC ("can't open free map");
@@ -68,18 +68,18 @@ free_map_open (void)
 
 /* Writes the free map to disk and closes the free map file. */
 void
-free_map_close (void) 
+free_map_close (void)
 {
-  printf("free_map_close(): Trace 1\tfile_close(%x)\n", free_map_file);
+  // printf("free_map_close(): Trace 1\tfile_close(%x)\n", free_map_file);
   file_close (free_map_file);
 }
 
 /* Creates a new free map file on disk and writes the free map to
    it. */
 void
-free_map_create (void) 
+free_map_create (void)
 {
-  printf("free_map_create(): Trace 1\n");
+  // printf("free_map_create(): Trace 1\n");
   /* Create inode. */
   if (!inode_create (FREE_MAP_SECTOR, bitmap_file_size (free_map)))
     PANIC ("free map creation failed");
