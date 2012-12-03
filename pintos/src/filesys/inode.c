@@ -101,7 +101,7 @@ void ptr_set_exist(inode_ptr *ptr)
 bool ptr_exists(const inode_ptr *ptr)
 {
   ASSERT(ptr != NULL);
-  return ((*ptr) >> 15);
+  return ((*ptr) & 0x8000);
 }
 
 //======[ Methods to Set/Query Attributes of inode ]=========================
@@ -195,11 +195,11 @@ byte_to_inode(const struct inode *inode, off_t pos)
   printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
 //   ASSERT(inode != NULL);
 
-  printf("byte_to_inode(%x, %d): Trace 1.1 \t pos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
+  printf("byte_to_inode(%x, %d): Trace 1.1 \t pos: %d, inode->data.file_length: %d, inode->data.prev_length: %d, inode->data.node_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length, inode->data.node_length);
 
   if (inode != NULL && pos < inode->data.file_length)
   {
-    printf("byte_to_inode(%x, %d): Trace 2\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length);
+    printf("byte_to_inode(%x, %d): Trace 2\tpos: %d, inode->data.file_length: %d, inode->data.prev_length: %d, inode->data.node_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length, inode->data.node_length);
     // If this check failed, we passed POS at some point -> doubly-linked list?
     ASSERT(pos >= inode->data.prev_length);
 
@@ -249,9 +249,9 @@ byte_to_sector(const struct inode *inode, off_t pos)
     printf("byte_to_sector(%x, %d): Trace 2\n", inode, pos);
 
     // Calculate the local byte offset position that would correspond to POS
-    off_t local_pos = pos - inode->data.prev_length;
+    off_t local_pos = pos - node->data.prev_length;
 
-    inode_ptr addr = inode->data.blockptrs[local_pos/BLOCK_SECTOR_SIZE];
+    inode_ptr addr = node->data.blockptrs[local_pos/BLOCK_SECTOR_SIZE];
     printf("byte_to_sector(%x, %d): Trace 3 \t local_pos: %d, addr: %x\n", inode, pos, local_pos, addr);
     if (ptr_exists(&addr)) {
       printf("byte_to_sector(%x, %d): Trace 4.1 EXIT return %d\n", inode, pos, ptr_get_address(&addr));
@@ -322,7 +322,7 @@ inode_create(block_sector_t sector, off_t length)
       // Update used file length of this node
       current_node->data.prev_length = length - bytes_left;
       current_node->data.file_length = length;
-      
+
       // Calculate the number of sectors this node will contain
       next_sector = 0;
 
@@ -352,13 +352,13 @@ inode_create(block_sector_t sector, off_t length)
           ptr_set_exist(&current_node->data.blockptrs[next_sector]);
 
           // Update used capacity of the current node
-          if (bytes_left < BYTE_CAPACITY) {
+          if (bytes_left < BLOCK_SECTOR_SIZE) {
             current_node->data.node_length += bytes_left;
             bytes_left = 0;
           }
           else {
-            current_node->data.node_length += BYTE_CAPACITY;
-            bytes_left -= BYTE_CAPACITY;
+            current_node->data.node_length += BLOCK_SECTOR_SIZE;
+            bytes_left -= BLOCK_SECTOR_SIZE;
           }
 
           // Update loop parameters
