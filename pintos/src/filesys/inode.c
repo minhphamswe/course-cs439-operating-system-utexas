@@ -9,6 +9,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 //======[ #define Macros ]===================================================
 
@@ -54,6 +55,7 @@ struct inode
   int deny_write_cnt;                 // 0: writes ok, >0: deny writes.
 
   struct inode_disk data;             // Inode content.
+  struct inode* next;                 // The subsequent inode struct pointer
 };
 
 //======[ Forward Declarations ]=============================================
@@ -73,7 +75,8 @@ struct inode *allocate_inode(void);
 block_sector_t get_next_addr(struct inode *node);
 // Return the inode that contains byte offset POS within INODE.
 // Return NULL there is no such inode.
-static struct inode* byte_to_inode(const struct inode *inode, off_t pos);
+static struct inode* byte_to_inode(struct inode *inode, off_t pos);
+struct inode* inode_extend(struct inode *head, uint32_t newSize);
 
 //======[ Methods to Set/Query Attributes of inode_ptr ]=====================
 
@@ -111,13 +114,13 @@ bool ptr_exists(const inode_ptr *ptr)
 // FIXME: this allocates memory for inode_disk twice
 struct inode *allocate_inode()
 {
-//   // printf("allocate_inode(): Trace 1\n");
+  // printf("allocate_inode(): Trace 1\n");
   struct inode_disk *data = calloc(1, sizeof(struct inode_disk));
 
   if (data == NULL)
   {
     // Out of memory: return NULL
-//     // printf("allocate_inode(): Trace 2 EXIT\tOut of memory - return %d\n", NULL);
+    // printf("allocate_inode(): Trace 2 EXIT\tOut of memory - return %d\n", NULL);
     return NULL;
   }
   else
@@ -157,6 +160,7 @@ struct inode *allocate_inode()
         node->removed = false;          // True if deleted, false otherwise.
         node->deny_write_cnt = false;   // 0: writes ok, >0: deny writes.
         node->data = *data;             // Inode content.
+        node->next = NULL;
 
         // And return
         // printf("allocate_inode(): Trace 5 EXIT\treturn %x\n", node);
@@ -190,8 +194,11 @@ bytes_to_sectors(off_t size)
 // Return the inode that contains byte offset POS within INODE.
 // Return NULL there is no such inode.
 static struct inode*
-byte_to_inode(const struct inode *inode, off_t pos)
+byte_to_inode(struct inode *inode, off_t pos)
 {
+  if(pos == -1)
+    return inode;
+
   // printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
 //   ASSERT(inode != NULL);
 
@@ -215,15 +222,17 @@ byte_to_inode(const struct inode *inode, off_t pos)
     }
     else
     { // Not ours. Go bother the next guy.
-      inode_ptr addr = inode->data.doubleptr;
-      if (ptr_exists(&addr)) {
-        node = inode_open(ptr_get_address(&addr));
+      if (inode->next != NULL) {
+        return byte_to_inode(inode->next, pos);
+      }
+      else if (ptr_exists(&inode->data.doubleptr)) {
         // printf("byte_to_inode(%x, %d): Trace 4.1 EXIT \t return byte_to_inode(%x, %d)\n", inode, pos, node, pos);
-        return byte_to_inode(node, pos);
+        inode->next = inode_open(ptr_get_address(&inode->data.doubleptr));
+        return byte_to_inode(inode->next, pos);
       }
       else {
-        // printf("byte_to_inode(%x, %d): Trace 4.1 EXIT \t return -1\n", inode, pos);
-        return -1;
+        // printf("byte_to_inode(%x, %d): Trace 4.2 EXIT \t return NULL\n", inode, pos);
+        return NULL;
       }
     }
   }
@@ -269,11 +278,14 @@ byte_to_sector(const struct inode *inode, off_t pos)
   }
 }
 
+static struct semaphore closing_sema;
+
 /* Initializes the inode module. */
 void
 inode_init(void)
 {
   list_init(&open_inodes);
+  sema_init(&closing_sema, 1);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -299,7 +311,7 @@ inode_create(block_sector_t sector, off_t length)
   // printf("inode_create(%d, %d): Trace 4\tmain_node: %x\n", sector, length, main_node);
 
   // Create as many inodes as we'll need to hold the bytes
-  while (bytes_left > 0)
+  while (bytes_left > 0 || (main_node == NULL))
   {
     // printf("inode_create(%d, %d): Trace 5\n", sector, length);
     current_node = allocate_inode();
@@ -374,6 +386,7 @@ inode_create(block_sector_t sector, off_t length)
 
       // Link the previous node to the current node
       if (prev_node != NULL) {
+        prev_node->next = current_node;
         prev_node->data.doubleptr = ptr_create(current_node->sector);
         ptr_set_exist(&prev_node->data.doubleptr);
       }
@@ -384,9 +397,8 @@ inode_create(block_sector_t sector, off_t length)
   }
 
   // printf("inode_create(%d, %d): Trace 13, main_node: %x\n", sector, length, main_node);
-  // Everything OK: Write main inode to disk, and reset its sector member
+  // Everything OK: Write main inode to disk
   block_write(fs_device, sector, &main_node->data);
-//   main_node->sector = sector;
 
   // printf("inode_create(%d, %d): Trace 14 EXIT return %d\n", sector, length, true);
   return true;
@@ -398,7 +410,7 @@ inode_create(block_sector_t sector, off_t length)
 struct inode *
 inode_open(block_sector_t sector)
 {
-  // printf("inode_open(%d): Trace 1\n", sector);
+   printf("inode_open(%d): Trace 1\n", sector);
   struct list_elem *e;
   struct inode *inode;
 
@@ -431,6 +443,7 @@ inode_open(block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  inode->next = NULL;
   block_read(fs_device, inode->sector, &inode->data);
 
   // printf("inode_open(%d): Trace 4 EXIT\treturn %x, inode->data.file_length: %d\n", sector, inode, inode->data.file_length);
@@ -465,37 +478,45 @@ inode_get_inumber(const struct inode *inode)
 void
 inode_close(struct inode *inode)
 {
-  // printf("inode_close(%x): Trace 1\n", inode);
+//  printf("inode_close(%d): Trace 1\n", inode->sector);
+
+/*  struct inode* head = inode;
+  block_write(fs_device, head->sector, &head->data);
+  while(ptr_exists(&head->data.doubleptr))
+  {
+    head = inode_open(ptr_get_address(&head->data.doubleptr));
+    block_write(fs_device, head->sector, &head->data);
+  }
+*/
 
   /* Ignore null pointer. */
   if (inode == NULL)
     return;
+    
+  ASSERT(inode->next != inode);    
 
-  // Close subsequent inodes as well
-  
-
+  // printf("inode_close(%x): Trace 2 \t inode->open_cnt: %d\n", inode, inode->open_cnt);
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
   {
+    // printf("inode_close(%x): Trace 3 \t inode->open_cnt: %d Releasing file.\n", inode, inode->open_cnt);
     /* Remove from inode list and release lock. */
     list_remove(&inode->elem);
 
+    sema_down(&closing_sema);
     /* Deallocate blocks if removed. */
     if (inode->removed)
     {
-      block_sector_t current_addr = inode->sector;
-      inode_ptr next = inode->data.doubleptr;
-
-      while (ptr_exists(&next))
-      {
-        free_map_release(current_addr, 1);
-
-        current_addr = ptr_get_address(&next);
-        block_read(fs_device, current_addr, &inode->data);
-        next = inode->data.doubleptr;
-      }
+      // TODO, Free data for entire file
+      free_map_release(inode->sector, 1);
     }
-
+    else {
+      // printf("inode_close(%x): Trace 4.2 \t writing file to disk\n", inode);
+//      block_write(fs_device, inode->sector, &inode->data);
+    }
+    sema_up(&closing_sema);
+    if (inode->next != NULL)
+      inode_close(inode->next);
     free(inode);
   }
 }
@@ -587,9 +608,7 @@ inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset)
 
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
-   less than SIZE if end of file is reached or an error occurs.
-   (Normally a write at end of file would extend the inode, but
-   growth is not yet implemented.) */
+   less than SIZE if an error occurs.nn */
 off_t
 inode_write_at(struct inode *inode, const void *buffer_, off_t size,
                off_t offset)
@@ -609,7 +628,10 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
     return 0;
   }
 
-  // printf("inode_write_at(%x, %x, %d, %d): Trace 4\n", inode, buffer_, size, offset);
+  // printf("inode_write_at(%x, %x, %d, %d): Trace 4 \t size: %d, offset: %d, size + offset: %d\n", inode, buffer_, size, offset, size, offset, size+offset);
+
+  if (size + offset > inode->data.file_length)
+    inode_extend(inode, size + offset);
 
   while (size > 0)
   {
@@ -719,4 +741,131 @@ inode_length(const struct inode *inode)
   // printf("inode_length(%x): Trace 1\n", inode);
   // printf("inode_length(%x): Trace 2 EXIT\treturn %d\n", inode, inode->data.file_length);
   return inode->data.file_length;
+}
+
+/* Extends the current file to be at least NEWSIZE bytes in length 
+   Returns inode of last data block */
+   
+struct inode*
+inode_extend(struct inode *head, uint32_t newSize)
+{
+  uint32_t currentSize = head->data.file_length;
+  uint32_t numCurBlocks = DIV_ROUND_UP(currentSize, BLOCK_SECTOR_SIZE);
+  uint32_t numNewBlocks = DIV_ROUND_UP(newSize, BLOCK_SECTOR_SIZE);
+  uint32_t numBlocksToCreate = numNewBlocks - numCurBlocks;
+  uint32_t bytes_left = newSize - currentSize;
+  uint32_t length = newSize > currentSize ? newSize : currentSize;
+  
+  // Get the last inode
+  // printf("inode_extend(%x, %d): trace 1.  CurrentSize = %u\n", head, newSize, currentSize);
+  struct inode *current_node = byte_to_inode(head, currentSize - 1);
+  struct inode *prev_node = current_node;
+  // printf("inode_extend(%x, %d): trace 2.\n", head, newSize);
+  
+  // Extend until no more blocks need to be added
+  while (numBlocksToCreate > 0)
+  {
+    numBlocksToCreate--;
+    // printf("inode_extend(%x, %d): trace 3.\n", head, newSize);
+    size_t next_sector;         // Next sector to allocate in current node
+    block_sector_t data_addr;   // Disk address of a data sector
+    
+    // Create as many inodes as we'll need to hold the bytes
+    while (bytes_left > 0)
+    {
+      // printf("inode_extend(%x, %d): trace 4.\n", head, newSize);
+      if (current_node == NULL)
+      { 
+        // printf("inode_extend(%x, %d): trace 5.\n", head, newSize);
+        current_node = allocate_inode();
+        current_node->data.prev_length = length - bytes_left;
+        current_node->data.file_length = length;
+        if (current_node == NULL) {
+          // printf("inode_extend(%x, %d): trace 6.\n", head, newSize);
+          // THIS WILL CAUSE A PROBLEM
+        }
+      }
+      else
+      { // Successfully allocated disk space for subsequent INODE
+        // Update used file length of this node
+        // printf("inode_extend(%x, %d): trace 7.\n", head, newSize);
+        current_node->data.file_length = length;
+
+        // Calculate the number of sectors this node will contain
+        next_sector = DIV_ROUND_UP(current_node->data.node_length, BLOCK_SECTOR_SIZE);
+
+        // Allocate space for the data blocks
+        while ((next_sector < NODE_CAPACITY) && (bytes_left > 0))
+        {
+          // printf("inode_extend(%x, %d): trace 8.\n", head, newSize);
+          if (!free_map_allocate(1, &data_addr))
+          {
+            // Free all allocated pages
+            // printf("inode_extend(%x, %d): trace 9.\n", head, newSize);
+            return current_node;
+          }
+          else
+          { // Successfully allocated disk space for DATA node
+            // printf("inode_extend(%x, %d): trace 10.\n", head, newSize);
+            // Write block of all zero to data sector
+            block_write(fs_device, data_addr, &zeros);
+
+            // Set the metadata for the DATA sector to existing
+            current_node->data.blockptrs[next_sector] = ptr_create(data_addr);
+            ptr_set_exist(&current_node->data.blockptrs[next_sector]);
+            // printf("inode_extend(%x, %d): trace 11.\n", head, newSize);
+            // Update used capacity of the current node
+            if (bytes_left < BLOCK_SECTOR_SIZE) {
+              // printf("inode_extend(%x, %d): trace 12.\n", head, newSize);
+              current_node->data.node_length += bytes_left;
+              bytes_left = 0;
+            }
+            else {
+              // printf("inode_extend(%x, %d): trace 13.\n", head, newSize);
+              current_node->data.node_length += BLOCK_SECTOR_SIZE;
+              bytes_left -= BLOCK_SECTOR_SIZE;
+            }
+
+            // Update loop parameters
+            next_sector++;
+          }
+        }
+        // printf("inode_extend(%x, %d): trace 14.\n", head, newSize);
+        // Write inode data to corresponding disk sector
+//        block_write(fs_device, current_node->sector, &current_node->data);
+        // printf("inode_extend(%x, %d): trace 15.\n", head, newSize);
+        // Link the previous node to the current node
+        if (prev_node != NULL && prev_node != current_node) {
+          // printf("inode_extend(%x, %d): trace 16.\n", head, newSize);
+          prev_node->next = current_node;
+          prev_node->data.doubleptr = ptr_create(current_node->sector);
+          ptr_set_exist(&prev_node->data.doubleptr);
+        }
+        // printf("inode_extend(%x, %d): trace 17.\n", head, newSize);
+        // Update loop parameters
+        prev_node = current_node;
+        current_node = NULL;
+      }
+    }
+  }
+  // printf("inode_extend(%x, %d): trace 18.\n", head, newSize);
+  if (newSize > head->data.file_length)
+  {
+    // printf("inode_extend(%x, %d): trace 19.1 \t head->data.file_length: %d.\n", head, newSize, head->data.file_length);
+    head->data.file_length = newSize;
+    // printf("inode_extend(%x, %d): trace 19.2 \t head->data.file_length: %d.\n", head, newSize, head->data.file_length);
+    while(ptr_exists(&head->data.doubleptr))
+    {
+      // printf("inode_extend(%x, %d): trace 19B. \t head: %x, head->sector: %x, head->data.doubleptr: %x\n", head, newSize, head, head->sector, head->data.doubleptr);
+      head = inode_open(ptr_get_address(&head->data.doubleptr));
+      head->data.file_length = newSize;
+    }
+    
+    if (prev_node->data.file_length - prev_node->data.prev_length < BYTE_CAPACITY)
+      prev_node->data.node_length = prev_node->data.file_length - prev_node->data.prev_length;
+    else
+      prev_node->data.node_length = BYTE_CAPACITY;
+  }
+  // printf("inode_extend(%x, %d): trace 20.\n", head, newSize);
+  return prev_node;
 }
