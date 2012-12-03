@@ -832,7 +832,7 @@ inode_extend(struct inode *head, uint32_t newSize)
         }
         // // printf("inode_extend(%x, %d): trace 14.\n", head, newSize);
         // Write inode data to corresponding disk sector
-//        block_write(fs_device, current_node->sector, &current_node->data);
+        block_write(fs_device, current_node->sector, &current_node->data);
         // // printf("inode_extend(%x, %d): trace 15.\n", head, newSize);
         // Link the previous node to the current node
         if (prev_node != NULL && prev_node != current_node) {
