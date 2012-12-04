@@ -1,6 +1,5 @@
 #include "filesys/inode.h"
 
-#include "lib/kernel/list.h"
 #include "lib/debug.h"
 #include "lib/round.h"
 #include "lib/string.h"
@@ -11,17 +10,6 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 
-//======[ #define Macros ]===================================================
-
-/* Identifies an inode. */
-#define INODE_MAGIC 0x494e4f44
-
-/* Number of sectors per inode */
-#define NODE_CAPACITY 246
-
-/* Number of bytes stored per inode (= NODE_CAPACITY * BLOCK_SECTOR_SIZE) */
-#define BYTE_CAPACITY 125952
-
 //======[ Global Definitions ]===============================================
 
 /* List of open inodes, so that opening a single inode twice
@@ -30,33 +18,6 @@ static struct list open_inodes;
 
 // A full block of all zeros
 static char zeros[BLOCK_SECTOR_SIZE];
-
-//======[ Struct Definitions ]===============================================
-
-/* On-disk inode.
-   Must be exactly BLOCK_SECTOR_SIZE bytes long. */
-struct inode_disk
-{
-  off_t file_length;                    // File length in bytes
-  off_t prev_length;                    // Combined length of previous inodes
-  off_t node_length;                    // Number of bytes used in this node
-  unsigned magic;                       // Magic number
-  inode_ptr blockptrs[NODE_CAPACITY];   // Index of data pointers
-  inode_ptr doubleptr;                  // Pointer to next indirect inode
-};
-
-/* In-memory inode. */
-struct inode
-{
-  struct list_elem elem;              // Element in inode list.
-  block_sector_t sector;              // Sector number of disk location.
-  int open_cnt;                       // Number of openers.
-  bool removed;                       // True if deleted, false otherwise
-  int deny_write_cnt;                 // 0: writes ok, >0: deny writes.
-
-  struct inode_disk data;             // Inode content.
-  struct inode* next;                 // The subsequent inode struct pointer
-};
 
 //======[ Forward Declarations ]=============================================
 // Create a node pointer from a sector number
@@ -105,6 +66,20 @@ bool ptr_exists(const inode_ptr *ptr)
 {
   ASSERT(ptr != NULL);
   return ((*ptr) & 0x8000);
+}
+
+// Set the pointer as being a directory file
+void set_is_dir(inode_ptr *ptr)
+{
+  ASSERT(ptr != NULL);
+  (*ptr) = (*ptr) | 0x4000;
+}
+
+// Return true if the meta data says the pointer is a directory file
+bool inode_is_dir(inode_ptr *ptr)
+{
+  ASSERT(ptr != NULL);
+  return ((*ptr) & 0x4000);
 }
 
 //======[ Methods to Set/Query Attributes of inode ]=========================

@@ -1,6 +1,5 @@
 #include "userprog/syscall.h"
-#include <stdio.h>
-#include <syscall-nr.h>
+
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -9,10 +8,15 @@
 
 #include "lib/kernel/list.h"
 #include "lib/string.h"
-#include <lib/syscall-nr.h>
+#include "lib/syscall-nr.h"
+#include "lib/stdio.h"
+
 #include "devices/shutdown.h"
 #include "userprog/process.h"
+
 #include "filesys/filesys.h"
+#include "filesys/file.h"
+#include "filesys/inode.h"
 
 // Forward declarations of functions
 static void syscall_handler (struct intr_frame *);
@@ -21,6 +25,7 @@ void syshalt_handler (struct intr_frame *f);
 void sysexit_handler (struct intr_frame *f);
 void sysexec_handler (struct intr_frame *f);
 void syswait_handler (struct intr_frame *f);
+
 void syscreate_handler (struct intr_frame *f);
 void sysremove_handler (struct intr_frame *f);
 void sysopen_handler (struct intr_frame *f);
@@ -32,6 +37,12 @@ void systell_handler (struct intr_frame *f);
 void sysclose_handler (struct intr_frame *f);
 void sysmmap_handler (struct intr_frame *f);
 void sysunmmap_handler (struct intr_frame *f);
+
+void syschdir_handler(struct intr_frame* f);
+void sysmkdir_handler(struct intr_frame* f);
+void sysreaddir_handler(struct intr_frame* f);
+void sysisdir_handler(struct intr_frame* f);
+void sysinumber_handler(struct intr_frame* f);
 
 uint32_t pop_stack(struct intr_frame *f);
 
@@ -155,6 +166,21 @@ syscall_handler (struct intr_frame *f)
     case SYS_MUNMAP:
       sysmunmap_handler(f);
       break;
+    case SYS_CHDIR:
+      syschdir_handler(f);
+      break;
+    case SYS_MKDIR:
+      sysmkdir_handler(f);
+      break;
+    case SYS_READDIR:
+      sysreaddir_handler(f);
+      break;
+    case SYS_ISDIR:
+      sysisdir_handler(f);
+      break;
+    case SYS_INUMBER:
+      sysinumber_handler(f);
+      break;                 
   }
 
   // Replace stack pointer back to where it was for the application
@@ -640,10 +666,99 @@ struct fileHandle* get_handle(int fd)
   return NULL;
 }
 
+
+/* Directory system calls */
+
+/* bool chdir (const char *dir) 
+   Changes the current working directory of the process to dir
+   which may be relative or absolute. Returns true if successful,
+   false on failure.
+*/
+
+void syschdir_handler(struct intr_frame* f)
+{
+  char *dir = pop_stack(f);
+
+  return NULL;
+}
+
+/* bool mkdir (const char *dir) 
+  Creates the directory named dir, which may be relative or absolute.
+  Returns true if successful, false on failure. Fails if dir already
+  exists or if any directory name in dir, besides the last, does not
+  already exist. That is, mkdir("/a/b/c") succeeds only if "/a/b"
+  already exists and "/a/b/c" does not.
+*/
+void sysmkdir_handler(struct intr_frame* f)
+{
+  char *dir = pop_stack(f);
+  return NULL;
+}
+
+/* bool readdir (int fd, char *name) 
+   Reads a directory entry from file descriptor fd, which must
+   represent a directory. If successful, stores the null-terminated
+   file name in name, which must have room for READDIR_MAX_LEN + 1
+   bytes, and returns true. If no entries are left in the directory,
+   returns false.
+
+   "." and ".." should not be returned by readdir.
+
+  If the directory changes while it is open, then it is acceptable
+  for some entries not to be read at all or to be read multiple times.
+  Otherwise, each directory entry should be read once, in any order.
+
+  READDIR_MAX_LEN is defined in "lib/user/syscall.h". If your file
+  system supports longer file names than the basic file system,
+  you should increase this value from the default of 14.
+*/
+void sysreaddir_handler(struct intr_frame* f)
+{
+
+  return NULL;
+}
+
+/* bool isdir (int fd) 
+   Returns true if fd represents a directory, false if it represents
+   an ordinary file. 
+*/
+void sysisdir_handler(struct intr_frame* f)
+{
+  int fd = pop_stack(f);
+  
+  struct fileHandle *fhp = get_handle(fd);
+  if (fhp != NULL) {
+    struct file *fp = fhp->file;
+    struct inode *ip = file_get_inode(fp);
+  
+    f->eax = inode_is_dir(&ip->data.this);
+  }
+}
+
+/* int inumber (int fd)
+   Returns the inode number of the inode associated with fd, which
+   may represent an ordinary file or a directory.
+   An inode number persistently identifies a file or directory.
+   It is unique during the file's existence. In Pintos, the sector
+   number of the inode is suitable for use as an inode number.
+*/
+void sysinumber_handler(struct intr_frame* f)
+{
+  int fd = pop_stack(f);
+  
+  struct fileHandle *fhp = get_handle(fd);
+  if (fhp != NULL) {
+    struct file *fp = fhp->file;
+    struct inode *ip = file_get_inode(fp);
+  
+    f->eax = inode_get_inumber(ip);
+  }
+}
+
+
 // Fails gracefully whenever a program does something bad
 void terminate_thread(void)
 {
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();
 }
-

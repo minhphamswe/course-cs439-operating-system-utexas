@@ -5,7 +5,9 @@
 #include "kernel/list.h"
 #include <stdint.h>
 #include "threads/synch.h"
+
 #include "filesys/file.h"
+#include "filesys/directory.h"
 
 #include "vm/page.h"
 
@@ -87,6 +89,13 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
+//======[ #define Macros ]===================================================
+
+/* Can only have 16 files in the OS for part 2 anyway */
+#define MAXOPENFILES 16
+
+//======[ Struct Definitions ]===============================================
+
 typedef struct priority_lock {
   struct lock* lock;
   struct thread* thread;                 /* Whose donation we are using */
@@ -109,8 +118,6 @@ struct exit_status {
   struct list_elem wait_elem;   /* insert into thread's list of waited pid */
   struct list_elem child_elem;  /* insert into thread's list of child pid */
 };
-
-#define MAXOPENFILES 16           /* Can only have 16 files in the OS for part 2 anyway */
 
 struct thread
 {
@@ -152,6 +159,9 @@ struct thread
   struct page_table pages;
 
   int nextFD;                     /* The next file, increment */
+  
+  /* Keep track of current directory */
+  struct dir *pwd;
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */

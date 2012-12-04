@@ -155,6 +155,12 @@ process_execute (const char *file_name)
   // Check if the thread loaded properly
   struct thread *child = thread_by_tid(tid);
   if (child) {
+    /* Initialize present working directory as the root */
+    if (thread_current()->pwd == NULL)
+      child->pwd = dir_open_root();
+    else
+      child->pwd = thread_current()->pwd;
+  
     // Thread has not yet exited: wait for status of load
     sema_down(&child->exec_sema);
 
