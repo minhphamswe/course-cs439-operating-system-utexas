@@ -100,3 +100,25 @@ do_format (void)
   free_map_close ();
   printf ("done.\n");
 }
+
+
+/* Changes the current working directory of the process to dir
+   which may be relative or absolute. Returns true if successful,
+   false on failure. */
+struct dir *filesys_chdir(const char *dirname)
+{
+
+}
+
+/* Creates the directory named dir, which may be relative or absolute.
+   Returns true if successful, false on failure. Fails if dir already
+   exists or if any directory name in dir, besides the last, does not
+   already exist. That is, mkdir("/a/b/c") succeeds only if "/a/b"
+   already exists and "/a/b/c" does not. */
+struct dir *filesys_mkdir(const char *dirname)
+{
+//   struct inode *inode = inode_create (sector, 1 * sizeof (struct dir_entry));
+//     set_is_dir(&inode->data.this);
+//     return inode;
+//   return inode_create(sector, entry_cnt *sizeof(struct dir_entry));
+}
