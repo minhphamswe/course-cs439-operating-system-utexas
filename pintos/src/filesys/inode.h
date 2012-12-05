@@ -15,10 +15,10 @@ struct bitmap;
 #define INODE_MAGIC 0x494e4f44
 
 /* Number of sectors per inode */
-#define NODE_CAPACITY 246
+#define NODE_CAPACITY 2
 
 /* Number of bytes stored per inode (= NODE_CAPACITY * BLOCK_SECTOR_SIZE) */
-#define BYTE_CAPACITY 125952
+#define BYTE_CAPACITY (BLOCK_SECTOR_SIZE * NODE_CAPACITY)
 
 typedef uint16_t inode_ptr;
 
@@ -32,9 +32,9 @@ struct inode_disk
   off_t prev_length;                    // Combined length of previous inodes
   off_t node_length;                    // Number of bytes used in this node
   inode_ptr this;                       // Pointer to myself, for reference
-  unsigned magic;                       // Magic number
+  uint32_t magic;                       // Magic number
+  inode_ptr doubleptr;                  // Pointer to next indirect inode  
   inode_ptr blockptrs[NODE_CAPACITY];   // Index of data pointers
-  inode_ptr doubleptr;                  // Pointer to next indirect inode
 };
 
 /* In-memory inode. */

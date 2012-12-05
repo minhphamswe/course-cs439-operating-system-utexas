@@ -160,7 +160,7 @@ process_execute (const char *file_name)
       child->pwd = dir_open_root();
     else
       child->pwd = thread_current()->pwd;
-  
+
     // Thread has not yet exited: wait for status of load
     sema_down(&child->exec_sema);
 

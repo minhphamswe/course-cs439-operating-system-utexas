@@ -180,7 +180,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_INUMBER:
       sysinumber_handler(f);
-      break;                 
+      break;
   }
 
   // Replace stack pointer back to where it was for the application
