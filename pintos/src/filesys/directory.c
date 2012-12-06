@@ -5,17 +5,24 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
-/* Creates a directory with space for ENTRY_CNT entries in the
-   given SECTOR.  Returns true if successful, false on failure. */
+/* Creates the root directory at the sector given.
+   Returns true if successful, false on failure. */
 bool
-dir_create(block_sector_t sector, size_t entry_cnt)
+dir_create_root(block_sector_t sector)
 {
-  /*  struct inode *inode = inode_create (sector, entry_cnt * sizeof (struct dir_entry));
-    set_is_dir(&inode->data.this);
-    return inode;
-  */
-  return inode_create(sector, entry_cnt * sizeof(struct dir_entry));
+  bool success = 0;
+  struct inode node;
+  success = inode_create(sector, BLOCK_SECTOR_SIZE);
+  node.data.file_length = 0;
+  node.data.prev_length = 0;
+  node.data.node_length = 0;
+  node.data.self = ptr_create(&node.sector);
+  node.data.magic = INODE_MAGIC;
+  node.data.doubleptr = NULL;
+  block_write(fs_device, sector, &node.data);
+  return success;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -23,6 +30,7 @@ dir_create(block_sector_t sector, size_t entry_cnt)
 struct dir *
 dir_open(struct inode *inode)
 {
+//  dir = dir_get_leaf(dir);
   struct dir *dir = calloc(1, sizeof *dir);
 
   if (inode != NULL && dir != NULL)
@@ -138,6 +146,8 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   off_t ofs;
   bool success = false;
 
+ // dir = dir_get_leaf(dir);
+
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
 
@@ -163,6 +173,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 
   /* Write slot. */
   e.in_use = true;
+  e.is_dir = false;
   strlcpy(e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
   success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
@@ -181,6 +192,8 @@ dir_remove(struct dir *dir, const char *name)
   struct inode *inode = NULL;
   bool success = false;
   off_t ofs;
+
+ // dir = dir_get_leaf(dir);
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
@@ -214,9 +227,11 @@ done:
    NAME.  Returns true if successful, false if the directory
    contains no more entries. */
 bool
-dir_readdir(struct dir *dir, char name[NAME_MAX + 1])
+dir_readdir(struct dir *dir, char *name)
 {
   struct dir_entry e;
+  
+ // dir = dir_get_leaf(dir);
 
   while (inode_read_at(dir->inode, &e, sizeof e, dir->pos) == sizeof e)
   {
@@ -230,4 +245,129 @@ dir_readdir(struct dir *dir, char name[NAME_MAX + 1])
   }
 
   return false;
+}
+
+
+/* Creates a directory that is not root at the given sector,
+   adds the new directory to the current working directory.
+   Returns true if successful, false if already exists, bad name, etc */
+bool
+dir_create(struct dir *dir, const char *name, block_sector_t sector)
+{
+  struct dir_entry e;
+  off_t ofs;
+  bool success = false;
+
+ // dir = dir_get_leaf(dir);
+
+  ASSERT(dir != NULL);
+  ASSERT(name != NULL);
+
+  /* Check NAME for validity. */
+  if (*name == '\0' || strlen(name) > NAME_MAX)
+    return false;
+
+  /* Check that NAME is not in use. */
+  if (lookup(dir, name, NULL, NULL))
+    goto done;
+
+  /* Set OFS to offset of free slot.
+     If there are no free slots, then it will be set to the
+     current end-of-file.
+
+     inode_read_at() will only return a short read at end of file.
+     Otherwise, we'd need to verify that we didn't get a short
+     read due to something intermittent such as low memory. */
+  for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e)
+    if (!e.in_use)
+      break;
+
+  /* Write slot. */
+  e.in_use = true;
+  e.is_dir = true;
+  strlcpy(e.name, name, sizeof e.name);
+  e.inode_sector = sector;
+  success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+
+  done:
+
+  if(success)
+  {
+    struct inode node;
+    success = inode_create(sector, BLOCK_SECTOR_SIZE);
+    node.data.file_length = 0;
+    node.data.prev_length = 0;
+    node.data.node_length = 0;
+    node.data.self = ptr_create(&node.sector);
+    node.data.magic = INODE_MAGIC;
+    node.data.doubleptr = NULL;
+    block_write(fs_device, sector, &node.data);
+  }
+  return success;
+}
+
+/* Go to a child directory from the current directory */
+struct dir *
+dir_child(struct dir *current, const char *child)
+{
+  struct dir_entry e;
+  struct dir *retdir;
+
+  ASSERT(current != NULL);
+  ASSERT(child != NULL);
+
+  if (lookup(current, child, &e, NULL))
+    retdir->inode = inode_open(e.inode_sector);
+  else
+    retdir->inode = NULL;
+    
+  if (!e.is_dir)
+    retdir->inode = NULL;
+
+  return retdir;
+}
+
+/* Strip string name to leaf directory starting at either cwd or root
+   return a struct dir */
+struct dir *
+dir_get_leaf(const char *name)
+{
+//   if(!is_thread(running_thread()))
+//     return dir_open_root();
+  char *tempname = calloc(1, 256 * sizeof(char)); 
+  char *token = calloc(1, 256 * sizeof(char));;
+  char *save_ptr;
+  struct dir *tmpdir;
+  struct dir *lastdir = tmpdir;
+  bool enddir;
+  struct thread *t = thread_current();
+
+  if(name == NULL)
+    return dir_open_root();
+
+  strlcpy(tempname, name, strlen(name));
+
+  if(tempname[0] == '/')        /* Absolute path name */
+    tmpdir = dir_open_root();
+
+//  strlcpy(&token, t->pwd[1], strlen(t->pwd) + 1);
+
+  if(tempname[strlen(tempname)] == '/')
+    enddir = true;
+  else
+    enddir = false;
+
+  for (token = strtok_r (tempname, '/', &save_ptr); token != NULL;
+       token = strtok_r (NULL, '/', &save_ptr)) {
+    lastdir = tmpdir;
+    tmpdir = dir_child(tmpdir, token);
+    if(tmpdir == NULL)
+      break;
+  }
+
+  if (enddir)
+    return tmpdir;
+  else
+    return lastdir;
 }

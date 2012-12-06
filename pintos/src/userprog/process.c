@@ -157,9 +157,9 @@ process_execute (const char *file_name)
   if (child) {
     /* Initialize present working directory as the root */
     if (thread_current()->pwd == NULL)
-      child->pwd = dir_open_root();
+      strlcpy(child->pwd, "/", 2);
     else
-      child->pwd = thread_current()->pwd;
+      strlcpy(child->pwd, thread_current()->pwd, strlen(thread_current()->pwd) + 1);
 
     // Thread has not yet exited: wait for status of load
     sema_down(&child->exec_sema);

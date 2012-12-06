@@ -6,6 +6,7 @@
 
 #include "filesys/off_t.h"
 #include "devices/block.h"
+#include "threads/synch.h"
 
 struct bitmap;
 
@@ -45,10 +46,13 @@ struct inode
   int open_cnt;                       // Number of openers.
   bool removed;                       // True if deleted, false otherwise
   int deny_write_cnt;                 // 0: writes ok, >0: deny writes.
+  struct semaphore extend_sema;
 
   struct inode_disk data;             // Inode content.
   struct inode* next;                 // The subsequent inode struct pointer
 };
+
+//======[ Forward Declarations ]=============================================
 
 void inode_init (void);
 bool inode_create (block_sector_t, off_t);
@@ -65,6 +69,28 @@ off_t inode_length (const struct inode *);
 
 void set_is_dir(inode_ptr *ptr);
 bool inode_is_dir(const inode_ptr *ptr);
+
+// Create a node pointer from a sector number
+inode_ptr ptr_create(block_sector_t sector);
+// Get disk sector address from inode ptr
+block_sector_t ptr_get_address(const inode_ptr *ptr);
+// Register the pointer as having data on disk
+void ptr_set_exist(inode_ptr *ptr);
+// Return true if the meta data says the pointer exists on disk
+bool ptr_exists(const inode_ptr *ptr);
+
+// Allocate a single new inode, along with its data. If ON_DISK is true, also
+// allocate space on disk for the inode.
+// Return the struct inode pointer if successful, NULL otherwise
+struct inode *allocate_inode(bool on_disk);
+// Return the disk address of the next inode (if it exists, otherwise -1)
+block_sector_t get_next_addr(struct inode *node);
+// Return the inode that contains byte offset POS within INODE.
+// Return NULL there is no such inode.
+static struct inode* byte_to_inode(struct inode *inode, off_t pos);
+
+bool inode_fill(struct inode *current_node, uint32_t *bytes_left, uint32_t length);
+struct inode* inode_extend_link(struct inode *prev_node, uint32_t bytes_left, uint32_t length);
 
 
 #endif /* filesys/inode.h */
