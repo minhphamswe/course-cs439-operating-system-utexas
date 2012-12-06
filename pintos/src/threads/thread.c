@@ -690,7 +690,7 @@ init_thread (struct thread *t, const char *name, int priority)
   intr_set_level(old_level);
   
   /* Initialize present working directory as the root */
-  t->pwd = NULL;
+  strlcpy(t->pwd, "/", 2);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -935,3 +935,4 @@ void thread_mark_waited(struct exit_status* es)
   list_push_front(&t->wait_list, &es->wait_elem);
   intr_set_level(old_level);
 }
+
