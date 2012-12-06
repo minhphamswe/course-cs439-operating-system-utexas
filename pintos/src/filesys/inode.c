@@ -972,6 +972,7 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
 bool
 inode_fill(struct inode *current_node, uint32_t *bytes_left)
 {
+  printf("inode_fill(%x, %x): Trace 1 \t current_node->data.file_length: %u, *bytes_left: %u", current_node->data.file_length, *bytes_left);
   ASSERT(current_node != NULL);
   ASSERT(bytes_left != NULL);
   // Calculate the number of sectors this node will contain
@@ -987,6 +988,7 @@ inode_fill(struct inode *current_node, uint32_t *bytes_left)
     if (!free_map_allocate(1, &data_addr))
     {
       // Free all allocated pages ??
+      printf("inode_fill(%x, %x): Trace 2 EXIT \t current_node->data.file_length: %u, *bytes_left: %u", current_node->data.file_length, *bytes_left);
       return false;
     }
     else
@@ -1018,5 +1020,6 @@ inode_fill(struct inode *current_node, uint32_t *bytes_left)
   }
 
   block_write(fs_device, current_node->sector, &current_node->data);
+  printf("inode_fill(%x, %x): Trace 3 EXIT \t current_node->data.file_length: %u, *bytes_left: %u", current_node->data.file_length, *bytes_left);
   return true;
 }
