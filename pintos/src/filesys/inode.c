@@ -77,7 +77,7 @@ bool ptr_exists(const inode_ptr *ptr)
 // Set the pointer as being a directory file
 void set_is_dir(inode_ptr *ptr)
 {
-  (ptr != NULL);
+  ASSERT(ptr != NULL);
   (*ptr) = (*ptr) | 0x4000;
 }
 
@@ -522,15 +522,15 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
   off_t bytes_written = 0;
   uint8_t *bounce = NULL;
 
-  // printf("inode_write_at(%x, %x, %d, %d): Trace 2\n", inode, buffer_, size, offset);
+//   printf("inode_write_at(%x, %x, %d, %d): Trace 2\n", inode, buffer_, size, offset);
 
   if (inode->deny_write_cnt)
   {
-    // printf("inode_write_at(%x, %x, %d, %d): Trace 3\n", inode, buffer_, size, offset);
+//     printf("inode_write_at(%x, %x, %d, %d): Trace 3\n", inode, buffer_, size, offset);
     return 0;
   }
 
-  // printf("inode_write_at(%x, %x, %d, %d): Trace 4 \t size: %d, offset: %d, size + offset: %d\n", inode, buffer_, size, offset, size, offset, size + offset);
+//   printf("inode_write_at(%x, %x, %d, %d): Trace 4 \t size: %d, offset: %d, size + offset: %d\n", inode, buffer_, size, offset, size, offset, size + offset);
 
 //   if (size + offset > inode->data.file_length)
 //     inode_extend(inode, size + offset);
@@ -587,7 +587,7 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
         if (bounce == NULL)
         {
-          // printf("inode_write_at(%x, %x, %d, %d): Trace 10\n", inode, buffer_, size, offset);
+//           printf("inode_write_at(%x, %x, %d, %d): Trace 10\n", inode, buffer_, size, offset);
           break;
         }
       }
@@ -619,7 +619,7 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
   }
 
   free(bounce);
-  // printf("inode_write_at(%x, %x, %d, %d): Trace 15 EXIT\n", inode, buffer_, size, offset);
+//   printf("inode_write_at(%x, %x, %d, %d): Trace 15 EXIT\n", inode, buffer_, size, offset);
   return bytes_written;
 }
 
