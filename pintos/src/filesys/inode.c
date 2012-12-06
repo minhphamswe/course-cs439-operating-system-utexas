@@ -180,7 +180,7 @@ byte_to_inode(struct inode *inode, off_t pos)
   // printf("byte_to_inode(%x, %d): Trace 1\n", inode, pos);
 //   ASSERT(inode != NULL);
 
-  // printf("byte_to_inode(%x, %d): Trace 1.1 \t pos: %d, inode->data.file_length: %d, inode->data.prev_length: %d, inode->data.node_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length, inode->data.node_length);
+  printf("byte_to_inode(%x, %d): Trace 1.1 \t pos: %d, inode->data.file_length: %d, inode->data.prev_length: %d, inode->data.node_length: %d\n", inode, pos, pos, inode->data.file_length, inode->data.prev_length, inode->data.node_length);
 
   if (inode != NULL && pos < inode->data.file_length)
   {
@@ -192,12 +192,10 @@ byte_to_inode(struct inode *inode, off_t pos)
     // Calculate the local byte offset position that would correspond to POS
     off_t local_pos = pos - inode->data.prev_length;
 
-    struct inode *node;
-
     if (local_pos < BYTE_CAPACITY)
     {
       // This is one of ours
-      // printf("byte_to_inode(%x, %d): Trace 3 EXIT \t return %x ONE OF OURS\n", inode, pos, inode);
+      printf("byte_to_inode(%x, %d): Trace 3 EXIT \t return %x ONE OF OURS\n", inode, pos, inode);
       return inode;
     }
     else
@@ -206,25 +204,26 @@ byte_to_inode(struct inode *inode, off_t pos)
       if (inode->next != NULL)
       {
         ASSERT(inode->next != inode);
+        printf("byte_to_inode(%x, %d): Trace 4.1 EXIT \t return byte_to_inode(%x, %d)\n", inode, pos, inode->next, pos);
         return byte_to_inode(inode->next, pos);
       }
       else if (ptr_exists(&inode->data.doubleptr))
       {
         ASSERT(inode->sector != ptr_get_address(&inode->data.doubleptr));
-        // printf("byte_to_inode(%x, %d): Trace 4.1 EXIT \t return byte_to_inode(%x, %d)\n", inode, pos, node, pos);
         inode->next = inode_open(ptr_get_address(&inode->data.doubleptr));
+        printf("byte_to_inode(%x, %d): Trace 4.1 EXIT \t return byte_to_inode(%x, %d)\n", inode, pos, inode->next, pos);
         return byte_to_inode(inode->next, pos);
       }
       else
       {
-        // printf("byte_to_inode(%x, %d): Trace 4.2 EXIT \t return NULL\n", inode, pos);
+        printf("byte_to_inode(%x, %d): Trace 4.2 EXIT \t return NULL\n", inode, pos);
         return NULL;
       }
     }
   }
   else
   {
-    // printf("byte_to_inode(%x, %d): Trace 5 EXIT return NULL\n", inode, pos);
+    printf("byte_to_inode(%x, %d): Trace 5 EXIT return NULL\n", inode, pos);
     return NULL;
   }
 }
@@ -251,18 +250,18 @@ byte_to_sector(const struct inode *inode, off_t pos)
 
     if (ptr_exists(&addr))
     {
-      // printf("byte_to_sector(%x, %d): Trace 4.1 EXIT return %d\n", inode, pos, ptr_get_address(&addr));
+      printf("byte_to_sector(%x, %d): Trace 4.1 EXIT return %d\n", inode, pos, ptr_get_address(&addr));
       return ptr_get_address(&addr);
     }
     else
     {
-      // printf("byte_to_sector(%x, %d): Trace 4.2 EXIT return -1\n", inode, pos);
+      printf("byte_to_sector(%x, %d): Trace 4.2 EXIT return -1\n", inode, pos);
       return -1;
     }
   }
   else
   {
-    // printf("byte_to_sector(%x, %d): Trace 5 EXIT return -1\n", inode, pos);
+    printf("byte_to_sector(%x, %d): Trace 5 EXIT return -1\n", inode, pos);
     return -1;
   }
 }
@@ -533,17 +532,26 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
   // printf("inode_write_at(%x, %x, %d, %d): Trace 4 \t size: %d, offset: %d, size + offset: %d\n", inode, buffer_, size, offset, size, offset, size + offset);
 
-  if (size + offset > inode->data.file_length)
-    inode_extend(inode, size + offset);
+//   if (size + offset > inode->data.file_length)
+//     inode_extend(inode, size + offset);
 
+  if (size + offset > inode->data.file_length) {
+    struct inode *tail_node = inode_extend_link(inode, size + offset);
+    if (tail_node == NULL)
+    {
+      return 0;
+    }
+  }
+
+  printf("inode_write_at(%x, %x, %d, %d): Trace 5\n", inode, buffer_, size, offset);
   while (size > 0)
   {
-    // printf("inode_write_at(%x, %x, %d, %d): Trace 5.1\n", inode, buffer_, size, offset);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.1\n", inode, buffer_, size, offset);
     /* Sector to write, starting byte offset within sector. */
     block_sector_t sector_idx = byte_to_sector(inode, offset);
     int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
-    // printf("inode_write_at(%x, %x, %d, %d): Trace 5.2 \t sector_idx: %d, sector_ofs: %d\n", inode, buffer_, size, offset, sector_idx, sector_ofs);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.2 \t sector_idx: %d, sector_ofs: %d\n", inode, buffer_, size, offset, sector_idx, sector_ofs);
     /* Bytes left in inode, bytes left in sector, lesser of the two. */
     off_t inode_left = inode_length(inode) - offset;
     int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
@@ -552,12 +560,12 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
     /* Number of bytes to actually write into this sector. */
     int chunk_size = size < min_left ? size : min_left;
 
-    // printf("inode_write_at(%x, %x, %d, %d): Trace 5.3 \t inode_left: %d, sector_left: %d\n", inode, buffer_, size, offset, inode_left, sector_left);
-    // printf("inode_write_at(%x, %x, %d, %d): Trace 5.4 \t min_left: %d, chunk_size: %d\n", inode, buffer_, size, offset, min_left, chunk_size);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.3 \t inode_left: %d, sector_left: %d\n", inode, buffer_, size, offset, inode_left, sector_left);
+    printf("inode_write_at(%x, %x, %d, %d): Trace 5.4 \t min_left: %d, chunk_size: %d\n", inode, buffer_, size, offset, min_left, chunk_size);
 
     if (chunk_size <= 0)
     {
-      // printf("inode_write_at(%x, %x, %d, %d): Trace 6\n", inode, buffer_, size, offset);
+      printf("inode_write_at(%x, %x, %d, %d): Trace 6\n", inode, buffer_, size, offset);
       break;
     }
 
@@ -642,7 +650,7 @@ off_t
 inode_length(const struct inode *inode)
 {
   // printf("inode_length(%x): Trace 1\n", inode);
-  // printf("inode_length(%x): Trace 2 EXIT\treturn %d\n", inode, inode->data.file_length);
+  printf("inode_length(%x): Trace 2 EXIT\treturn %d\n", inode, inode->data.file_length);
   return inode->data.file_length;
 }
 
@@ -882,7 +890,7 @@ inode_extend(struct inode *head, uint32_t new_size)
 struct inode *
 inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
 {
-  // printf("inode_extend_link(%x, %u): Trace 1\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 1\n", prev_node, bytes_left);
   ASSERT(prev_node != NULL);
 
   // Check if something went wrong trying to fill up PREV_NODE
@@ -890,14 +898,14 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
   {
     return NULL;
   }
-  // printf("inode_extend_link(%x, %u): Trace 2\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 2\n", prev_node, bytes_left);
 
   // Check if there's nothing more to allocate
   if (bytes_left <= 0)
   {
     return prev_node;
   }
-  // printf("inode_extend_link(%x, %u): Trace 3\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 3\n", prev_node, bytes_left);
   
   // Attempt to allocate a new node
   struct inode *current_node = allocate_inode(true);
@@ -907,7 +915,7 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
   {
     return NULL;
   }
-  // printf("inode_extend_link(%x, %u): Trace 4 \t current_node: %x\n", prev_node, bytes_left, current_node);
+  printf("inode_extend_link(%x, %u): Trace 4 \t current_node: %x\n", prev_node, bytes_left, current_node);
 
   // Successfully allocated disk space for subsequent INODE
   // Quick check against circularity
@@ -923,7 +931,7 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
     free(current_node);
     return NULL;
   }
-  // printf("inode_extend_link(%x, %u): Trace 5\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 5\n", prev_node, bytes_left);
 
   // Successfully filled up this node
   // Update lengths of this node
@@ -936,7 +944,7 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
     prev_node->data.doubleptr = ptr_create(current_node->sector);
     ptr_set_exist(&prev_node->data.doubleptr);
   }
-  // printf("inode_extend_link(%x, %u): Trace 6\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 6\n", prev_node, bytes_left);
 
   // Continue extending and linking
   struct inode *node = inode_extend_link(current_node, bytes_left);
@@ -951,7 +959,7 @@ inode_extend_link(struct inode *prev_node, uint32_t bytes_left)
 
     return NULL;
   }
-  // printf("inode_extend_link(%x, %u): Trace 7\n", prev_node, bytes_left);
+  printf("inode_extend_link(%x, %u): Trace 7\n", prev_node, bytes_left);
 
   // Everything is OK: finalize by writing to disk and return
   block_write(fs_device, prev_node->sector, &prev_node->data);
@@ -999,8 +1007,9 @@ inode_fill(struct inode *current_node, uint32_t *bytes_left)
       }
       else
       {
-        current_node->data.node_length = (sector_idx + 1) * BLOCK_SECTOR_SIZE;
-        *bytes_left -= BLOCK_SECTOR_SIZE;
+        uint32_t diff = (sector_idx + 1) * BLOCK_SECTOR_SIZE - current_node->data.node_length;
+        current_node->data.node_length += diff;
+        *bytes_left -= diff;
       }
 
       // Update loop parameters
@@ -1008,5 +1017,6 @@ inode_fill(struct inode *current_node, uint32_t *bytes_left)
     }
   }
 
+  block_write(fs_device, current_node->sector, &current_node->data);
   return true;
 }
