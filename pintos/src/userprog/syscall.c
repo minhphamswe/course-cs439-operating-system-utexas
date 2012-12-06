@@ -692,7 +692,11 @@ void syschdir_handler(struct intr_frame* f)
 void sysmkdir_handler(struct intr_frame* f)
 {
   char *dir = pop_stack(f);
-  return NULL;
+  
+  bool success;
+  success = filesys_create_dir(dir);
+  
+  f->eax = success;
 }
 
 /* bool readdir (int fd, char *name) 

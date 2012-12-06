@@ -15,7 +15,7 @@ struct bitmap;
 #define INODE_MAGIC 0x494e4f44
 
 /* Number of sectors per inode */
-#define NODE_CAPACITY 2
+#define NODE_CAPACITY 244
 
 /* Number of bytes stored per inode (= NODE_CAPACITY * BLOCK_SECTOR_SIZE) */
 #define BYTE_CAPACITY (BLOCK_SECTOR_SIZE * NODE_CAPACITY)

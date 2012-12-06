@@ -6,16 +6,22 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 
-/* Creates a directory with space for ENTRY_CNT entries in the
-   given SECTOR.  Returns true if successful, false on failure. */
+/* Creates the root directory at the sector given.
+   Returns true if successful, false on failure. */
 bool
-dir_create(block_sector_t sector, size_t entry_cnt)
+dir_create_root(block_sector_t sector)
 {
-  /*  struct inode *inode = inode_create (sector, entry_cnt * sizeof (struct dir_entry));
-    set_is_dir(&inode->data.this);
-    return inode;
-  */
-  return inode_create(sector, entry_cnt * sizeof(struct dir_entry));
+  bool success = 0;
+  struct inode node;
+  success = inode_create(sector, BLOCK_SECTOR_SIZE);
+  node.data.file_length = 0;
+  node.data.prev_length = 0;
+  node.data.node_length = 0;
+  node.data.this = &node;
+  node.data.magic = INODE_MAGIC;
+  node.data.doubleptr = NULL;
+  block_write(fs_device, sector, &node.data);
+  return success;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -230,4 +236,61 @@ dir_readdir(struct dir *dir, char name[NAME_MAX + 1])
   }
 
   return false;
+}
+
+
+/* Creates a directory that is not root at the given sector,
+   adds the new directory to the current working directory.
+   Returns true if successful, false if already exists, bad name, etc */
+bool
+dir_create(struct dir *dir, const char *name, block_sector_t sector)
+{
+  struct dir_entry e;
+  off_t ofs;
+  bool success = false;
+
+  ASSERT(dir != NULL);
+  ASSERT(name != NULL);
+
+  /* Check NAME for validity. */
+  if (*name == '\0' || strlen(name) > NAME_MAX)
+    return false;
+
+  /* Check that NAME is not in use. */
+  if (lookup(dir, name, NULL, NULL))
+    goto done;
+
+  /* Set OFS to offset of free slot.
+     If there are no free slots, then it will be set to the
+     current end-of-file.
+
+     inode_read_at() will only return a short read at end of file.
+     Otherwise, we'd need to verify that we didn't get a short
+     read due to something intermittent such as low memory. */
+  for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e)
+    if (!e.in_use)
+      break;
+
+  /* Write slot. */
+  e.in_use = true;
+  strlcpy(e.name, name, sizeof e.name);
+  e.inode_sector = sector;
+  success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+
+done:
+
+  if(success)
+  {
+    struct inode node;
+    success = inode_create(sector, BLOCK_SECTOR_SIZE);
+    node.data.file_length = 0;
+    node.data.prev_length = 0;
+    node.data.node_length = 0;
+    node.data.this = &node;
+    node.data.magic = INODE_MAGIC;
+    node.data.doubleptr = NULL;
+    block_write(fs_device, sector, &node.data);
+  }
+  return success;
 }
