@@ -731,7 +731,7 @@ void sysisdir_handler(struct intr_frame* f)
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
   
-    f->eax = inode_is_dir(&ip->data.this);
+    f->eax = inode_is_dir(&ip->data.self);
   }
 }
 

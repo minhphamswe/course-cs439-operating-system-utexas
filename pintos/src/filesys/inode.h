@@ -15,7 +15,7 @@ struct bitmap;
 #define INODE_MAGIC 0x494e4f44
 
 /* Number of sectors per inode */
-#define NODE_CAPACITY 2
+#define NODE_CAPACITY 244
 
 /* Number of bytes stored per inode (= NODE_CAPACITY * BLOCK_SECTOR_SIZE) */
 #define BYTE_CAPACITY (BLOCK_SECTOR_SIZE * NODE_CAPACITY)
@@ -31,7 +31,7 @@ struct inode_disk
   off_t file_length;                    // File length in bytes
   off_t prev_length;                    // Combined length of previous inodes
   off_t node_length;                    // Number of bytes used in this node
-  inode_ptr this;                       // Pointer to myself, for reference
+  inode_ptr self;                       // Pointer to myself, for reference
   uint32_t magic;                       // Magic number
   inode_ptr doubleptr;                  // Pointer to next indirect inode  
   inode_ptr blockptrs[NODE_CAPACITY];   // Index of data pointers
@@ -64,7 +64,7 @@ void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
 void set_is_dir(inode_ptr *ptr);
-bool inode_is_dir(inode_ptr *ptr);
+bool inode_is_dir(const inode_ptr *ptr);
 
 
 #endif /* filesys/inode.h */
