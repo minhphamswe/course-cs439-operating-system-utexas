@@ -678,8 +678,11 @@ struct fileHandle* get_handle(int fd)
 void syschdir_handler(struct intr_frame* f)
 {
   char *dir = pop_stack(f);
-
-  return NULL;
+  bool success;
+  
+  success = dir_changedir(dir);
+  
+  f->eax = success;
 }
 
 /* bool mkdir (const char *dir) 

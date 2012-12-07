@@ -128,7 +128,11 @@ dir_lookup(const struct dir *dir, const char *name,
   ASSERT(name != NULL);
 
   if (lookup(dir, name, &e, NULL))
+  {
     *inode = inode_open(e.inode_sector);
+    if(e.is_dir)
+      inode_deny_write(*inode);
+  }
   else
     *inode = NULL;
 
@@ -309,23 +313,88 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   return success;
 }
 
+/* Change directory */
+bool
+dir_changedir(const char *name)
+{
+  // printf("dir_changedir(%s) Tracer 1\n", name);
+  // Valid looking name?
+  if(!is_valid_dirstring(name))
+    return false;
+
+  // printf("dir_changedir(%s) Tracer 2\n", name);
+  // Not pre-user threads at this point, get the thread
+  struct thread *t = thread_current();
+    
+  // Changing to root?
+  if(strlen(name) == 1 && name[0] == '/')
+  {
+    *t->pwd = '/';
+    return true;
+  }
+
+  char *temp[256];
+  strlcpy(temp, name, 256);
+  
+  // For get_leaf to work, directories must end in '/'
+  if(name[strlen(name) - 1] != '/')
+  { 
+    // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
+    strlcat(temp, "/", sizeof(temp));
+  }
+
+  // printf("dir_changedir(%s) Tracer 3\n", temp);
+  // Is the new directory valid?
+  // If it's root it would have already returned, so dir_get_leaf should
+  // return not root if valid, root otherwise
+  // Keep pwd the same
+  if(dir_get_leaf(temp)->inode == dir_open_root()->inode)
+  {
+    // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
+    return false;
+  }
+  // printf("dir_changedir(%s) Tracer 4\n", temp);
+  // Absolute path name?
+  if(temp[0] == '/') {
+    *t->pwd = temp;
+    // printf("dir_changedir(%s) Tracer 5\n", temp);
+  }
+  // Relative path name?
+  else {
+  // printf("dir_changedir(%s) Tracer 6\n", temp);  
+  strlcat(t->pwd, temp, sizeof(t->pwd));
+}
+  // printf("dir_changedir(%s) Tracer 7\n", temp);
+  return true;
+}
+
 /* Go to a child directory from the current directory */
 struct dir *
 dir_child(struct dir *current, const char *child)
 {
+  // printf("dir_child(%s) Tracer 1 \n", child);
   struct dir_entry e;
-  struct dir *retdir;
+  struct dir *retdir = calloc(1, sizeof(struct dir));
 
   ASSERT(current != NULL);
   ASSERT(child != NULL);
 
   if (lookup(current, child, &e, NULL))
+  {
+    // printf("dir_child(%s) Tracer 2 \n", child);
     retdir->inode = inode_open(e.inode_sector);
+  }
   else
+  {
+    // printf("dir_child(%s) Tracer 3 \n", child);
     retdir->inode = NULL;
+  }
     
   if (!e.is_dir)
+  {
     retdir->inode = NULL;
+    // printf("dir_child(%s) Tracer 4 \n", child);
+  }
 
   return retdir;
 }
@@ -335,10 +404,10 @@ dir_child(struct dir *current, const char *child)
 struct dir *
 dir_get_leaf(const char *name)
 {
-  //printf("dir_get_leaf(%s) Trace 1 \n", name);
+  // printf("dir_get_leaf(%s) Trace 1 \n", name);
   if(name == NULL || !is_valid_dirstring(name))
     return dir_open_root();
-    
+  // printf("dir_get_leaf(%s) Trace 2 \n", name);  
   char *tempname = calloc(1, 256 * sizeof(char)); 
   char *token = calloc(1, 256 * sizeof(char));;
   char *save_ptr;
@@ -346,27 +415,38 @@ dir_get_leaf(const char *name)
   struct dir *lastdir = tmpdir;
   bool enddir;
   struct thread *t = thread_current();
-
-  strlcpy(tempname, name, strlen(name));
+// printf("dir_get_leaf(%s) Trace 3 \n", name);
+  strlcpy(tempname, name, strlen(name) + 1);
 
   if(tempname[0] == '/')        /* Absolute path name */
     tmpdir = dir_open_root();
-
-//  strlcpy(&token, t->pwd[1], strlen(t->pwd) + 1);
-
-  if(tempname[strlen(tempname)] == '/')
-    enddir = true;
   else
-    enddir = false;
+    tmpdir = dir_get_leaf(t->pwd);
+// printf("dir_get_leaf(%s) Trace 4 \n", tempname);
+  //strlcpy(&token, t->pwd[1], strlen(t->pwd) + 1);
 
-  for (token = strtok_r (tempname, '/', &save_ptr); token != NULL;
-       token = strtok_r (NULL, '/', &save_ptr)) {
+  if(tempname[strlen(tempname) - 1] == '/')
+  {
+    enddir = true;
+    // printf("dir_get_leaf(%s) Trace 5 \n", tempname);
+  }
+  else
+  {
+    enddir = false;
+    // printf("dir_get_leaf(%s) Trace 6 \n", tempname);
+  }
+
+  for (token = strtok_r (tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r (NULL, "/", &save_ptr)) {
     lastdir = tmpdir;
+    // printf("dir_get_leaf(%s) Trace 7, token : %s\n", tempname, token);
     tmpdir = dir_child(tmpdir, token);
+
     if(tmpdir == NULL)
       break;
   }
-
+  
+  // printf("dir_get_leaf(%s) Trace 8 \n", tempname);
   if (enddir)
     return tmpdir;
   else
