@@ -47,6 +47,7 @@ struct inode
   bool removed;                       // True if deleted, false otherwise
   int deny_write_cnt;                 // 0: writes ok, >0: deny writes.
   struct semaphore extend_sema;
+  bool is_dir;                        // 0 is file, 1 is directory
 
   struct inode_disk data;             // Inode content.
   struct inode* next;                 // The subsequent inode struct pointer

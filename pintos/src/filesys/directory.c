@@ -131,7 +131,9 @@ dir_lookup(const struct dir *dir, const char *name,
   {
     *inode = inode_open(e.inode_sector);
     if(e.is_dir)
-      inode_deny_write(*inode);
+      (*inode)->is_dir = 1;
+    else
+      (*inode)->is_dir = 0;
   }
   else
     *inode = NULL;
