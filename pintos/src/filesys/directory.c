@@ -125,7 +125,7 @@ bool
 dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
-  printf("dirlookup 1  %s\n", name);
+//   printf("dirlookup 1  %s\n", name);
   struct dir_entry e;
   
   // Change to pathed directory
@@ -169,7 +169,7 @@ dir_lookup(const struct dir *dir, const char *name,
     free(token);
     return false;
   }
-printf("dir_lookup 2\n");
+// printf("dir_lookup 2\n");
   if (lookup(dir, token, &e, NULL))
   {
     *inode = inode_open(e.inode_sector);
@@ -325,7 +325,7 @@ dir_remove(struct dir *dir, const char *name)
 
   /* Erase directory entry. */
   e.in_use = false;
-  printf("Erasing %s \n", name);
+//   printf("Erasing %s \n", name);
 
   if (inode_write_at(dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;

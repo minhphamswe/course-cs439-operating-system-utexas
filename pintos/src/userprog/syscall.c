@@ -19,24 +19,24 @@
 #include "filesys/inode.h"
 
 // Forward declarations of functions
-static void syscall_handler (struct intr_frame *);
+static void syscall_handler(struct intr_frame *);
 
-void syshalt_handler (struct intr_frame *f);
-void sysexit_handler (struct intr_frame *f);
-void sysexec_handler (struct intr_frame *f);
-void syswait_handler (struct intr_frame *f);
+void syshalt_handler(struct intr_frame *f);
+void sysexit_handler(struct intr_frame *f);
+void sysexec_handler(struct intr_frame *f);
+void syswait_handler(struct intr_frame *f);
 
-void syscreate_handler (struct intr_frame *f);
-void sysremove_handler (struct intr_frame *f);
-void sysopen_handler (struct intr_frame *f);
-void sysfilesize_handler (struct intr_frame *f);
-void sysread_handler (struct intr_frame *f);
-void syswrite_handler (struct intr_frame *f);
-void sysseek_handler (struct intr_frame *f);
-void systell_handler (struct intr_frame *f);
-void sysclose_handler (struct intr_frame *f);
-void sysmmap_handler (struct intr_frame *f);
-void sysunmmap_handler (struct intr_frame *f);
+void syscreate_handler(struct intr_frame *f);
+void sysremove_handler(struct intr_frame *f);
+void sysopen_handler(struct intr_frame *f);
+void sysfilesize_handler(struct intr_frame *f);
+void sysread_handler(struct intr_frame *f);
+void syswrite_handler(struct intr_frame *f);
+void sysseek_handler(struct intr_frame *f);
+void systell_handler(struct intr_frame *f);
+void sysclose_handler(struct intr_frame *f);
+void sysmmap_handler(struct intr_frame *f);
+void sysunmmap_handler(struct intr_frame *f);
 
 void syschdir_handler(struct intr_frame* f);
 void sysmkdir_handler(struct intr_frame* f);
@@ -46,7 +46,7 @@ void sysinumber_handler(struct intr_frame* f);
 
 uint32_t pop_stack(struct intr_frame *f);
 
-struct fileHandle* get_handle (int fd);
+struct fileHandle* get_handle(int fd);
 void terminate_thread(void);
 
 static struct semaphore filesys_sema;
@@ -56,14 +56,17 @@ static struct semaphore filesys_sema;
 * Returns the byte value if successful, -1 if a segfault occurred.
 */
 static int
-get_user (const uint32_t *uaddr) {
-  if (uaddr < PHYS_BASE) {
+get_user(const uint32_t *uaddr)
+{
+  if (uaddr < PHYS_BASE)
+  {
     int result;
-    asm ( "movl $1f, %0; movl %1, %0; 1:"
-          : "=&a" (result)
-          : "m" (*uaddr));
+    asm("movl $1f, %0; movl %1, %0; 1:"
+        : "=&a"(result)
+        : "m"(*uaddr));
     return result;
   }
+
   return -1;
 }
 
@@ -72,14 +75,17 @@ get_user (const uint32_t *uaddr) {
 * Returns true if successful, false if a segfault occurred.
 */
 static bool
-put_user (uint8_t *udst, uint8_t byte) {
-  if (udst < PHYS_BASE) {
+put_user(uint8_t *udst, uint8_t byte)
+{
+  if (udst < PHYS_BASE)
+  {
     int error_code;
-    asm ( "movl $1f, %0; movb %b2, %1; 1:"
-	  : "=&a" (error_code), "=m" (*udst)
-	  : "q" (byte));
+    asm("movl $1f, %0; movb %b2, %1; 1:"
+        : "=&a"(error_code), "=m"(*udst)
+        : "q"(byte));
     return error_code != -1;
   }
+
   return false;
 }
 
@@ -89,30 +95,32 @@ put_user (uint8_t *udst, uint8_t byte) {
 uint32_t pop_stack(struct intr_frame *f)
 {
   // Check if the address is below PHYS_BASE
-  if (((uint32_t) f->esp < (uint32_t) PHYS_BASE) && f->esp != NULL) {
+  if (((uint32_t) f->esp < (uint32_t) PHYS_BASE) && f->esp != NULL)
+  {
     uint32_t ret = *(uint32_t *)f->esp;
     f->esp = (uint32_t *) f->esp + 1;
     return ret;
   }
   // Otherwise, bad access.  Terminate gracefully
-  else {
+  else
+  {
     terminate_thread();
     return 0;
   }
 }
 
 void
-syscall_init (void)
+syscall_init(void)
 {
   // Initialize semaphore(s)
   sema_init(&filesys_sema, 1);
 
   // Register handler
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
-syscall_handler (struct intr_frame *f)
+syscall_handler(struct intr_frame *f)
 {
   // It's easier to pop the stack as we go, so we will need to reset it
   void *tmpesp = f->esp;
@@ -120,7 +128,8 @@ syscall_handler (struct intr_frame *f)
   // Examine user memory to find out which system call gets called
   int syscall_number = pop_stack(f);
 
-  switch (syscall_number) {
+  switch (syscall_number)
+  {
     case SYS_HALT:
       syshalt_handler(f);
       break;
@@ -189,8 +198,8 @@ syscall_handler (struct intr_frame *f)
 
 
 /**
- * Thread turns off system.
- * 
+ * void halt (void)
+ *
  * Terminates Pintos by calling shutdown_power_off() (declared in
  * devices/shutdown.h). This should be seldom used, because you lose some
  * information about possible deadlock situations, etc.
@@ -203,7 +212,7 @@ void syshalt_handler(struct intr_frame *f)
 
 
 /**
- * Thread calls exit()
+ * void exit (int status)
  *
  * Terminates the current user program, returning status to the kernel. If
  * the process's parent waits for it (see below), this is the status that
@@ -223,7 +232,7 @@ void sysexit_handler(struct intr_frame *f)
 }
 
 /**
- * Thread calls sysexec
+ * pid_t exec (const char *cmd_line)
  *
  * Runs the executable whose name is given in cmd_line, passing any given
  * arguments, and returns the new process's program id (pid). Must return
@@ -236,13 +245,14 @@ void sysexec_handler(struct intr_frame *f)
 {
   char *cmdline = pop_stack(f);
 
-  if (cmdline) {
+  if (cmdline)
+  {
     f->eax = process_execute(cmdline);
   }
 }
 
 /**
- * Thread calls syswait
+ * int wait (pid_t pid)
  *
  * Waits for a child process pid and retrieves the child's exit status.
  * If pid is still alive, waits until it terminates. Then, returns the status
@@ -287,7 +297,8 @@ void syswait_handler(struct intr_frame *f)
   f->eax = process_wait(child);
 }
 
-/** Thread calls syscreate
+/**
+ * bool create (const char *file, unsigned initial_size)
  *
  * Creates a new file called file initially initial_size bytes in size.
  * Returns true if successful, false otherwise. Creating a new file does not
@@ -300,7 +311,7 @@ void syscreate_handler(struct intr_frame *f)
   char *filename = pop_stack(f);
   off_t filesize = pop_stack(f);
 
-  if (get_user(filename) == -1) 
+  if (get_user(filename) == -1)
     terminate_thread();
 
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
@@ -312,7 +323,7 @@ void syscreate_handler(struct intr_frame *f)
 }
 
 /**
- * Thread calls sysremove
+ * bool remove (const char *file)
  *
  * Deletes the file called file. Returns true if successful, false otherwise.
  * A file may be removed regardless of whether it is open or closed, and
@@ -329,7 +340,8 @@ void sysremove_handler(struct intr_frame *f)
   sema_up(&filesys_sema);
 }
 
-/** Thread calls sysopen
+/**
+ * int open (const char *file)
  *
  * Opens the file called file. Returns a nonnegative integer handle called a
  * "file descriptor" (fd), or -1 if the file could not be opened. File
@@ -352,7 +364,8 @@ void sysopen_handler(struct intr_frame *f)
   // Get file name
   char *file_name = pop_stack(f);
 
-  if(file_name == NULL) {
+  if (file_name == NULL)
+  {
     terminate_thread();
   }
 
@@ -362,11 +375,13 @@ void sysopen_handler(struct intr_frame *f)
   sema_up(&filesys_sema);
 
   // File cannot be opened: return -1
-  if (file == NULL) {
+  if (file == NULL)
+  {
     f->eax = -1;
   }
   // File is opened: put it on the list of open file handles
-  else {
+  else
+  {
     struct thread *t = thread_current();
 
     enum intr_level old_level = intr_disable();
@@ -382,7 +397,7 @@ void sysopen_handler(struct intr_frame *f)
 }
 
 /**
- * Thread call sysfilesize
+ * int filesize (int fd)
  *
  * Returns the size, in bytes, of the file open as fd.
  */
@@ -392,18 +407,21 @@ void sysfilesize_handler(struct intr_frame *f)
   int fd = (int) pop_stack(f);
 
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp) {
+
+  if (fhp)
+  {
     sema_down(&filesys_sema);
     f->eax = file_length(fhp->file);
     sema_up(&filesys_sema);
   }
-  else {
-    f->eax -1;
+  else
+  {
+    f->eax - 1;
   }
 }
 
 /**
- * Thread calls sysread
+ * int read (int fd, void *buffer, unsigned size)
  *
  * Reads size bytes from the file open as fd into buffer. Returns the number
  * of bytes actually read (0 at end of file), or -1 if the file could not be
@@ -418,36 +436,45 @@ void sysread_handler(struct intr_frame *f)
   off_t size = pop_stack(f);
 
   // fd is 0: Read from stdin
-  if (fd == 0) {
+  if (fd == 0)
+  {
     *(char*) buffer = input_getc();
     f->eax = 1;
     return;
   }
-  else if (fd == 1 || size < 0) {
+  else if (fd == 1 || size < 0)
+  {
     f->eax = -1;
     return;
   }
-  else if (size == 0) {
+  else if (size == 0)
+  {
     f->eax = 0;
     return;
   }
-  else {
+  else
+  {
     // Check to make sure buffer is in user space
-    if (get_user(buffer) == -1) {
+    if (get_user(buffer) == -1)
+    {
       terminate_thread();
     }
 
-    if (put_user(buffer, 0x1) == false) {
+    if (put_user(buffer, 0x1) == false)
+    {
       terminate_thread();
     }
 
     struct fileHandle *fhp = get_handle(fd);
-    if (fhp) {
+
+    if (fhp)
+    {
       sema_down(&filesys_sema);
       f->eax = file_read(fhp->file, buffer, size);
       sema_up(&filesys_sema);
-     }
-    else {
+    }
+    else
+    {
       // File descriptor not found: return -1
       f->eax = -1;
     }
@@ -455,12 +482,12 @@ void sysread_handler(struct intr_frame *f)
 }
 
 /**
- * Thread calls syswrite
+ * int write (int fd, const void *buffer, unsigned size)
  *
  * Writes size bytes from buffer to the open file fd. Returns the number of
  * bytes actually written, which may be less than size if some bytes could
  * not be written.
- * 
+ *
  * Writing past end-of-file would normally extend the file, but file growth
  * is not implemented by the basic file system. The expected behavior is to
  * write as many bytes as possible up to end-of-file and return the actual
@@ -481,31 +508,36 @@ void syswrite_handler(struct intr_frame *f)
   uint32_t bufferSize = pop_stack(f);   // size of the buffer to write
 
   // Check to see if it's a console out, and print if yes
-  if(fdnum == 1) {
+  if (fdnum == 1)
+  {
     putbuf((char *) buffer, bufferSize);
     f->eax = bufferSize;
   }
   // Not to console, so print to file
-  else if (fdnum > 1) {
+  else if (fdnum > 1)
+  {
     struct fileHandle *fhp = get_handle(fdnum);
 
     // Is the file currently executing?
-    if (fhp != NULL) {
-     sema_down(&filesys_sema);
+    if (fhp != NULL)
+    {
+      sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
-     sema_up(&filesys_sema);
-     }
-    else {
+      sema_up(&filesys_sema);
+    }
+    else
+    {
       f->eax = -1;
     }
   }
-  else {
+  else
+  {
     f->eax = -1;
   }
 }
 
 /**
- * Thread calls seek(int fd, unsigned position)
+ * void seek (int fd, unsigned position)
  *
  * Changes the next byte to be read or written in open file fd to position,
  * expressed in bytes from the beginning of the file. (Thus, a position of 0
@@ -526,7 +558,9 @@ void sysseek_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp) {
+
+  if (fhp)
+  {
     sema_down(&filesys_sema);
     file_seek(fhp->file, newpos);
     sema_up(&filesys_sema);
@@ -535,7 +569,7 @@ void sysseek_handler(struct intr_frame *f)
 }
 
 /**
- * Thread calls systell
+ * unsigned tell (int fd)
  *
  * Returns the position of the next byte to be read or written in open file
  * fd, expressed in bytes from the beginning of the file.
@@ -547,19 +581,22 @@ void systell_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp) {
+
+  if (fhp)
+  {
     // File descriptor found: read file
     sema_down(&filesys_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
     sema_up(&filesys_sema);
   }
-  else {
+  else
+  {
     f->eax = -1;
   }
 }
 
 /**
- * Thread calls sysclose
+ * void close (int fd)
  *
  * Closes file descriptor fd. Exiting or terminating a process implicitly
  * closes all its open file descriptors, as if by calling this function for
@@ -575,10 +612,13 @@ void sysclose_handler(struct intr_frame *f)
 
   // Search for file descriptor in the thread open-file handles
   for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-       e = list_next(e)) {
+       e = list_next(e))
+  {
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+
     // File descriptor found: read file
-    if (fhp->fd == fd) {
+    if (fhp->fd == fd)
+    {
       sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
@@ -589,7 +629,7 @@ void sysclose_handler(struct intr_frame *f)
 }
 
 /**
- * Thread class mmap (int fd, void *addr).
+ * mapid_t mmap (int fd, void *addr)
  *
  * Maps the file open as fd into the process's virtual address space. The
  * entire file is mapped into consecutive virtual pages starting at addr.
@@ -624,14 +664,15 @@ void sysmmap_handler(struct intr_frame* f)
 
   int ret = -1;     // return value, -1 for failure
 
-  if (fd != 0 && fd != 1 && pg_ofs(addr) == 0) {
+  if (fd != 0 && fd != 1 && pg_ofs(addr) == 0)
+  {
   }
 
   f->eax = ret;
 }
 
 /**
- * Thread calls munmap (mapid_t mapid).
+ * void munmap (mapid_t mapping)
  *
  * Unmaps the mapping designated by mapping, which must be a mapping ID
  * returned by a previous call to mmap by the same process that has not yet
@@ -654,10 +695,13 @@ struct fileHandle* get_handle(int fd)
 
   // Search for file descriptor in the thread open-file handles
   for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-      e = list_next(e)) {
+       e = list_next(e))
+  {
     struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+
     // File descriptor found: return file handle
-    if (fhp->fd == fd) {
+    if (fhp->fd == fd)
+    {
       return fhp;
     }
   }
@@ -669,99 +713,110 @@ struct fileHandle* get_handle(int fd)
 
 /* Directory system calls */
 
-/* bool chdir (const char *dir) 
-   Changes the current working directory of the process to dir
-   which may be relative or absolute. Returns true if successful,
-   false on failure.
-*/
-
+/**
+ * bool chdir (const char *dir)
+ *
+ * Changes the current working directory of the process to dir
+ * which may be relative or absolute. Returns true if successful,
+ * false on failure.
+ */
 void syschdir_handler(struct intr_frame* f)
 {
   char *dir = pop_stack(f);
   bool success;
-  
+
   success = dir_changedir(dir);
-  
+
   f->eax = success;
 }
 
-/* bool mkdir (const char *dir) 
-  Creates the directory named dir, which may be relative or absolute.
-  Returns true if successful, false on failure. Fails if dir already
-  exists or if any directory name in dir, besides the last, does not
-  already exist. That is, mkdir("/a/b/c") succeeds only if "/a/b"
-  already exists and "/a/b/c" does not.
-*/
+/**
+ * bool mkdir (const char *dir)
+ * Creates the directory named dir, which may be relative or absolute.
+ * Returns true if successful, false on failure. Fails if dir already
+ * exists or if any directory name in dir, besides the last, does not
+ * already exist. That is, mkdir("/a/b/c") succeeds only if "/a/b"
+ * already exists and "/a/b/c" does not.
+ */
 void sysmkdir_handler(struct intr_frame* f)
 {
   char *dir = pop_stack(f);
-  
+
   bool success;
   success = filesys_create_dir(dir);
-  
+
   f->eax = success;
 }
 
-/* bool readdir (int fd, char *name) 
-   Reads a directory entry from file descriptor fd, which must
-   represent a directory. If successful, stores the null-terminated
-   file name in name, which must have room for READDIR_MAX_LEN + 1
-   bytes, and returns true. If no entries are left in the directory,
-   returns false.
-
-   "." and ".." should not be returned by readdir.
-
-  If the directory changes while it is open, then it is acceptable
-  for some entries not to be read at all or to be read multiple times.
-  Otherwise, each directory entry should be read once, in any order.
-
-  READDIR_MAX_LEN is defined in "lib/user/syscall.h". If your file
-  system supports longer file names than the basic file system,
-  you should increase this value from the default of 14.
-*/
+/**
+ * bool readdir (int fd, char *name)
+ *
+ * Reads a directory entry from file descriptor fd, which must
+ * represent a directory. If successful, stores the null-terminated
+ * file name in name, which must have room for READDIR_MAX_LEN + 1
+ * bytes, and returns true. If no entries are left in the directory,
+ * returns false.
+ *
+ * "." and ".." should not be returned by readdir.
+ *
+ * If the directory changes while it is open, then it is acceptable
+ * for some entries not to be read at all or to be read multiple times.
+ * Otherwise, each directory entry should be read once, in any order.
+ *
+ * READDIR_MAX_LEN is defined in "lib/user/syscall.h". If your file
+ * system supports longer file names than the basic file system,
+ * you should increase this value from the default of 14.
+ */
 void sysreaddir_handler(struct intr_frame* f)
 {
 
   return NULL;
 }
 
-/* bool isdir (int fd) 
-   Returns true if fd represents a directory, false if it represents
-   an ordinary file. 
-*/
+/**
+ * bool isdir (int fd)
+ *
+ * Returns true if fd represents a directory, false if it represents
+ * an ordinary file.
+ */
 void sysisdir_handler(struct intr_frame* f)
 {
   int fd = pop_stack(f);
-  
+
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp != NULL) {
+
+  if (fhp != NULL)
+  {
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
-  
+
     f->eax = inode_is_dir(&ip->data.self);
   }
 }
 
-/* int inumber (int fd)
-   Returns the inode number of the inode associated with fd, which
-   may represent an ordinary file or a directory.
-   An inode number persistently identifies a file or directory.
-   It is unique during the file's existence. In Pintos, the sector
-   number of the inode is suitable for use as an inode number.
-*/
+/**
+ * int inumber (int fd)
+ *
+ * Returns the inode number of the inode associated with fd, which
+ * may represent an ordinary file or a directory.
+ * An inode number persistently identifies a file or directory.
+ * It is unique during the file's existence. In Pintos, the sector
+ * number of the inode is suitable for use as an inode number.
+ */
 void sysinumber_handler(struct intr_frame* f)
 {
   int fd = pop_stack(f);
-  
+
   struct fileHandle *fhp = get_handle(fd);
-  if (fhp != NULL) {
+
+  if (fhp != NULL)
+  {
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
-  
+
     f->eax = inode_get_inumber(ip);
   }
 }
-
 
 // Fails gracefully whenever a program does something bad
 void terminate_thread(void)
