@@ -92,7 +92,7 @@ static bool
 lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
-  // printf("lookup %s\n", name);
+//  printf("lookup %s\n", name);
   if (name == NULL || strlen(name) == 0)
     return 0;
   struct dir_entry e;
@@ -125,13 +125,11 @@ bool
 dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
-  // printf("dirlookup 1  %s\n", name);
+  printf("dirlookup 1  %s\n", name);
   struct dir_entry e;
   
   // Change to pathed directory
   dir = dir_get_leaf(name);
-  if(dir == NULL)
-    return false;
   
   // Strip path off of file name
   char *token, *prevtoken;
@@ -171,7 +169,7 @@ dir_lookup(const struct dir *dir, const char *name,
     free(token);
     return false;
   }
-// printf("dir_lookup 2\n");
+printf("dir_lookup 2\n");
   if (lookup(dir, token, &e, NULL))
   {
     *inode = inode_open(e.inode_sector);
@@ -201,8 +199,6 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 
   // Change to pathed directory
   dir = dir_get_leaf(name);
-  if(dir == NULL)
-    return false;  
   
   // Strip path off of file name
   char *token, *prevtoken;
@@ -285,8 +281,6 @@ dir_remove(struct dir *dir, const char *name)
 
   // Change to pathed directory
   dir = dir_get_leaf(name);
-  if(dir == NULL)
-    return false;  
   
   // Strip path off of file name
   char *token, *prevtoken;
@@ -331,7 +325,7 @@ dir_remove(struct dir *dir, const char *name)
 
   /* Erase directory entry. */
   e.in_use = false;
-  // printf("Erasing %s \n", name);
+  printf("Erasing %s \n", name);
 
   if (inode_write_at(dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
@@ -380,15 +374,13 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   if (name == NULL || strlen(name) == 0)
     return 0;
   
-  //// printf("dir_create(%s) Tracer 1 \n", name);
+  //printf("dir_create(%s) Tracer 1 \n", name);
   struct dir_entry e;
   off_t ofs;
   bool success = false;
 
   // Change to pathed directory
   dir = dir_get_leaf(name);
-  if(dir == NULL)
-    return false;  
   
   // Strip path off of file name
   char *token, *prevtoken;
@@ -418,7 +410,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
     strlcpy(token, prevtoken, NAME_MAX + 1);
   }
 
-  //// printf("dir_create(%s) Tracer 5 \n", token);
+  //printf("dir_create(%s) Tracer 5 \n", token);
 
   ASSERT(dir != NULL);
   ASSERT(token != NULL);
@@ -477,12 +469,12 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
 bool
 dir_changedir(const char *name)
 {
-  // // printf("dir_changedir(%s) Tracer 1\n", name);
+  // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if(!is_valid_dirstring(name))
     return false;
 
-  // // printf("dir_changedir(%s) Tracer 2\n", name);
+  // printf("dir_changedir(%s) Tracer 2\n", name);
   // Not pre-user threads at this point, get the thread
   struct thread *t = thread_current();
     
@@ -499,32 +491,32 @@ dir_changedir(const char *name)
   // For get_leaf to work, directories must end in '/'
   if(name[strlen(name) - 1] != '/')
   { 
-    // // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
+    // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
     strlcat(temp, "/", sizeof(temp));
   }
 
-  // // printf("dir_changedir(%s) Tracer 3\n", temp);
+  // printf("dir_changedir(%s) Tracer 3\n", temp);
   // Is the new directory valid?
   // If it's root it would have already returned, so dir_get_leaf should
   // return not root if valid, root otherwise
   // Keep pwd the same
   if(dir_get_leaf(temp)->inode == dir_open_root()->inode)
   {
-    // // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
+    // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
     return false;
   }
-  // // printf("dir_changedir(%s) Tracer 4\n", temp);
+  // printf("dir_changedir(%s) Tracer 4\n", temp);
   // Absolute path name?
   if(temp[0] == '/') {
     *t->pwd = temp;
-    // // printf("dir_changedir(%s) Tracer 5\n", temp);
+    // printf("dir_changedir(%s) Tracer 5\n", temp);
   }
   // Relative path name?
   else {
-  // // printf("dir_changedir(%s) Tracer 6\n", temp);  
+  // printf("dir_changedir(%s) Tracer 6\n", temp);  
   strlcat(t->pwd, temp, sizeof(t->pwd));
 }
-  // // printf("dir_changedir(%s) Tracer 7\n", temp);
+  // printf("dir_changedir(%s) Tracer 7\n", temp);
   return true;
 }
 
@@ -605,8 +597,6 @@ dir_get_leaf(const char *name)
 
     if(tmpdir == NULL)
       break;
-    if(tmpdir->inode == NULL)
-      return NULL;
   }
   
   free(tempname);
