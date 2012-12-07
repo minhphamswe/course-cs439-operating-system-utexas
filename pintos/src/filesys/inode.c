@@ -520,7 +520,8 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
   if (size + offset > inode->data.file_length)
   {
-    struct inode *tail_node = inode_extend_link(inode, size + offset, size + offset);
+    uint32_t bytes_left = size + offset - inode->data.file_length;
+    struct inode *tail_node = inode_extend_link(inode, bytes_left, size + offset);
 
     if (tail_node == NULL)
     {
