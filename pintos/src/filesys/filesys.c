@@ -45,6 +45,12 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size) 
 {
+  // Name is no longer implicitly checked on length below, must check
+  // at creation of call
+  
+  if(strlen(name) > NAME_MAX)
+    return 0;
+  
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root ();
   bool success = (dir != NULL
@@ -91,9 +97,9 @@ filesys_open (const char *name)
   struct inode *inode = NULL;
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-    
+
   dir_close (dir);
-  return file_open (inode);
+    return file_open (inode);
 }
 
 /* Deletes the file named NAME.

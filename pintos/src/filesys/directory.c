@@ -92,6 +92,9 @@ static bool
 lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
+  // printf("lookup %s\n", name);
+  if (name == NULL || strlen(name) == 0)
+    return 0;
   struct dir_entry e;
   size_t ofs;
 
@@ -122,12 +125,54 @@ bool
 dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
+  // printf("dirlookup 1  %s\n", name);
   struct dir_entry e;
-
+  
+  // Change to pathed directory
+  dir = dir_get_leaf(name);
+  if(dir == NULL)
+    return false;
+  
+  // Strip path off of file name
+  char *token, *prevtoken;
+  char *tempname = calloc(1, 256);
+  char *save_ptr;
+  
+  prevtoken = NULL;
+  
+  strlcpy(tempname, name, 256);
+  for (token = strtok_r (tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r (NULL, "/", &save_ptr))
+  {
+    prevtoken = token;
+  }
+  
+  // If it was just a name and not a path, token will be null
+  // In that case, a recopy will suffice
+  if(prevtoken == NULL)
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, name, NAME_MAX + 1);
+  }
+  // Otherwise, we want the last
+  else
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, prevtoken, NAME_MAX + 1);
+  }
+  
   ASSERT(dir != NULL);
-  ASSERT(name != NULL);
+  ASSERT(token != NULL);
 
-  if (lookup(dir, name, &e, NULL))
+  /* Check NAME for validity. */
+  if (*token == '\0' || strlen(token) > NAME_MAX)
+  {
+    free(tempname);
+    free(token);
+    return false;
+  }
+// printf("dir_lookup 2\n");
+  if (lookup(dir, token, &e, NULL))
   {
     *inode = inode_open(e.inode_sector);
     if(e.is_dir)
@@ -154,17 +199,52 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   off_t ofs;
   bool success = false;
 
-  dir = dir_get_leaf(dir);
-
+  // Change to pathed directory
+  dir = dir_get_leaf(name);
+  if(dir == NULL)
+    return false;  
+  
+  // Strip path off of file name
+  char *token, *prevtoken;
+  char *tempname = calloc(1, 256);
+  char *save_ptr;
+  
+  prevtoken = NULL;
+  
+  strlcpy(tempname, name, 256);
+  for (token = strtok_r (tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r (NULL, "/", &save_ptr))
+  {
+    prevtoken = token;
+  }
+  
+  // If it was just a name and not a path, token will be null
+  // In that case, a recopy will suffice
+  if(prevtoken == NULL)
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, name, NAME_MAX + 1);
+  }
+  // Otherwise, we want the last
+  else
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, prevtoken, NAME_MAX + 1);
+  }
+  
   ASSERT(dir != NULL);
-  ASSERT(name != NULL);
+  ASSERT(token != NULL);
 
   /* Check NAME for validity. */
-  if (*name == '\0' || strlen(name) > NAME_MAX)
+  if (*token == '\0' || strlen(token) > NAME_MAX)
+  {
+    free(tempname);
+    free(token);
     return false;
+  }
 
   /* Check that NAME is not in use. */
-  if (lookup(dir, name, NULL, NULL))
+  if (lookup(dir, token, NULL, NULL))
     goto done;
 
   /* Set OFS to offset of free slot.
@@ -182,11 +262,13 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   /* Write slot. */
   e.in_use = true;
   e.is_dir = false;
-  strlcpy(e.name, name, sizeof e.name);
+  strlcpy(e.name, token, sizeof e.name);
   e.inode_sector = inode_sector;
   success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
+  free(tempname);
+  free(token);
   return success;
 }
 
@@ -201,13 +283,44 @@ dir_remove(struct dir *dir, const char *name)
   bool success = false;
   off_t ofs;
 
-  dir = dir_get_leaf(dir);
+  // Change to pathed directory
+  dir = dir_get_leaf(name);
+  if(dir == NULL)
+    return false;  
+  
+  // Strip path off of file name
+  char *token, *prevtoken;
+  char *tempname = calloc(1, 256);
+  char *save_ptr;
+  
+  prevtoken = NULL;
+  
+  strlcpy(tempname, name, 256);
+  for (token = strtok_r (tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r (NULL, "/", &save_ptr))
+  {
+    prevtoken = token;
+  }
+  
+  // If it was just a name and not a path, token will be null
+  // In that case, a recopy will suffice
+  if(prevtoken == NULL)
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, name, NAME_MAX + 1);
+  }
+  // Otherwise, we want the last
+  else
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, prevtoken, NAME_MAX + 1);
+  }
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
 
   /* Find directory entry. */
-  if (!lookup(dir, name, &e, &ofs))
+  if (!lookup(dir, token, &e, &ofs))
     goto done;
 
   /* Open inode. */
@@ -218,6 +331,7 @@ dir_remove(struct dir *dir, const char *name)
 
   /* Erase directory entry. */
   e.in_use = false;
+  // printf("Erasing %s \n", name);
 
   if (inode_write_at(dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
@@ -227,6 +341,7 @@ dir_remove(struct dir *dir, const char *name)
   success = true;
 
 done:
+
   inode_close(inode);
   return success;
 }
@@ -239,7 +354,7 @@ dir_readdir(struct dir *dir, char *name)
 {
   struct dir_entry e;
   
-  dir = dir_get_leaf(dir);
+  //dir = dir_get_leaf(name);
 
   while (inode_read_at(dir->inode, &e, sizeof e, dir->pos) == sizeof e)
   {
@@ -262,21 +377,62 @@ dir_readdir(struct dir *dir, char *name)
 bool
 dir_create(struct dir *dir, const char *name, block_sector_t sector)
 {
+  if (name == NULL || strlen(name) == 0)
+    return 0;
+  
+  //// printf("dir_create(%s) Tracer 1 \n", name);
   struct dir_entry e;
   off_t ofs;
   bool success = false;
 
-  dir = dir_get_leaf(dir);
+  // Change to pathed directory
+  dir = dir_get_leaf(name);
+  if(dir == NULL)
+    return false;  
+  
+  // Strip path off of file name
+  char *token, *prevtoken;
+  char *tempname = calloc(1, 256);
+  char *save_ptr;
+  
+  prevtoken = NULL;
+  
+  strlcpy(tempname, name, 256);
+  for (token = strtok_r (tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r (NULL, "/", &save_ptr))
+  {
+    prevtoken = token;
+  }
+  
+  // If it was just a name and not a path, token will be null
+  // In that case, a recopy will suffice
+  if(prevtoken == NULL)
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, name, NAME_MAX + 1);
+  }
+  // Otherwise, we want the last
+  else
+  {
+    token = calloc(1, NAME_MAX + 1);
+    strlcpy(token, prevtoken, NAME_MAX + 1);
+  }
+
+  //// printf("dir_create(%s) Tracer 5 \n", token);
 
   ASSERT(dir != NULL);
-  ASSERT(name != NULL);
+  ASSERT(token != NULL);
 
   /* Check NAME for validity. */
-  if (*name == '\0' || strlen(name) > NAME_MAX)
+  if (*token == '\0' || strlen(token) > NAME_MAX)
+  {
+    free(token);
+    free(tempname);
     return false;
+  }
 
   /* Check that NAME is not in use. */
-  if (lookup(dir, name, NULL, NULL))
+  if (lookup(dir, token, NULL, NULL))
     goto done;
 
   /* Set OFS to offset of free slot.
@@ -294,7 +450,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   /* Write slot. */
   e.in_use = true;
   e.is_dir = true;
-  strlcpy(e.name, name, sizeof e.name);
+  strlcpy(e.name, token, sizeof e.name);
   e.inode_sector = sector;
   success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
 
@@ -312,6 +468,8 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
     node.data.doubleptr = NULL;
     block_write(fs_device, sector, &node.data);
   }
+  free(token);
+  free(tempname);
   return success;
 }
 
@@ -319,12 +477,12 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
 bool
 dir_changedir(const char *name)
 {
-  // printf("dir_changedir(%s) Tracer 1\n", name);
+  // // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if(!is_valid_dirstring(name))
     return false;
 
-  // printf("dir_changedir(%s) Tracer 2\n", name);
+  // // printf("dir_changedir(%s) Tracer 2\n", name);
   // Not pre-user threads at this point, get the thread
   struct thread *t = thread_current();
     
@@ -341,32 +499,32 @@ dir_changedir(const char *name)
   // For get_leaf to work, directories must end in '/'
   if(name[strlen(name) - 1] != '/')
   { 
-    // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
+    // // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
     strlcat(temp, "/", sizeof(temp));
   }
 
-  // printf("dir_changedir(%s) Tracer 3\n", temp);
+  // // printf("dir_changedir(%s) Tracer 3\n", temp);
   // Is the new directory valid?
   // If it's root it would have already returned, so dir_get_leaf should
   // return not root if valid, root otherwise
   // Keep pwd the same
   if(dir_get_leaf(temp)->inode == dir_open_root()->inode)
   {
-    // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
+    // // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
     return false;
   }
-  // printf("dir_changedir(%s) Tracer 4\n", temp);
+  // // printf("dir_changedir(%s) Tracer 4\n", temp);
   // Absolute path name?
   if(temp[0] == '/') {
     *t->pwd = temp;
-    // printf("dir_changedir(%s) Tracer 5\n", temp);
+    // // printf("dir_changedir(%s) Tracer 5\n", temp);
   }
   // Relative path name?
   else {
-  // printf("dir_changedir(%s) Tracer 6\n", temp);  
+  // // printf("dir_changedir(%s) Tracer 6\n", temp);  
   strlcat(t->pwd, temp, sizeof(t->pwd));
 }
-  // printf("dir_changedir(%s) Tracer 7\n", temp);
+  // // printf("dir_changedir(%s) Tracer 7\n", temp);
   return true;
 }
 
@@ -375,6 +533,7 @@ struct dir *
 dir_child(struct dir *current, const char *child)
 {
   // printf("dir_child(%s) Tracer 1 \n", child);
+  // TODO: This calloc is never freed, every dir/file access has a memory leak
   struct dir_entry e;
   struct dir *retdir = calloc(1, sizeof(struct dir));
 
@@ -407,7 +566,7 @@ struct dir *
 dir_get_leaf(const char *name)
 {
   // printf("dir_get_leaf(%s) Trace 1 \n", name);
-  if(name == NULL || !is_valid_dirstring(name))
+  if(name == NULL || strlen(name) == 0 || !is_valid_dirstring(name))
     return dir_open_root();
   // printf("dir_get_leaf(%s) Trace 2 \n", name);  
   char *tempname = calloc(1, 256 * sizeof(char)); 
@@ -446,7 +605,12 @@ dir_get_leaf(const char *name)
 
     if(tmpdir == NULL)
       break;
+    if(tmpdir->inode == NULL)
+      return NULL;
   }
+  
+  free(tempname);
+  free(token);
   
   // printf("dir_get_leaf(%s) Trace 8 \n", tempname);
   if (enddir)
@@ -463,13 +627,13 @@ is_valid_dirstring(const char *name)
   int i;
   for(i = 0; i < strlen(name); i++)
   {
-    // Allow periods and slashes (ascii 46-47)
+    // Allow dashes, periods and slashes (ascii 46-47)
     // Allow numbers (ascii 48-57)
     // Allow upper case letters (ascii 65-90)
     // Allow underscores (ascii 95)
     // Allow lower case letters (ascii 97-122)
     
-    if ((int) name[i] < 46)
+    if ((int) name[i] < 45)
       return false;
     if ((int) name[i] > 57 && (int) name[i] < 65)
       return false;
