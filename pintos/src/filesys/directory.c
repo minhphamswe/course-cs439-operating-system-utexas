@@ -7,6 +7,9 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
+// Function to check if a string has bad characters for a directory
+bool is_valid_dirstring(const char *name);
+
 /* Creates the root directory at the sector given.
    Returns true if successful, false on failure. */
 bool
@@ -30,7 +33,6 @@ dir_create_root(block_sector_t sector)
 struct dir *
 dir_open(struct inode *inode)
 {
-//  dir = dir_get_leaf(dir);
   struct dir *dir = calloc(1, sizeof *dir);
 
   if (inode != NULL && dir != NULL)
@@ -146,7 +148,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   off_t ofs;
   bool success = false;
 
- // dir = dir_get_leaf(dir);
+  dir = dir_get_leaf(dir);
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
@@ -193,7 +195,7 @@ dir_remove(struct dir *dir, const char *name)
   bool success = false;
   off_t ofs;
 
- // dir = dir_get_leaf(dir);
+  dir = dir_get_leaf(dir);
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
@@ -231,7 +233,7 @@ dir_readdir(struct dir *dir, char *name)
 {
   struct dir_entry e;
   
- // dir = dir_get_leaf(dir);
+  dir = dir_get_leaf(dir);
 
   while (inode_read_at(dir->inode, &e, sizeof e, dir->pos) == sizeof e)
   {
@@ -258,7 +260,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   off_t ofs;
   bool success = false;
 
- // dir = dir_get_leaf(dir);
+  dir = dir_get_leaf(dir);
 
   ASSERT(dir != NULL);
   ASSERT(name != NULL);
@@ -333,8 +335,10 @@ dir_child(struct dir *current, const char *child)
 struct dir *
 dir_get_leaf(const char *name)
 {
-//   if(!is_thread(running_thread()))
-//     return dir_open_root();
+  //printf("dir_get_leaf(%s) Trace 1 \n", name);
+  if(name == NULL || !is_valid_dirstring(name))
+    return dir_open_root();
+    
   char *tempname = calloc(1, 256 * sizeof(char)); 
   char *token = calloc(1, 256 * sizeof(char));;
   char *save_ptr;
@@ -342,9 +346,6 @@ dir_get_leaf(const char *name)
   struct dir *lastdir = tmpdir;
   bool enddir;
   struct thread *t = thread_current();
-
-  if(name == NULL)
-    return dir_open_root();
 
   strlcpy(tempname, name, strlen(name));
 
@@ -370,4 +371,33 @@ dir_get_leaf(const char *name)
     return tmpdir;
   else
     return lastdir;
+}
+
+/* I need a function to determine if a string appears to be a valid
+   directory or file from character set for some of the other functions */
+bool
+is_valid_dirstring(const char *name)
+{
+  int i;
+  for(i = 0; i < strlen(name); i++)
+  {
+    // Allow periods and slashes (ascii 46-47)
+    // Allow numbers (ascii 48-57)
+    // Allow upper case letters (ascii 65-90)
+    // Allow underscores (ascii 95)
+    // Allow lower case letters (ascii 97-122)
+    
+    if ((int) name[i] < 46)
+      return false;
+    if ((int) name[i] > 57 && (int) name[i] < 65)
+      return false;
+    if ((int) name[i] > 90 && (int) name[i] < 95)
+      return false;
+    if ((int) name[i] == 96)
+      return false;
+    if ((int) name[i] > 122)
+      return false;
+  }
+  
+  return true;
 }
