@@ -10,8 +10,10 @@
 #include "lib/string.h"
 #include "lib/syscall-nr.h"
 #include "lib/stdio.h"
+#include "lib/kernel/stdio.h"
 
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "userprog/process.h"
 
 #include "filesys/filesys.h"
@@ -36,7 +38,7 @@ void sysseek_handler(struct intr_frame *f);
 void systell_handler(struct intr_frame *f);
 void sysclose_handler(struct intr_frame *f);
 void sysmmap_handler(struct intr_frame *f);
-void sysunmmap_handler(struct intr_frame *f);
+void sysmunmap_handler(struct intr_frame *f);
 
 void syschdir_handler(struct intr_frame* f);
 void sysmkdir_handler(struct intr_frame* f);
@@ -58,7 +60,7 @@ static struct semaphore filesys_sema;
 static int
 get_user(const uint32_t *uaddr)
 {
-  if (uaddr < PHYS_BASE)
+  if ((void*) uaddr < PHYS_BASE)
   {
     int result;
     asm("movl $1f, %0; movl %1, %0; 1:"
@@ -77,7 +79,7 @@ get_user(const uint32_t *uaddr)
 static bool
 put_user(uint8_t *udst, uint8_t byte)
 {
-  if (udst < PHYS_BASE)
+  if ((void*) udst < PHYS_BASE)
   {
     int error_code;
     asm("movl $1f, %0; movb %b2, %1; 1:"
@@ -204,7 +206,7 @@ syscall_handler(struct intr_frame *f)
  * devices/shutdown.h). This should be seldom used, because you lose some
  * information about possible deadlock situations, etc.
  */
-void syshalt_handler(struct intr_frame *f)
+void syshalt_handler(struct intr_frame *f UNUSED)
 {
   // Turn off pintos
   shutdown_power_off();
@@ -243,7 +245,7 @@ void sysexit_handler(struct intr_frame *f)
  */
 void sysexec_handler(struct intr_frame *f)
 {
-  char *cmdline = pop_stack(f);
+  char *cmdline = (char*) pop_stack(f);
 
   if (cmdline)
   {
@@ -293,7 +295,7 @@ void sysexec_handler(struct intr_frame *f)
 void syswait_handler(struct intr_frame *f)
 {
   // Get PID from stack
-  tid_t child = pop_stack(f);
+  tid_t child = (tid_t) pop_stack(f);
   f->eax = process_wait(child);
 }
 
@@ -308,10 +310,10 @@ void syswait_handler(struct intr_frame *f)
 void syscreate_handler(struct intr_frame *f)
 {
   // Get file name and size from stack
-  char *filename = pop_stack(f);
-  off_t filesize = pop_stack(f);
+  char *filename = (char*) pop_stack(f);
+  off_t filesize = (off_t) pop_stack(f);
 
-  if (get_user(filename) == -1)
+  if (get_user((uint32_t*) filename) == -1)
     terminate_thread();
 
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
@@ -333,7 +335,7 @@ void syscreate_handler(struct intr_frame *f)
 void sysremove_handler(struct intr_frame *f)
 {
   // Get file name from stack
-  char *filename = pop_stack(f);
+  char *filename = (char*) pop_stack(f);
 
   sema_down(&filesys_sema);
   f->eax = filesys_remove(filename);
@@ -362,7 +364,7 @@ void sysremove_handler(struct intr_frame *f)
 void sysopen_handler(struct intr_frame *f)
 {
   // Get file name
-  char *file_name = pop_stack(f);
+  char *file_name = (char*) pop_stack(f);
 
   if (file_name == NULL)
   {
@@ -416,7 +418,7 @@ void sysfilesize_handler(struct intr_frame *f)
   }
   else
   {
-    f->eax - 1;
+    f->eax = -1;
   }
 }
 
@@ -431,9 +433,9 @@ void sysfilesize_handler(struct intr_frame *f)
 void sysread_handler(struct intr_frame *f)
 {
   // Get arguments from the stack
-  int fd = pop_stack(f);
-  void *buffer = pop_stack(f);
-  off_t size = pop_stack(f);
+  int fd = (int) pop_stack(f);          // file descriptor number
+  void *buffer = (void*) pop_stack(f);  // destination buffer
+  off_t size = (off_t) pop_stack(f);    // number of bytes to read
 
   // fd is 0: Read from stdin
   if (fd == 0)
@@ -503,9 +505,9 @@ void sysread_handler(struct intr_frame *f)
 void syswrite_handler(struct intr_frame *f)
 {
   // Get arguments from the stack
-  uint32_t fdnum = pop_stack(f);        // file descriptor number
-  uint32_t buffer = pop_stack(f);       // address (in UVAS) of buffer
-  uint32_t bufferSize = pop_stack(f);   // size of the buffer to write
+  int fdnum = (int) pop_stack(f);                   // file descriptor number
+  void* buffer = (void*) pop_stack(f);              // UVAS address  of buffer
+  uint32_t bufferSize = (uint32_t) pop_stack(f);    // size of buffer to write
 
   // Check to see if it's a console out, and print if yes
   if (fdnum == 1)
@@ -522,7 +524,7 @@ void syswrite_handler(struct intr_frame *f)
     if (fhp != NULL)
     {
       sema_down(&filesys_sema);
-      f->eax = file_write(fhp->file, (void*) buffer, bufferSize);
+      f->eax = file_write(fhp->file, buffer, bufferSize);
       sema_up(&filesys_sema);
     }
     else
@@ -553,8 +555,8 @@ void syswrite_handler(struct intr_frame *f)
 void sysseek_handler(struct intr_frame *f)
 {
   // Get arguments from the stack
-  int fd = pop_stack(f);
-  off_t newpos = pop_stack(f);
+  int fd = (int) pop_stack(f);
+  off_t newpos = (off_t) pop_stack(f);
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
@@ -577,7 +579,7 @@ void sysseek_handler(struct intr_frame *f)
 void systell_handler(struct intr_frame *f)
 {
   // Get the file descriptor from the stack
-  int fd = pop_stack(f);
+  int fd = (int) pop_stack(f);
 
   // Search for file descriptor in the thread open-file handles
   struct fileHandle *fhp = get_handle(fd);
@@ -605,7 +607,7 @@ void systell_handler(struct intr_frame *f)
 void sysclose_handler(struct intr_frame *f)
 {
   // Get the file descriptor from the stack
-  int fd = pop_stack(f);
+  int fd = (int) pop_stack(f);
 
   struct thread *tp = thread_current();
   struct list_elem *e;
@@ -659,8 +661,8 @@ void sysclose_handler(struct intr_frame *f)
  */
 void sysmmap_handler(struct intr_frame* f)
 {
-  int fd = pop_stack(f);
-  void *addr = pop_stack(f);
+  int fd = (int) pop_stack(f);
+  void *addr = (void*) pop_stack(f);
 
   int ret = -1;     // return value, -1 for failure
 
@@ -680,7 +682,7 @@ void sysmmap_handler(struct intr_frame* f)
  */
 void sysmunmap_handler(struct intr_frame* f)
 {
-  int mapid = pop_stack(f);
+  int mapid = (int) pop_stack(f);
 }
 
 
@@ -710,8 +712,7 @@ struct fileHandle* get_handle(int fd)
   return NULL;
 }
 
-
-/* Directory system calls */
+//======[ Directory system calls ]===========================================
 
 /**
  * bool chdir (const char *dir)
@@ -722,7 +723,7 @@ struct fileHandle* get_handle(int fd)
  */
 void syschdir_handler(struct intr_frame* f)
 {
-  char *dir = pop_stack(f);
+  char *dir = (char*) pop_stack(f);
   bool success;
 
   success = dir_changedir(dir);
@@ -740,10 +741,10 @@ void syschdir_handler(struct intr_frame* f)
  */
 void sysmkdir_handler(struct intr_frame* f)
 {
-  char *dir = pop_stack(f);
+  char *dir = (char*) pop_stack(f);
 
   bool success;
-  success = filesys_create_dir(dir);
+  success = filesys_mkdir(dir);
 
   f->eax = success;
 }
@@ -767,10 +768,8 @@ void sysmkdir_handler(struct intr_frame* f)
  * system supports longer file names than the basic file system,
  * you should increase this value from the default of 14.
  */
-void sysreaddir_handler(struct intr_frame* f)
+void sysreaddir_handler(struct intr_frame* f UNUSED)
 {
-
-  return NULL;
 }
 
 /**
@@ -781,7 +780,7 @@ void sysreaddir_handler(struct intr_frame* f)
  */
 void sysisdir_handler(struct intr_frame* f)
 {
-  int fd = pop_stack(f);
+  int fd = (int) pop_stack(f);
 
   struct fileHandle *fhp = get_handle(fd);
 
@@ -790,7 +789,7 @@ void sysisdir_handler(struct intr_frame* f)
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
 
-    f->eax = inode_is_dir(&ip->data.self);
+    f->eax = ptr_isdir(&ip->data.self);
   }
 }
 
@@ -805,7 +804,7 @@ void sysisdir_handler(struct intr_frame* f)
  */
 void sysinumber_handler(struct intr_frame* f)
 {
-  int fd = pop_stack(f);
+  int fd = (int) pop_stack(f);
 
   struct fileHandle *fhp = get_handle(fd);
 

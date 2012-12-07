@@ -1,9 +1,13 @@
 #include "filesys/directory.h"
+
 #include "lib/stdio.h"
 #include "lib/string.h"
 #include "lib/kernel/list.h"
+#include "lib/debug.h"
+
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
@@ -15,16 +19,19 @@ bool is_valid_name(const char *name);
 bool
 dir_create_root(block_sector_t sector)
 {
-  bool success = 0;
-  struct inode node;
+  bool success = false;
+
+  // Create and write an inode to the sector
   success = inode_create(sector, BLOCK_SECTOR_SIZE);
-  node.data.file_length = 0;
-  node.data.prev_length = 0;
-  node.data.node_length = 0;
-  node.data.self = ptr_create(&node.sector);
-  node.data.magic = INODE_MAGIC;
-  node.data.doubleptr = NULL;
-  block_write(fs_device, sector, &node.data);
+
+  // Set the inode's metadata to say it's a directory
+  if (success)
+  {
+    struct inode *node = inode_open(sector);
+    ptr_set_isdir(&node->data.self);
+    inode_close(node);
+  }
+
   return success;
 }
 
@@ -457,15 +464,15 @@ done:
 
   if (success)
   {
-    struct inode node;
+//     struct inode node;
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
-    node.data.file_length = 0;
-    node.data.prev_length = 0;
-    node.data.node_length = 0;
-    node.data.self = ptr_create(&node.sector);
-    node.data.magic = INODE_MAGIC;
-    node.data.doubleptr = NULL;
-    block_write(fs_device, sector, &node.data);
+//     node.data.file_length = 0;
+//     node.data.prev_length = 0;
+//     node.data.node_length = 0;
+//     node.data.self = ptr_create(&node.sector);
+//     node.data.magic = INODE_MAGIC;
+//     node.data.doubleptr = NULL;
+//     block_write(fs_device, sector, &node.data);
   }
 
   free(token);
@@ -629,7 +636,7 @@ dir_get_leaf(const char *name)
 bool
 is_valid_name(const char *name)
 {
-  int i = 0;
+  size_t i = 0;
   char c = 0;
   bool success = (name != NULL) &&      // Name cannot be NULL
                  (strlen(name) > 0);    // Must have at least 1 character

@@ -20,7 +20,9 @@ static struct semaphore fault_sema;     // Protect page fault handler
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+#ifdef VM
 static void extend_stack (struct intr_frame *, void *fault_addr);
+#endif
 static void kill_process (struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
@@ -242,7 +244,7 @@ extend_stack (struct intr_frame *f, void *fault_addr) {
 
 /// Kill a process
 static void
-kill_process (struct intr_frame *f)
+kill_process (struct intr_frame *f UNUSED)
 {
   thread_set_exit_status(thread_current()->tid, -1);
   thread_exit();

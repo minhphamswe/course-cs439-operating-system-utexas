@@ -6,6 +6,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include <threads/thread.h>
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -67,28 +68,6 @@ filesys_create(const char *name, off_t initial_size)
   return success;
 }
 
-/* Creates a directory named NAME.
-   Returns true if successful, false otherwise.
-   Fails if a file/dir named NAME already exists,
-   or if internal memory allocation fails. */
-bool
-filesys_create_dir(const char *name)
-{
-  block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root();
-  bool success = (dir != NULL
-                  && free_map_allocate(1, &inode_sector)
-                  && inode_create(inode_sector, BLOCK_SECTOR_SIZE)
-                  && dir_create(dir, name, inode_sector));
-
-  if (!success && inode_sector != 0)
-    free_map_release(inode_sector, 1);
-
-  dir_close(dir);
-
-  return success;
-}
-
 /* Opens the file with the given NAME.
    Returns the new file if successful or a null pointer
    otherwise.
@@ -98,6 +77,8 @@ struct file *
 filesys_open(const char *name)
 {
 //   printf("filesys_open(%s): Trace 1\n", name);
+//   printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
+
   struct dir *dir = dir_open_root();
   struct inode *inode = NULL;
 
@@ -141,20 +122,35 @@ do_format(void)
 /* Changes the current working directory of the process to dir
    which may be relative or absolute. Returns true if successful,
    false on failure. */
-struct dir *filesys_chdir(const char *dirname)
+bool filesys_chdir(const char *dirname)
 {
 
 }
 
-/* Creates the directory named dir, which may be relative or absolute.
-   Returns true if successful, false on failure. Fails if dir already
-   exists or if any directory name in dir, besides the last, does not
-   already exist. That is, mkdir("/a/b/c") succeeds only if "/a/b"
-   already exists and "/a/b/c" does not. */
-struct dir *filesys_mkdir(const char *dirname)
+
+/* Creates a directory named NAME.
+   Returns true if successful, false otherwise.
+   Fails if a file/dir named NAME already exists,
+   or if internal memory allocation fails,
+   or if any directory name in dir, besides the last, does not
+   already exist.
+   That is, mkdir("/a/b/c") succeeds only if "/a/b" already exists and
+   "/a/b/c" does not.
+   */
+bool
+filesys_mkdir(const char *name)
 {
-//   struct inode *inode = inode_create (sector, 1 * sizeof (struct dir_entry));
-//     set_is_dir(&inode->data.this);
-//     return inode;
-//   return inode_create(sector, entry_cnt *sizeof(struct dir_entry));
+  block_sector_t inode_sector = 0;
+  struct dir *dir = dir_open_root();
+  bool success = (dir != NULL
+                  && free_map_allocate(1, &inode_sector)
+                  && inode_create(inode_sector, BLOCK_SECTOR_SIZE)
+                  && dir_create(dir, name, inode_sector));
+
+  if (!success && inode_sector != 0)
+    free_map_release(inode_sector, 1);
+
+  dir_close(dir);
+
+  return success;
 }

@@ -21,6 +21,13 @@ static struct list open_inodes;
 // A full block of all zeros
 static char zeros[BLOCK_SECTOR_SIZE];
 
+//======[ Forward Declarations ]=============================================
+
+// Return the inode that contains byte offset POS within INODE.
+// Return NULL there is no such inode.
+static struct inode* byte_to_inode(struct inode *inode, off_t pos);
+
+
 //======[ Methods to Set/Query Attributes of inode_ptr ]=====================
 
 // Create a node pointer from a sector number
@@ -51,14 +58,14 @@ bool ptr_exists(const inode_ptr *ptr)
 }
 
 // Set the pointer as being a directory file
-void set_is_dir(inode_ptr *ptr)
+void ptr_set_isdir(inode_ptr *ptr)
 {
   ASSERT(ptr != NULL);
   (*ptr) = (*ptr) | 0x4000;
 }
 
 // Return true if the meta data says the pointer is a directory file
-bool inode_is_dir(const inode_ptr *ptr)
+bool ptr_isdir(const inode_ptr *ptr)
 {
   ASSERT(ptr != NULL);
   return ((*ptr) & 0x4000);
@@ -110,6 +117,7 @@ struct inode *allocate_inode(bool on_disk)
       node->data.file_length = 0;       // File length in bytes
       node->data.prev_length = 0;       // Combined length of previous inodes
       node->data.node_length = 0;       // Number of bytes used in this node
+      node->data.self = ptr_create(node->sector);
       node->data.doubleptr = 0;
       node->data.magic = INODE_MAGIC;   // Magic number
 
@@ -209,7 +217,7 @@ byte_to_inode(struct inode *inode, off_t pos)
 /* Returns the block device sector that contains byte offset POS within INODE.
    Returns -1 if INODE does not contain data for a byte at offset POS. */
 static block_sector_t
-byte_to_sector(const struct inode *inode, off_t pos)
+byte_to_sector(struct inode *inode, off_t pos)
 {
   // printf("byte_to_sector(%x, %d): Trace 1\n", inode, pos);
 //   ASSERT(inode != NULL);
@@ -246,7 +254,6 @@ byte_to_sector(const struct inode *inode, off_t pos)
 }
 
 static struct semaphore closing_sema;
-static struct semaphore extend_sema;
 
 /* Initializes the inode module. */
 void
@@ -254,7 +261,6 @@ inode_init(void)
 {
   list_init(&open_inodes);
   sema_init(&closing_sema, 1);
-  sema_init(&extend_sema, 1);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -268,14 +274,10 @@ inode_create(block_sector_t sector, off_t length)
   // printf("inode_create(%d, %d): Trace 1\n", sector, length);
   ASSERT(length >= 0);
 
-  // Declare parameters to be used in the following loops
-  off_t bytes_left = length;  // Number of bytes left to allocate
-  size_t sector_idx;          // Index of next sector to allocate in current node
-  block_sector_t data_addr;   // Disk address of a data sector
-
-  // The main inode
+  // Create the main inode
   struct inode *main_node = allocate_inode(false);
   main_node->sector = sector;
+  main_node->data.self = ptr_create(main_node->sector);
   main_node->data.file_length = length;
 
   // The last node to be allocated

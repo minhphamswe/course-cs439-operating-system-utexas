@@ -34,7 +34,7 @@ struct inode_disk
   off_t node_length;                    // Number of bytes used in this node
   inode_ptr self;                       // Pointer to myself, for reference
   uint32_t magic;                       // Magic number
-  inode_ptr doubleptr;                  // Pointer to next indirect inode  
+  inode_ptr doubleptr;                  // Pointer to next indirect inode
   inode_ptr blockptrs[NODE_CAPACITY];   // Index of data pointers
 };
 
@@ -55,21 +55,22 @@ struct inode
 
 //======[ Forward Declarations ]=============================================
 
-void inode_init (void);
-bool inode_create (block_sector_t, off_t);
-struct inode *inode_open (block_sector_t);
-struct inode *inode_reopen (struct inode *);
-block_sector_t inode_get_inumber (const struct inode *);
-void inode_close (struct inode *);
-void inode_remove (struct inode *);
-off_t inode_read_at (struct inode *, void *, off_t size, off_t offset);
-off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
-void inode_deny_write (struct inode *);
-void inode_allow_write (struct inode *);
-off_t inode_length (const struct inode *);
+//==========[ OLD: inode functions ]=========================================
 
-void set_is_dir(inode_ptr *ptr);
-bool inode_is_dir(const inode_ptr *ptr);
+void inode_init(void);
+bool inode_create(block_sector_t, off_t);
+struct inode *inode_open(block_sector_t);
+struct inode *inode_reopen(struct inode *);
+block_sector_t inode_get_inumber(const struct inode *);
+void inode_close(struct inode *);
+void inode_remove(struct inode *);
+off_t inode_read_at(struct inode *, void *, off_t size, off_t offset);
+off_t inode_write_at(struct inode *, const void *, off_t size, off_t offset);
+void inode_deny_write(struct inode *);
+void inode_allow_write(struct inode *);
+off_t inode_length(const struct inode *);
+
+//==========[ NEW: inode_ptr functions ]=====================================
 
 // Create a node pointer from a sector number
 inode_ptr ptr_create(block_sector_t sector);
@@ -79,6 +80,12 @@ block_sector_t ptr_get_address(const inode_ptr *ptr);
 void ptr_set_exist(inode_ptr *ptr);
 // Return true if the meta data says the pointer exists on disk
 bool ptr_exists(const inode_ptr *ptr);
+// Set the pointer as being a directory file
+void ptr_set_isdir(inode_ptr *ptr);
+// Return true if the meta data says the pointer is a directory file
+bool ptr_isdir(const inode_ptr *ptr);
+
+//==========[ NEW: inode functions ]=========================================
 
 // Allocate a single new inode, along with its data. If ON_DISK is true, also
 // allocate space on disk for the inode.
@@ -86,9 +93,6 @@ bool ptr_exists(const inode_ptr *ptr);
 struct inode *allocate_inode(bool on_disk);
 // Return the disk address of the next inode (if it exists, otherwise -1)
 block_sector_t get_next_addr(struct inode *node);
-// Return the inode that contains byte offset POS within INODE.
-// Return NULL there is no such inode.
-static struct inode* byte_to_inode(struct inode *inode, off_t pos);
 
 bool inode_fill(struct inode *current_node, uint32_t *bytes_left, uint32_t length);
 struct inode* inode_extend_link(struct inode *prev_node, uint32_t bytes_left, uint32_t length);
