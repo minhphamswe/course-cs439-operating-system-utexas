@@ -498,7 +498,7 @@ off_t
 inode_write_at(struct inode *inode, const void *buffer_, off_t size,
                off_t offset)
 {
-  // printf("inode_write_at(%x, %x, %d, %d): Trace 1\n", inode, buffer_, size, offset);
+//   printf("inode_write_at(%x, %x, %d, %d): Trace 1\n", inode, buffer_, size, offset);
   ASSERT(inode != NULL);
   ASSERT(buffer_ != NULL);
   const uint8_t *buffer = buffer_;
@@ -520,7 +520,8 @@ inode_write_at(struct inode *inode, const void *buffer_, off_t size,
 
   if (size + offset > inode->data.file_length)
   {
-    uint32_t bytes_left = size + offset - inode->data.file_length;
+    uint32_t bytes_left = (size + offset) - inode->data.file_length;
+//     printf("inode_write_at(%x, %x, %d, %d): Trace 4 \t bytes_left: %u\n", inode, buffer_, size, offset, bytes_left);
     struct inode *tail_node = inode_extend_link(inode, bytes_left, size + offset);
 
     if (tail_node == NULL)
@@ -774,15 +775,17 @@ inode_fill(struct inode *current_node, uint32_t *bytes_left, uint32_t length)
       current_node->data.blockptrs[sector_idx] = ptr_create(data_addr);
       ptr_set_exist(&current_node->data.blockptrs[sector_idx]);
 
+      // Calculate the difference between the new size and the old size
+      uint32_t diff = (sector_idx + 1) * BLOCK_SECTOR_SIZE - current_node->data.node_length;
+
       // Update used capacity of the current node
-      if (*bytes_left < BLOCK_SECTOR_SIZE)
+      if (*bytes_left < diff)
       {
         current_node->data.node_length += *bytes_left;
         *bytes_left = 0;
       }
       else
       {
-        uint32_t diff = (sector_idx + 1) * BLOCK_SECTOR_SIZE - current_node->data.node_length;
         current_node->data.node_length += diff;
         *bytes_left -= diff;
       }
