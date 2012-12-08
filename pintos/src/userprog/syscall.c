@@ -368,31 +368,38 @@ void sysopen_handler(struct intr_frame *f)
   {
     terminate_thread();
   }
-
-  // Open file
-  sema_down(&filesys_sema);
-  struct file *file = filesys_open(file_name);
-  sema_up(&filesys_sema);
-
-  // File cannot be opened: return -1
-  if (file == NULL)
+  
+  if (file_name == "")
   {
     f->eax = -1;
   }
-  // File is opened: put it on the list of open file handles
   else
   {
-    struct thread *t = thread_current();
+    // Open file
+    sema_down(&filesys_sema);
+    struct file *file = filesys_open(file_name);
+    sema_up(&filesys_sema);
 
-    enum intr_level old_level = intr_disable();
-    struct fileHandle *newHandle = malloc(sizeof(struct fileHandle));
-    newHandle->file = file;
-    newHandle->fd = t->nextFD++;
-    list_push_back(&t->handles, &newHandle->fileElem);
-    intr_set_level(old_level);
+    // File cannot be opened: return -1
+    if (file == NULL)
+    {
+      f->eax = -1;
+    }
+    // File is opened: put it on the list of open file handles
+    else
+    {
+      struct thread *t = thread_current();
 
-    // return the file descriptor
-    f->eax = newHandle->fd;
+      enum intr_level old_level = intr_disable();
+      struct fileHandle *newHandle = malloc(sizeof(struct fileHandle));
+      newHandle->file = file;
+      newHandle->fd = t->nextFD++;
+      list_push_back(&t->handles, &newHandle->fileElem);
+      intr_set_level(old_level);
+
+      // return the file descriptor
+      f->eax = newHandle->fd;
+    }
   }
 }
 
