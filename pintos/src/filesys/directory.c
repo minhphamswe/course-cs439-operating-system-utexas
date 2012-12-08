@@ -7,7 +7,6 @@
 
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
-#include "filesys/path.h"
 
 #include "threads/malloc.h"
 #include "threads/thread.h"
@@ -138,7 +137,7 @@ dir_lookup(const struct dir *dir, const char *name,
   struct dir_entry e;
 
   // Change to pathed directory
-//   dir = dir_get_leaf(name);
+  dir = dir_get_leaf(name);
 
   // Strip path off of file name
   char *token, *prevtoken;
@@ -465,10 +464,15 @@ done:
 
   if (success)
   {
+//     struct inode node;
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
-    struct inode *node = inode_open(sector);
-    ptr_set_isdir(&node->data.self);
-    inode_close(node);
+//     node.data.file_length = 0;
+//     node.data.prev_length = 0;
+//     node.data.node_length = 0;
+//     node.data.self = ptr_create(&node.sector);
+//     node.data.magic = INODE_MAGIC;
+//     node.data.doubleptr = NULL;
+//     block_write(fs_device, sector, &node.data);
   }
 
   free(token);
@@ -567,44 +571,64 @@ dir_child(struct dir *current, const char *child)
   return retdir;
 }
 
-/**
- * Return a pointer to the directory leaf directory, given absolute PATH.
- * Not sure what to do in case of failure (PATH does not exist).
- */
+/* Strip string name to leaf directory starting at either cwd or root
+   return a struct dir */
 struct dir *
-dir_get_leaf(const char *path)
+dir_get_leaf(const char *name)
 {
-//   printf("dir_get_leaf(%s): Trace 1\n", path);
-  char *abspath = path_abspath(path);
-//   printf("dir_get_leaf(%s): Trace 1.1 \t abspath: %s\n", path, abspath);
-//   printf("dir_get_leaf(%s): Trace 1.2 \t path_dirname(abspath): %s\n", path, path_dirname(abspath));
-//   printf("dir_get_leaf(%s): Trace 1.3 \t path_basename(abspath): %s\n", path, path_basename(abspath));
-  if (path_isroot(abspath))
-  {
-//     printf("dir_get_leaf(%s): Trace 2 EXIT return dir_open_root()\n", path);
+  // printf("dir_get_leaf(%s) Trace 1 \n", name);
+  if (!is_valid_name(name))
     return dir_open_root();
+
+  // printf("dir_get_leaf(%s) Trace 2 \n", name);
+  char *tempname = calloc(1, 256 * sizeof(char));
+  char *token = calloc(1, 256 * sizeof(char));;
+  char *save_ptr;
+  struct dir *tmpdir;
+  struct dir *lastdir = tmpdir;
+  bool enddir;
+  struct thread *t = thread_current();
+// printf("dir_get_leaf(%s) Trace 3 \n", name);
+  strlcpy(tempname, name, strlen(name) + 1);
+
+  if (tempname[0] == '/')       /* Absolute path name */
+    tmpdir = dir_open_root();
+  else
+    tmpdir = dir_get_leaf(t->pwd);
+
+// printf("dir_get_leaf(%s) Trace 4 \n", tempname);
+  //strlcpy(&token, t->pwd[1], strlen(t->pwd) + 1);
+
+  if (tempname[strlen(tempname) - 1] == '/')
+  {
+    enddir = true;
+    // printf("dir_get_leaf(%s) Trace 5 \n", tempname);
   }
   else
   {
-//     printf("dir_get_leaf(%s): Trace 3\n", path);
-    struct dir *parent = dir_get_leaf(path_dirname(abspath));
-//     printf("dir_get_leaf(%s): Trace 3.1\n", path);
-    struct inode *node = NULL;
-    dir_lookup(parent, path_basename(abspath), &node);
-
-    if (node == NULL)
-    { // path does not exist, but that's okay: return the parent
-      return parent;
-    }
-    else if (ptr_isdir(&node->data.self))
-    {
-      return dir_open(node);
-    }
-    else
-    { // path leads to a file: return the parent
-      return parent;
-    }
+    enddir = false;
+    // printf("dir_get_leaf(%s) Trace 6 \n", tempname);
   }
+
+  for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r(NULL, "/", &save_ptr))
+  {
+    lastdir = tmpdir;
+    // printf("dir_get_leaf(%s) Trace 7, token : %s\n", tempname, token);
+    tmpdir = dir_child(tmpdir, token);
+
+    if (tmpdir == NULL)
+      break;
+  }
+
+  free(tempname);
+  free(token);
+
+  // printf("dir_get_leaf(%s) Trace 8 \n", tempname);
+  if (enddir)
+    return tmpdir;
+  else
+    return lastdir;
 }
 
 /* I need a function to determine if a string appears to be a valid
@@ -633,13 +657,4 @@ is_valid_name(const char *name)
   }
 
   return success;
-}
-
-char*
-dir_getcwd(void)
-{
-  char *ret = &thread_current()->pwd[0];
-//   printf("dir_getcwd(): Trace 1 \t ret: %s\n", ret);
-  return ret;
-//   return "/";
 }
