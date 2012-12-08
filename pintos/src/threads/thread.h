@@ -104,6 +104,7 @@ typedef struct priority_lock {
 // A single open file handler.
 struct fileHandle {
   struct file *file;
+  struct dir *dir;
   int fd;
   struct list_elem fileElem;
 };
@@ -200,6 +201,8 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
+
+/* Functions to support thread scheduling */
 int thread_get_priority (void);
 void thread_set_priority (int);
 void updateActivePriority(struct thread *thread);
@@ -209,6 +212,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/* Functions to support waiting for child threads */
 struct thread* thread_by_tid(tid_t tid);
 bool thread_is_child(tid_t tid);
 bool thread_has_waited(tid_t tid);
@@ -219,6 +223,8 @@ void thread_clear_child_exit_status(struct thread *t);
 
 void thread_mark_waited(struct exit_status* es);
 
-//bool is_executing(char *filename);
+/* Functions to support file handlers */
+int thread_add_file_handler(struct file *file);
+int thread_add_dir_handler(struct dir *dir);
 
 #endif /* threads/thread.h */

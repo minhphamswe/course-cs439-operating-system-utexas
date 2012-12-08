@@ -7,11 +7,26 @@
  * Provide path-related functionalities.
  */
 
+/** Return a normalized absolutized version of the path name PATH. */
+char* path_abspath(const char* path);
+
+/**
+ * Return a normalized version of the path name PATH.
+ * It collapses redundant separators and up-level references.
+ * Examples:
+ * path_normpath("a//b") => "a/b"
+ * path_normpath("a/b/") => "a/b"
+ * path_normpath("a/./b") => "a/b"
+ * path_normpath("a/foo/../b") => "a/b"
+ */
+char* path_normpath(const char* path);
+
 /**
  * Return PATH with its trailing /component removed. If PATH contains no
  * /'s, output '.' (the current directory)
- * Example 1: path_dirname("/usr/bin/sort") => "/usr/bin"
- * Example 2: path_dirname("stdio.h") => "."
+ * Examples:
+ * path_dirname("/usr/bin/sort") => "/usr/bin"
+ * path_dirname("stdio.h") => "."
  */
 char* path_dirname(const char* path);
 
@@ -41,25 +56,26 @@ char* path_join(int num_paths, const char* path1, ...);
  */
 char* path_join2(const char *path1, const char *path2);
 
-/**
- * Return TRUE if PATH refers to an existing path.
- */
+/** Return TRUE if PATH refers to an existing path. */
 bool path_exists(const char* path);
 
-/**
- * Return TRUE if PATH is an absolute path name, i.e. it begins with a slash
- */
+/** Return TRUE if PATH is an absolute path name, i.e. begins with a slash */
 bool path_isabs(const char* path);
 
-/**
- * Return TRUE if PATH is an existing regular file.
- */
+/** Return TRUE if PATH is an existing regular file. */
 bool path_isfile(const char* path);
 
-/**
- * Return TRUE if PATH is an existing directory.
- */
+/** Return TRUE if PATH is an existing directory. */
 bool path_isdir(const char* path);
+
+/** Return TRUE if PATH is the root directory (/) */
+bool path_isroot(const char* path);
+
+/** Return TRUE if PATH is the current directory (.) */
+bool path_isdot(const char* path);
+
+/** Return TRUE if PATH is the parent directory (..) */
+bool path_isdotdot(const char* path);
 
 
 #endif

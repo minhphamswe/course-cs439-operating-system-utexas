@@ -1,10 +1,12 @@
 #include "threads/thread.h"
-#include <debug.h>
-#include <stddef.h>
-#include <random.h>
-#include <stdio.h>
-#include <string.h>
-#include <lib/kernel/list.h>
+
+#include "lib/debug.h"
+#include "lib/stddef.h"
+#include "lib/random.h"
+#include "lib/stdio.h"
+#include "lib/string.h"
+#include "lib/kernel/list.h"
+
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -936,3 +938,53 @@ void thread_mark_waited(struct exit_status* es)
   intr_set_level(old_level);
 }
 
+/**
+ * Add a handler for a file into the current thread's list
+ * of open handlers.
+ * Return the file descriptor of the new handler, or -1 if anything failed
+ */
+int thread_add_file_handler(struct file *file) {
+  struct thread *t = thread_current();
+
+  // Disable interrupts
+  enum intr_level old_level = intr_disable();
+
+  // Construct a new file handler and add it to list
+  struct fileHandle *new_handle = malloc(sizeof(struct fileHandle));
+  new_handle->file = file;
+  new_handle->dir = NULL;
+  new_handle->fd = t->nextFD++;
+  list_push_back(&t->handles, &new_handle->fileElem);
+
+  // Reenable interrupts
+  intr_set_level(old_level);
+
+  // Return the file descriptor
+  return new_handle->fd;
+}
+
+
+/**
+ * Add a handler for a directory into the current thread's list
+ * of open handlers.
+ * Return the file descriptor of the new handler, or -1 if anything failed
+ */
+int thread_add_dir_handler(struct dir *dir) {
+  struct thread *t = thread_current();
+
+  // Disable interrupts
+  enum intr_level old_level = intr_disable();
+
+  // Construct a new file handler and add it to list
+  struct fileHandle *new_handle = malloc(sizeof(struct fileHandle));
+  new_handle->file = NULL;
+  new_handle->dir = dir;
+  new_handle->fd = t->nextFD++;
+  list_push_back(&t->handles, &new_handle->fileElem);
+
+  // Reenable interrupts
+  intr_set_level(old_level);
+
+  // Return the file descriptor
+  return new_handle->fd;
+}

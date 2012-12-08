@@ -35,5 +35,6 @@ bool filesys_remove (const char *name);
 /* Creating and changing directories */
 bool filesys_chdir(const char *name);
 bool filesys_mkdir(const char *name);
+struct dir *filesys_opendir(const char *path);
 
 #endif /* filesys/filesys.h */

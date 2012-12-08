@@ -1,12 +1,15 @@
 #include "filesys/filesys.h"
+
 #include "lib/debug.h"
 #include "lib/stdio.h"
-#include <string.h>
+#include "lib/string.h"
+
 #include "filesys/file.h"
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
-#include <threads/thread.h>
+
+#include "threads/thread.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -153,4 +156,15 @@ filesys_mkdir(const char *name)
   dir_close(dir);
 
   return success;
+}
+
+/**
+ * Open a directory from a given path.
+ * Return a pointer to the newly open directory if successful,
+ * NULL otherwise.
+ */
+struct dir*
+filesys_opendir(const char* path)
+{
+  return NULL;
 }

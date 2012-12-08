@@ -18,7 +18,9 @@
 
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/directory.h"
 #include "filesys/inode.h"
+#include "filesys/path.h"
 
 // Forward declarations of functions
 static void syscall_handler(struct intr_frame *);
@@ -363,38 +365,41 @@ void sysremove_handler(struct intr_frame *f)
  */
 void sysopen_handler(struct intr_frame *f)
 {
-  // Get file name
-  char *file_name = (char*) pop_stack(f);
+  // Get path name
+  char *path = (char*) pop_stack(f);
 
-  if (file_name == NULL)
-  {
-    terminate_thread();
-  }
-
-  // Open file
-  sema_down(&filesys_sema);
-  struct file *file = filesys_open(file_name);
-  sema_up(&filesys_sema);
-
-  // File cannot be opened: return -1
-  if (file == NULL)
+  // Path name is NULL: return -1
+  if (path == NULL)
   {
     f->eax = -1;
   }
-  // File is opened: put it on the list of open file handles
+
+  // Attempt to open PATH
+  struct file *file;
+  struct dir *dir;
+  if (path_isfile(path))
+  {
+    file = filesys_open(path);
+  }
   else
   {
-    struct thread *t = thread_current();
+    dir = filesys_opendir(path);
+  }
 
-    enum intr_level old_level = intr_disable();
-    struct fileHandle *newHandle = malloc(sizeof(struct fileHandle));
-    newHandle->file = file;
-    newHandle->fd = t->nextFD++;
-    list_push_back(&t->handles, &newHandle->fileElem);
-    intr_set_level(old_level);
-
+  // PATH cannot be opened: return -1
+  if (file == NULL && dir == NULL)
+  {
+    f->eax = -1;
+  }
+  // PATH is opened as file: put it on the list of open file handles
+  else if (file != NULL)
+  {
     // return the file descriptor
-    f->eax = newHandle->fd;
+    f->eax = thread_add_file_handler(file);
+  }
+  else
+  {
+    f->eax = thread_add_dir_handler(dir);
   }
 }
 

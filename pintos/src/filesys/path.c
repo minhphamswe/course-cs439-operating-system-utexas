@@ -1,12 +1,14 @@
 #include "filesys/path.h"
 
-// #include "lib/stdbool.h"
-// #include "lib/string.h"
-#include <stdbool.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <malloc.h>
+#include "lib/stdbool.h"
+#include "lib/string.h"
+#include "lib/stdarg.h"
+#include "lib/stdio.h"
+#include "lib/debug.h"
+
+#include "threads/malloc.h"
+
+#include "filesys/directory.h"
 
 static bool path_isvalid(const char *path);
 
@@ -19,8 +21,7 @@ path_isvalid(const char *path)
   bool success = (path != NULL) &&      // Name cannot be NULL
                  (strlen(path) > 0);    // Must have at least 1 character
 
-  while (i < strlen(path) && success)
-  {
+  while (i < strlen(path) && success) {
     c = (char) path[i];
     success = (
                 (c == 45) ||                  // dash
@@ -37,47 +38,119 @@ path_isvalid(const char *path)
   return success;
 }
 
+/** Return a normalized absolutized version of the path name PATH. */
+char *path_abspath(const char *path)
+{
+//   printf("path_abspath(%s): Trace 1\n", path);
+//   printf("path_abspath(%s): Trace 2 \t dir_getcwd(): %s\n", path, dir_getcwd());
+//   printf("path_abspath(%s): Trace 3 \t path_join2(dir_getcwd(), path): %s\n", path, path_join2(dir_getcwd(), path));
+//   printf("path_abspath(%s): Trace 4 \t path_normpath(path_join2(dir_getcwd(), path): %s\n", path, path_normpath(path_join2(dir_getcwd(), path)));
+  return path_normpath(path_join2(dir_getcwd(), path));
+}
+
+/**
+ * Return a normalized version of the path name PATH.
+ * It collapses redundant separators and up-level references.
+ * Examples:
+ * path_normpath("a//b") => "a/b"
+ * path_normpath("a/b/") => "a/b"
+ * path_normpath("a/./b") => "a/b"
+ * path_normpath("a/foo/../b") => "a/b"
+ */
+char *path_normpath(const char *path)
+{
+  char *tempname = malloc(strlen(path) + 1);
+  char *token, *ret = NULL, *save_ptr;
+
+  strlcpy(tempname, path, strlen(path) + 1);
+
+  for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
+       token = strtok_r(NULL, "/", &save_ptr)) {
+    // Saw a ".."
+    if (path_isdotdot(token)) {
+      if (ret) {
+        // If possible, discard the parent
+        ret = path_dirname(ret);
+        continue;
+      }
+      else {
+        // Undefined edge case: anything goes
+        ret = token;
+        continue;
+      }
+    }
+    // Saw a "."
+    else if (path_isdot(token)) {
+      // Just pretend we didn't see it. Walk away.
+      continue;
+    }
+    // Saw a normal token
+    else {
+      if (ret == NULL) {
+        if (path_isabs(path)) {
+          ret = path_join2("/", token);
+        }
+        else {
+          ret = token;
+        }
+      }
+      else {
+        ret = path_join2(ret, token);
+      }
+    }
+  }
+
+  if (ret == NULL) {
+    if (path_isabs(path)) {
+      ret = "/";
+    }
+    else {
+      ret = ".";
+    }
+  }
+
+  return ret;
+}
+
 /**
  * Return PATH with its trailing /component removed. If PATH contains no
  * /'s, output '.' (the current directory)
  * Example 1: path_dirname("/usr/bin/sort") => "/usr/bin"
  * Example 2: path_dirname("stdio.h") => "."
  */
-char* path_dirname(const char* path)
+char *path_dirname(const char *path)
 {
   char *tempname = malloc(strlen(path) + 1);
-  char *token, *ret = NULL, *save_ptr, *sentry = NULL;
+  char *sentry, *ret = NULL, *save_ptr, *token = NULL;
 
-  strncpy(tempname, path, strlen(path) + 1);
+  strlcpy(tempname, path, strlen(path) + 1);
 
-  for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
-       token = strtok_r(NULL, "/", &save_ptr))
-  {
-    if (sentry != NULL)
-    {
-      if (ret == NULL)
-      {
-        if (path_isabs(path))
-        {
-          ret = path_join2("/", sentry);
+  for (sentry = strtok_r(tempname, "/", &save_ptr); sentry != NULL;
+       sentry = strtok_r(NULL, "/", &save_ptr)) {
+    if (token != NULL) {
+      if (ret == NULL) {
+        if (path_isabs(path)) {
+          ret = path_join2("/", token);
         }
-        else
-        {
-          ret = sentry;
+        else {
+          ret = token;
         }
       }
-      else
-      {
-        ret = path_join2(ret, sentry);
+      else {
+        ret = path_join2(ret, token);
       }
     }
-    sentry = token;
+
+    token = sentry;
   }
 
-  if (ret == NULL)
-  {
-    ret = malloc(2);
-    strncpy(ret, ".", 2);
+  if (ret == NULL) {
+    if (path_isabs(path)) {
+      ret = "/";
+    }
+    else {
+      ret = ".";
+    }
   }
 
   return ret;
@@ -88,17 +161,25 @@ char* path_dirname(const char* path)
  * Example 1: path_basename("/usr/bin/sort") => "sort"
  * Example 2: path_basename("stdio.h") => "stdio.h"
  */
-char* path_basename(const char* path)
+char *path_basename(const char *path)
 {
   char *tempname = malloc(strlen(path) + 1);
-  char *token, *ret, *save_ptr;
+  char *token = NULL, *ret = NULL, *save_ptr = NULL;
 
-  strncpy(tempname, path, strlen(path) + 1);
+  strlcpy(tempname, path, strlen(path) + 1);
 
   for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
-       token = strtok_r(NULL, "/", &save_ptr))
-  {
+       token = strtok_r(NULL, "/", &save_ptr)) {
     ret = token;
+  }
+
+  if (ret == NULL) {
+    if (path_isabs(path)) {
+      ret = "/";
+    }
+    else {
+      ret = ".";
+    }
   }
 
   return ret;
@@ -112,21 +193,22 @@ char* path_basename(const char* path)
  * exactly one directory separator following each non-empty part except the
  * last.
  */
-char* path_join(int num_paths, const char *path1, ...)
+char *path_join(int num_paths, const char *path1, ...)
 {
   va_list args;
   int i = 0;
   char *ret, *tmp;
 
   ret = malloc(strlen(path1) + 1);
-  strncpy(ret, path1, strlen(path1) + 1);
+  strlcpy(ret, path1, strlen(path1) + 1);
 
   va_start(args, path1);
-  for (i = 0; i < num_paths; i++)
-  {
-    tmp = va_arg(args, char*);
+
+  for (i = 0; i < num_paths; i++) {
+    tmp = va_arg(args, char *);
     ret = path_join2(ret, tmp);
   }
+
   va_end(args);
 
   return ret;
@@ -139,18 +221,24 @@ char* path_join(int num_paths, const char *path1, ...)
  * Return the concatenation of PATH1, and PATH2, with exactly one directory
  * separator following each non-empty part except the last.
  */
-char*
+char *
 path_join2(const char *path1, const char *path2)
 {
-//   ASSERT(path1 != NULL);
-//   ASSERT(path2 != NULL);
+  ASSERT(path1 != NULL || path2 != NULL);
+//   ASSERT(strlen(path1) >= 1 && strlen(path2) >= 9);
+  
   char *ret;
 
-  if (path_isabs(path2))
+  if (path2 == NULL)
+  {
+    ret = malloc(strlen(path1) + 1);
+    strlcpy(ret, path1, strlen(path1) + 1);
+  }
+  else if (path1 == NULL || path_isabs(path2))
   {
     // If PATH2 is an absolute path, then just return it
     ret = malloc(strlen(path2) + 1);
-    strncpy(ret, path2, strlen(path2) + 1);
+    strlcpy(ret, path2, strlen(path2) + 1);
   }
   else
   {
@@ -158,16 +246,16 @@ path_join2(const char *path1, const char *path2)
     if (path1[strlen(path1) - 1] == '/')
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
-      strncpy(ret, path1, strlen(path1));       // copy all but '\0'
-      strncpy(ret + strlen(path1),
+      strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
+      strlcpy(ret + strlen(path1),
               path2, strlen(path2) + 1);        // copy all of path2
     }
     else
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
-      strncpy(ret, path1, strlen(path1));       // copy all but '\0'
-      strncpy(ret + strlen(path1), "/", 1);     // copy the '/'
-      strncpy(ret + strlen(path1) + 1,
+      strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
+      strlcpy(ret + strlen(path1), "/", 2);     // copy the '/'
+      strlcpy(ret + strlen(path1) + 1,
               path2, strlen(path2) + 1);        // copy all of path2
     }
   }
@@ -178,7 +266,7 @@ path_join2(const char *path1, const char *path2)
 /**
  * Return TRUE if PATH refers to an existing path.
  */
-bool path_exists(const char* path)
+bool path_exists(const char *path)
 {
   return path_isvalid(path);
 }
@@ -186,20 +274,21 @@ bool path_exists(const char* path)
 /**
  * Return TRUE if PATH is an absolute path name, i.e. it begins with a slash
  */
-bool path_isabs(const char* path)
+bool path_isabs(const char *path)
 {
   bool success = path_isvalid(path);
-  if (success)
-  {
+
+  if (success) {
     success = (path[0] == '/');
   }
+
   return success;
 }
 
 /**
  * Return TRUE if PATH is an existing regular file.
  */
-bool path_isfile(const char* path)
+bool path_isfile(const char *path)
 {
   return false;
 }
@@ -207,7 +296,33 @@ bool path_isfile(const char* path)
 /**
  * Return TRUE if PATH is an existing directory.
  */
-bool path_isdir(const char* path)
+bool path_isdir(const char *path)
 {
   return false;
+}
+
+/** Return TRUE if PATH is the root directory (/) */
+bool path_isroot(const char *path)
+{
+//   printf("path_isroot(%s): Trace 1\n", path);
+//   printf("path_isroot(%s): Trace 2 \t path_isvalid(path): %d\n", path, path_isvalid(path));
+//   printf("path_isroot(%s): Trace 2 \t strlen(path) == 1: %d\n", path, strlen(path) == 1);
+//   printf("path_isroot(%s): Trace 2 \t path[0] == '/': %d\n", path, path[0] == '/');
+  return (path_isvalid(path) &&
+          strlen(path) == 1 && path[0] == '/');
+}
+
+/** Return TRUE if PATH is the current directory (.) */
+bool path_isdot(const char *path)
+{
+  return (path_isvalid(path) &&
+          strlen(path) == 1 && path[0] == '.');
+}
+
+/** Return TRUE if PATH is the parent directory (..) */
+bool path_isdotdot(const char *path)
+{
+  return (path_isvalid(path) &&
+          strlen(path) == 2 &&
+          path[0] == '.' && path[1] == '.');
 }
