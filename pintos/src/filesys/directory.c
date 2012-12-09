@@ -601,11 +601,11 @@ dir_changedir(const char *name)
 bool
 dir_child(struct dir *current, const char *child, struct dir *retdir)
 {
-  char *abspath = path_abspath(child);
-  if (strcmp(abspath, child)) {
-    abspath = "";
-  }
-  // printf("dir_child(%s) Tracer 1   current: %x\n", child, current);
+//   char *abspath = path_abspath(child);
+//   if (strcmp(abspath, child)) {
+//     abspath = "";
+//   }
+//   printf("dir_child(%s) Tracer 1   current: %x\n", child, current);
   struct dir_entry e;
   retdir = calloc(1, sizeof(struct dir));
 
