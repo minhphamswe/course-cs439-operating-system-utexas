@@ -373,37 +373,23 @@ void sysopen_handler(struct intr_frame *f)
   {
     f->eax = -1;
   }
-  if (path == "")
+  if (strlen(path) == 0)
   {
     f->eax = -1;
   }
   // Attempt to open PATH
-  struct file *file;
-  struct dir *dir;
-  if (path_isfile(path))
-  {
-    file = filesys_open(path);
-  }
-  else
-  {
-
-    dir = filesys_opendir(path);
-  }
+  struct file *file = filesys_open(path);
 
   // PATH cannot be opened: return -1
-  if (file == NULL && dir == NULL)
+  if (file == NULL)
   {
     f->eax = -1;
   }
   // PATH is opened as file: put it on the list of open file handles
-  else if (file != NULL)
+  else
   {
     // return the file descriptor
     f->eax = thread_add_file_handler(file);
-  }
-  else
-  {
-    f->eax = thread_add_dir_handler(dir);
   }
 }
 
