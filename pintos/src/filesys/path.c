@@ -11,10 +11,8 @@
 
 #include "filesys/directory.h"
 
-static bool path_isvalid(const char *path);
-
 /** Return TRUE if PATH is valid */
-static bool
+bool
 path_isvalid(const char *path)
 {
   enum intr_level old_level = intr_disable();
@@ -269,7 +267,7 @@ path_join2(const char *path1, const char *path2)
     }
   }
 
-  enum intr_level old_level = intr_disable();
+  intr_set_level(old_level);
   return ret;
 }
 

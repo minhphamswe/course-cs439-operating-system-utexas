@@ -7,12 +7,12 @@
 
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/path.h"
 
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
 // Function to check if a string has bad characters for a directory
-bool is_valid_name(const char *name);
 bool is_path(const char *name);
 
 /* Creates the root directory at the sector given.
@@ -101,7 +101,7 @@ lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
   // printf("lookup %s\n", name);
-  if (!is_valid_name(name))
+  if (!path_isvalid(name))
     return 0;
 
   struct dir_entry e;
@@ -404,7 +404,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   // printf("dir_create(%s) Tracer 1 \n", name);
   
   char *newdir = calloc(1, PATH_MAX * sizeof(char));
-  if (!is_valid_name(name))
+  if (!path_isvalid(name))
     return 0;
 
   //// printf("dir_create(%s) Tracer 1 \n", name);
@@ -515,7 +515,7 @@ dir_changedir(const char *name)
 {
   // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
-  if (!is_valid_name(name))
+  if (!path_isvalid(name))
     return false;
 
   // printf("dir_changedir(%s) Tracer 2\n", name);
@@ -609,7 +609,7 @@ struct dir *
 dir_get_leaf(const char *name)
 {
   // printf("dir_get_leaf(%s) Trace 1 \n", name);
-  if (!is_valid_name(name))
+  if (!path_isvalid(name))
     return NULL;
     
   // If root, will cause other problems, so take care of first
@@ -687,35 +687,6 @@ dir_get_leaf(const char *name)
     return tmpdir;
 }
 
-/* I need a function to determine if a string appears to be a valid
-   directory or file from character set for some of the other functions */
-bool
-is_valid_name(const char *name)
-{
-  size_t i = 0;
-  char c = 0;
-  bool success = (name != NULL) &&      // Name cannot be NULL
-                 (strlen(name) > 0);    // Must have at least 1 character
-
-  while (i < strlen(name) && success)
-  {
-    c = (char) name[i];
-    success = (
-                (c == 45) ||                  // dash
-                (c == 46) ||                  // period
-                (c == 47) ||                  // slash
-                (c >= 48 && c <= 57) ||       // numbers
-                (c >= 65 && c <= 90) ||       // upper case letters
-                (c == 95) ||                  // underscore
-                (c >= 97 && c <= 122)         // lower case letters
-              );
-    i++;
-  }
-
-  return success;
-}
-
-
 /* Is name a path or just a file/dir node name */
 bool
 is_path(const char *name)
@@ -724,7 +695,7 @@ is_path(const char *name)
   char *save_ptr;
   bool success = true;
   
-  if(!is_valid_name(name))
+  if(!path_isvalid(name))
     success = false;
 
   strlcpy(tempname, name, strlen(name) + 1);

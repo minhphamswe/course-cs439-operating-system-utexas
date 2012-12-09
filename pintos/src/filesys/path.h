@@ -7,6 +7,9 @@
  * Provide path-related functionalities.
  */
 
+/** Return TRUE if PATH is valid */
+bool path_isvalid(const char *path);
+
 /** Return a normalized absolutized version of the path name PATH. */
 char* path_abspath(const char* path);
 
