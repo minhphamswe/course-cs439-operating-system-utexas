@@ -387,7 +387,11 @@ int main(int argc, char **argv)
 //   printf("TEST path_basename(\"//\"): %s\n", path_basename("//"));
 //   printf("TEST path_basename(\"///\"): %s\n", path_basename("///"));
 //   printf("TEST path_basename(\"////\"): %s\n", path_basename("////"));
-// 
+//   printf("TEST path_basename(\"/..\"): %s\n", path_basename("/.."));
+//   printf("TEST path_basename(\"/../\"): %s\n", path_basename("/../"));
+//   printf("TEST path_basename(\"/.\"): %s\n", path_basename("/."));
+//   printf("TEST path_basename(\"/./\"): %s\n", path_basename("/./"));
+
 //   printf("TEST path_dirname(\".\"): %s\n", path_dirname("."));
 //   printf("TEST path_dirname(\"./\"): %s\n", path_dirname("./"));
 //   printf("TEST path_dirname(\"./////\"): %s\n", path_dirname("./////"));
@@ -398,6 +402,10 @@ int main(int argc, char **argv)
 //   printf("TEST path_dirname(\"//\"): %s\n", path_dirname("//"));
 //   printf("TEST path_dirname(\"///\"): %s\n", path_dirname("///"));
 //   printf("TEST path_dirname(\"////\"): %s\n", path_dirname("////"));
+//   printf("TEST path_dirname(\"/..\"): %s\n", path_dirname("/.."));
+//   printf("TEST path_dirname(\"/../\"): %s\n", path_dirname("/../"));
+//   printf("TEST path_dirname(\"/.\"): %s\n", path_dirname("/."));
+//   printf("TEST path_dirname(\"/./\"): %s\n", path_dirname("/./"));
 
 //   printf("TEST basename(\".\"): %s\n", basename("."));
 //   printf("TEST basename(\"./\"): %s\n", basename("./"));
@@ -428,10 +436,10 @@ int main(int argc, char **argv)
 //   printf("TEST path_normpath(\"../../../../\"): %s\n", path_normpath("../../../../"));
 //   printf("TEST path_normpath(\"/\"): %s\n", path_normpath("/"));
 
-  printf("TEST path_join2(\"/\", \"args-none\"): %s\n", path_join2("/", "args-none"));
-  printf("TEST path_join2(\"/\", \".\"): %s\n", path_join2("/", "."));
-  printf("TEST path_join2(\"lol\", \"cat\"): %s\n", path_join2("lol", "cat"));
-  printf("TEST path_join2(\"a\", \"b\"): %s\n", path_join2("a", "b"));
+//   printf("TEST path_join2(\"/\", \"args-none\"): %s\n", path_join2("/", "args-none"));
+//   printf("TEST path_join2(\"/\", \".\"): %s\n", path_join2("/", "."));
+//   printf("TEST path_join2(\"lol\", \"cat\"): %s\n", path_join2("lol", "cat"));
+//   printf("TEST path_join2(\"a\", \"b\"): %s\n", path_join2("a", "b"));
 //   printf("TEST path_join2(NULL, \"b\"): %s\n", path_join2(NULL, "b"));
 //   printf("TEST path_join2(\"a\", NULL): %s\n", path_join2("a", NULL));
 //   printf("TEST path_join2(NULL, \"cat\"): %s\n", path_join2(NULL, "cat"));
