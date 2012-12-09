@@ -162,7 +162,7 @@ struct thread
   int nextFD;                     /* The next file, increment */
   
   /* Keep track of current directory */
-  char * pwd[256];
+  char pwd[PATH_MAX];
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
