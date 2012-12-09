@@ -48,11 +48,7 @@ char *path_abspath(const char *path)
 
 char *path_cwd(void)
 {
-  enum intr_level old_level = intr_disable();
-  char* cwd = malloc(sizeof(thread_current()->pwd));
-  strlcpy(cwd, &thread_current()->pwd[0], sizeof(thread_current()->pwd) + 1);
-  intr_set_level(old_level);
-  return cwd;
+  return &thread_current()->pwd[0];
 }
 
 /**
