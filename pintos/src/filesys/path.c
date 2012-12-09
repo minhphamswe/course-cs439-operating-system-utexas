@@ -7,6 +7,7 @@
 #include "lib/debug.h"
 
 #include "threads/malloc.h"
+#include "threads/interrupt.h"
 
 #include "filesys/directory.h"
 
@@ -16,6 +17,7 @@ static bool path_isvalid(const char *path);
 static bool
 path_isvalid(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   size_t i = 0;
   char c = 0;
   bool success = (path != NULL) &&      // Name cannot be NULL
@@ -35,18 +37,19 @@ path_isvalid(const char *path)
     i++;
   }
 
+  intr_set_level(old_level);
   return success;
 }
 
 /** Return a normalized absolutized version of the path name PATH. */
-char *path_abspath(const char *path)
-{
+// char *path_abspath(const char *path)
+// {
 //   printf("path_abspath(%s): Trace 1\n", path);
 //   printf("path_abspath(%s): Trace 2 \t dir_getcwd(): %s\n", path, dir_getcwd());
 //   printf("path_abspath(%s): Trace 3 \t path_join2(dir_getcwd(), path): %s\n", path, path_join2(dir_getcwd(), path));
 //   printf("path_abspath(%s): Trace 4 \t path_normpath(path_join2(dir_getcwd(), path): %s\n", path, path_normpath(path_join2(dir_getcwd(), path)));
-  return path_normpath(path_join2(dir_getcwd(), path));
-}
+//   return path_normpath(path_join2(dir_getcwd(), path));
+// }
 
 /**
  * Return a normalized version of the path name PATH.
@@ -59,6 +62,7 @@ char *path_abspath(const char *path)
  */
 char *path_normpath(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
   char *token, *ret = NULL, *save_ptr;
 
@@ -109,6 +113,7 @@ char *path_normpath(const char *path)
     }
   }
 
+  intr_set_level(old_level);
   return ret;
 }
 
@@ -120,6 +125,7 @@ char *path_normpath(const char *path)
  */
 char *path_dirname(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
   char *sentry, *ret = NULL, *save_ptr, *token = NULL;
 
@@ -153,6 +159,7 @@ char *path_dirname(const char *path)
     }
   }
 
+  intr_set_level(old_level);
   return ret;
 }
 
@@ -163,6 +170,7 @@ char *path_dirname(const char *path)
  */
 char *path_basename(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
   char *token = NULL, *ret = NULL, *save_ptr = NULL;
 
@@ -182,6 +190,7 @@ char *path_basename(const char *path)
     }
   }
 
+  intr_set_level(old_level);
   return ret;
 }
 
@@ -225,7 +234,7 @@ char *
 path_join2(const char *path1, const char *path2)
 {
   ASSERT(path1 != NULL || path2 != NULL);
-//   ASSERT(strlen(path1) >= 1 && strlen(path2) >= 9);
+  enum intr_level old_level = intr_disable();
   
   char *ret;
 
@@ -260,6 +269,7 @@ path_join2(const char *path1, const char *path2)
     }
   }
 
+  enum intr_level old_level = intr_disable();
   return ret;
 }
 
@@ -276,12 +286,14 @@ bool path_exists(const char *path)
  */
 bool path_isabs(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);
 
   if (success) {
     success = (path[0] == '/');
   }
 
+  intr_set_level(old_level);
   return success;
 }
 
@@ -304,10 +316,6 @@ bool path_isdir(const char *path)
 /** Return TRUE if PATH is the root directory (/) */
 bool path_isroot(const char *path)
 {
-//   printf("path_isroot(%s): Trace 1\n", path);
-//   printf("path_isroot(%s): Trace 2 \t path_isvalid(path): %d\n", path, path_isvalid(path));
-//   printf("path_isroot(%s): Trace 2 \t strlen(path) == 1: %d\n", path, strlen(path) == 1);
-//   printf("path_isroot(%s): Trace 2 \t path[0] == '/': %d\n", path, path[0] == '/');
   return (path_isvalid(path) &&
           strlen(path) == 1 && path[0] == '/');
 }

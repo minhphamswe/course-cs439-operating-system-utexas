@@ -587,12 +587,14 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
   else
   {
     // printf("dir_child(%s) Tracer 3 \n", child);
+    free(retdir);
     retdir = NULL;
     return false;
   }
 
   if (!e.is_dir)
   {
+    free(retdir);
     retdir = NULL;
     return false;
     // printf("dir_child(%s) Tracer 4 \n", child);
