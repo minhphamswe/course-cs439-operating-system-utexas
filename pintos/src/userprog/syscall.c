@@ -373,7 +373,10 @@ void sysopen_handler(struct intr_frame *f)
   {
     f->eax = -1;
   }
-
+  if (path == "")
+  {
+    f->eax = -1;
+  }
   // Attempt to open PATH
   struct file *file;
   struct dir *dir;
@@ -383,6 +386,7 @@ void sysopen_handler(struct intr_frame *f)
   }
   else
   {
+
     dir = filesys_opendir(path);
   }
 
