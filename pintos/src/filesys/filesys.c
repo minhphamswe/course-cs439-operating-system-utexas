@@ -8,6 +8,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "filesys/path.h"
 
 #include "threads/thread.h"
 #include "threads/synch.h"
@@ -49,7 +50,7 @@ filesys_done(void)
 {
   free_map_close();
 }
-
+
 /* Creates a file named NAME with the given INITIAL_SIZE.
    Returns true if successful, false otherwise.
    Fails if a file named NAME already exists,
@@ -57,6 +58,8 @@ filesys_done(void)
 bool
 filesys_create(const char *name, off_t initial_size)
 {
+  char* abspath = path_abspath(name);
+  // printf("filesys_create(%s, %d): Trace 1 \t name: %s, abspath: %s\n", name, initial_size, name, abspath);
   // Name is no longer implicitly checked on length below, must check
   // at creation of call
 
@@ -86,6 +89,8 @@ filesys_create(const char *name, off_t initial_size)
 struct file *
 filesys_open(const char *name)
 {
+  char* abspath = path_abspath(name);
+  // printf("filesys_open(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   sema_down(&open_sema);
 //   printf("filesys_open(%s): Trace 1\n", name);
 //   printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
@@ -112,6 +117,8 @@ filesys_open(const char *name)
 bool
 filesys_remove(const char *name)
 {
+  char* abspath = path_abspath(name);
+  // printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   struct dir *dir = dir_open_root();
   bool success = dir != NULL && dir_remove(dir, name);
   dir_close(dir);
@@ -155,6 +162,8 @@ bool filesys_chdir(const char *dirname)
 bool
 filesys_mkdir(const char *name)
 {
+  char* abspath = path_abspath(name);
+  // printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root();
   bool success = (dir != NULL
