@@ -8,15 +8,19 @@
 
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
+
 #include "threads/malloc.h"
 #include "threads/synch.h"
-#include <threads/interrupt.h>
+#include "threads/interrupt.h"
 
 //======[ Global Definitions ]===============================================
 
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
+
+/* Semaphores */
+static struct semaphore alloc_sema;
 
 // A full block of all zeros
 static char zeros[BLOCK_SECTOR_SIZE];
@@ -78,6 +82,7 @@ bool ptr_isdir(const inode_ptr *ptr)
 // Return the struct inode pointer if successful, NULL otherwise
 struct inode *allocate_inode(bool on_disk)
 {
+  sema_down(&alloc_sema);
   // printf("allocate_inode(): Trace 1\n");
   bool success = true;
   block_sector_t data_addr = 0;
@@ -127,6 +132,7 @@ struct inode *allocate_inode(bool on_disk)
   }
 
   // printf("allocate_inode(): Trace 4 EXIT\treturn %x\n", node);
+  sema_up(&alloc_sema);
   return node;
 }
 
@@ -259,7 +265,11 @@ static struct semaphore closing_sema;
 void
 inode_init(void)
 {
+  // Initialize list of open inodes
   list_init(&open_inodes);
+
+  // Initialize semaphores
+  sema_init(&alloc_sema, 1);
   sema_init(&closing_sema, 1);
 }
 

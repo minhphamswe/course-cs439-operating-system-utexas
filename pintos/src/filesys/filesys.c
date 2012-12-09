@@ -91,14 +91,15 @@ filesys_open(const char *name)
 {
   char* abspath = path_abspath(name);
   // printf("filesys_open(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
-  sema_down(&open_sema);
+  
 //   printf("filesys_open(%s): Trace 1\n", name);
 //   printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
 
   struct dir *dir = dir_open_root();
   struct inode *inode = NULL;
 
-//   printf("filesys_open(%s): Trace 2.1 \t dir: %x\n", name, dir);
+  printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
+  sema_down(&open_sema);
   if (dir != NULL) {
     dir_lookup(dir, name, &inode);
 //     printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
