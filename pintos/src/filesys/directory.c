@@ -426,13 +426,13 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   if (strcmp(abspath, name)) {
     abspath = "";
   }
-//   printf("dir_create(%s) Tracer 1 \n", name);
-  
+  printf("dir_create(%s) Tracer 1 \n", name);
+
   char *newdir = calloc(1, PATH_MAX * sizeof(char));
   if (!path_isvalid(name))
     return 0;
 
-  //// printf("dir_create(%s) Tracer 1 \n", name);
+  printf("dir_create(%s) Tracer 1.1 \n", name);
   struct dir_entry e;
   off_t ofs;
   bool success = false;
@@ -448,7 +448,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
       index--;
     strlcpy(pathname, name, strlen(name));
     pathname[index] = '\0';
-    // printf("dir_create(%s) Tracer 2, pathname: \"%s\"  index: %d\n", name, pathname, index);
+    printf("dir_create(%s) Tracer 2, pathname: \"%s\"  index: %d\n", name, pathname, index);
     if(strlen(pathname) == 0)
       dir = dir_open_root();
     else
@@ -470,7 +470,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
     strlcpy(newdir, prevtoken, PATH_MAX);
 
 //    strlcpy(newdir, (char *)name[index], strlen(name) - index + 1);
-    // printf("dir_create(%s) Tracer 3   newdir: \"%s\"   dir: %x\n", name, newdir, dir);
+    printf("dir_create(%s) Tracer 3   newdir: \"%s\"   dir: %x\n", name, newdir, dir);
   }
   else
     strlcpy(newdir, name, strlen(name) + 1);
@@ -506,7 +506,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
     if (!e.in_use)
       break;
 
-  // printf("dir_create(%s) Tracer 6   newdir: \"%s\"\n", name, newdir);
+  printf("dir_create(%s) Tracer 6   newdir: \"%s\"\n", name, newdir);
 
   /* Write slot. */
   e.in_use = true;
