@@ -105,9 +105,9 @@ filesys_open(const char *name)
 //     printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
   }
 
+  sema_up(&open_sema);
   dir_close(dir);
 //   printf("filesys_open(%s): Trace 2 EXIT \t return %x\n", name, inode);
-  sema_up(&open_sema);
   return file_open(inode);
 }
 
