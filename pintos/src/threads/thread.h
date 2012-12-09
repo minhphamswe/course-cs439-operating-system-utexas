@@ -226,5 +226,6 @@ void thread_mark_waited(struct exit_status* es);
 /* Functions to support file handlers */
 int thread_add_file_handler(struct file *file);
 int thread_add_dir_handler(struct dir *dir);
+void thread_close_handler(int fd);
 
 #endif /* threads/thread.h */

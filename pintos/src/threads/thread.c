@@ -988,3 +988,32 @@ int thread_add_dir_handler(struct dir *dir) {
   // Return the file descriptor
   return new_handle->fd;
 }
+/** Close the file handler matching the file descriptor fd. If none matches,
+ *  do nothing. */
+void
+thread_close_handler(int fd)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&t->handles); e != list_end(&t->handles);
+       e = list_next(e))
+  {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+
+    // File descriptor found: read file
+    if (fhp->fd == fd)
+    {
+      // Close file
+      file_close(fhp->file);
+      
+      // Remove from list
+      enum intr_level old_level = intr_disable();
+      list_remove(e);
+      intr_set_level(old_level);
+
+      return;
+    }
+  }
+}

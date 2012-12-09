@@ -583,23 +583,7 @@ void sysclose_handler(struct intr_frame *f)
   // Get the file descriptor from the stack
   int fd = (int) pop_stack(f);
 
-  struct thread *tp = thread_current();
-  struct list_elem *e;
-
-  // Search for file descriptor in the thread open-file handles
-  for (e = list_begin(&tp->handles); e != list_end(&tp->handles);
-       e = list_next(e))
-  {
-    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
-
-    // File descriptor found: read file
-    if (fhp->fd == fd)
-    {
-      file_close(fhp->file);
-      list_remove(e);
-      return;
-    }
-  }
+  thread_close_handler(fd);
 }
 
 /**
