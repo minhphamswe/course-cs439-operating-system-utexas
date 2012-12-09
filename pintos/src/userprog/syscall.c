@@ -763,6 +763,38 @@ void sysmkdir_handler(struct intr_frame* f)
  */
 void sysreaddir_handler(struct intr_frame* f)
 {
+  int fd = (int) pop_stack(f);
+  char *name = (char*) pop_stack(f);
+
+  if (path_isdot(name) || path_isdotdot(name)) {
+    // "." and ".." should not be returned by readdir
+    f->eax = 0;
+  }
+  else {
+    // Not "." or "..": get the handler corresponding to the descriptor
+    struct fileHandle *fhp = get_handle(fd);
+
+    if (fhp != NULL) {
+      // Found a handler: get its inode
+      struct file *fp = fhp->file;
+      struct inode *ip = file_get_inode(fp);
+
+      // Check if the inode points to a directory
+      if (ptr_isdir(&ip->data.self)) {
+        // Yes it points to directory: Open and call dir_readdir on it
+        struct dir *dp = dir_open(ip);
+        f->eax = dir_readdir(dp, name);
+      }
+      else {
+        // No it is not: just return unsuccessful
+        f->eax = 0;
+      }
+    }
+    else {
+      // Unknown file descriptor
+      f->eax = -1;
+    }
+  }
 }
 
 /**
