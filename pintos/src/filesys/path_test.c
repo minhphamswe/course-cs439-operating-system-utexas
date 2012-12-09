@@ -104,8 +104,14 @@ char *path_normpath(const char *path)
       else
       {
          // Undefined edge case: anything goes
-        ret = token;
-        continue;
+        if (path_isabs(tempname)) {
+          ret = "/";
+          continue;
+        }
+        else {
+          ret = token;
+          continue;
+        }
       }
     }
     // Saw a "."
@@ -371,8 +377,9 @@ bool path_isdot(const char* path)
 bool path_isdotdot(const char* path)
 {
   return (path_isvalid(path) &&
-          strlen(path) == 2 &&
-          path[0] == '.' && path[1] == '.');
+          path[0] == '.' && path[1] == '.' &&
+          (strlen(path) == 2 ||
+           strlen(path) == 3 && path[2] == '/'));
 }
 
 int main(int argc, char **argv)
@@ -435,6 +442,13 @@ int main(int argc, char **argv)
 //   printf("TEST path_normpath(\"..////\"): %s\n", path_normpath("..////"));
 //   printf("TEST path_normpath(\"../../../../\"): %s\n", path_normpath("../../../../"));
 //   printf("TEST path_normpath(\"/\"): %s\n", path_normpath("/"));
+//   printf("TEST path_normpath(\"/..\"): %s\n", path_normpath("/.."));
+//   printf("TEST path_normpath(\"/../\"): %s\n", path_normpath("/../"));
+//   printf("TEST path_normpath(\"/../../..\"): %s\n", path_normpath("/../../.."));
+//   printf("TEST path_normpath(\"/../../../\"): %s\n", path_normpath("/../../../"));
+//   printf("TEST path_normpath(\"/.\"): %s\n", path_normpath("/."));
+//   printf("TEST path_normpath(\"/./\"): %s\n", path_normpath("/./"));
+
 
 //   printf("TEST path_join2(\"/\", \"args-none\"): %s\n", path_join2("/", "args-none"));
 //   printf("TEST path_join2(\"/\", \".\"): %s\n", path_join2("/", "."));

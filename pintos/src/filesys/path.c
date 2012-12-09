@@ -79,8 +79,14 @@ char *path_normpath(const char *path)
       }
       else {
         // Undefined edge case: anything goes
-        ret = token;
-        continue;
+        if (path_isabs(tempname)) {
+          ret = "/";
+          continue;
+        }
+        else {
+          ret = token;
+          continue;
+        }
       }
     }
     // Saw a "."
