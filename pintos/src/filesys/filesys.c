@@ -98,7 +98,7 @@ filesys_open(const char *name)
   struct dir *dir = dir_open_root();
   struct inode *inode = NULL;
 
-  printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
+//   printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
   sema_down(&open_sema);
   if (dir != NULL) {
     dir_lookup(dir, name, &inode);

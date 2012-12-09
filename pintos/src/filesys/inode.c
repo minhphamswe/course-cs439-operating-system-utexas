@@ -21,6 +21,7 @@ static struct list open_inodes;
 
 /* Semaphores */
 static struct semaphore alloc_sema;
+static struct semaphore open_sema;
 
 // A full block of all zeros
 static char zeros[BLOCK_SECTOR_SIZE];
@@ -270,6 +271,7 @@ inode_init(void)
 
   // Initialize semaphores
   sema_init(&alloc_sema, 1);
+  sema_init(&open_sema, 1);
   sema_init(&closing_sema, 1);
 }
 
@@ -313,6 +315,7 @@ inode_create(block_sector_t sector, off_t length)
 struct inode *
 inode_open(block_sector_t sector)
 {
+  sema_down(&open_sema);
   // printf("inode_open(%x): Trace 1\n", sector);
   struct list_elem *e;
   struct inode *inode;
@@ -327,6 +330,7 @@ inode_open(block_sector_t sector)
     {
       inode_reopen(inode);
       // printf("inode_open(%x): Trace 2 EXIT\treturn: %x\n", sector, inode);
+      sema_up(&open_sema);
       return inode;
     }
   }
@@ -337,6 +341,7 @@ inode_open(block_sector_t sector)
   if (inode == NULL)
   {
     // printf("inode_open(%x): Trace 3 EXIT\treturn: %x\n", sector, inode);
+    sema_up(&open_sema);
     return NULL;
   }
 
@@ -352,6 +357,7 @@ inode_open(block_sector_t sector)
   block_read(fs_device, inode->sector, &inode->data);
 
   // printf("inode_open(%x): Trace 4 EXIT\treturn %x, inode->data.file_length: %d, inode->data.node_length: %d\n", sector, inode, inode->data.file_length, inode->data.node_length);
+  sema_up(&open_sema);
   return inode;
 }
 
