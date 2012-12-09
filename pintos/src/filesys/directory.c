@@ -96,7 +96,7 @@ dir_get_inode(struct dir *dir)
    if EP is non-null, and sets *OFSP to the byte offset of the
    directory entry if OFSP is non-null.
    otherwise, returns false and ignores EP and OFSP. */
-static bool
+bool
 lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
@@ -543,7 +543,7 @@ bool
 dir_changedir(const char *name)
 {
   char *abspath = path_abspath(name);
-  printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
+//   printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
 //   printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
@@ -554,12 +554,12 @@ dir_changedir(const char *name)
   struct thread *t = thread_current();
 
   if (path_exists(abspath)) {
-    printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
+//     printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, strlen(abspath));
     return true;
   }
   else {
-    printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
+//     printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
     return false;
   }
 }

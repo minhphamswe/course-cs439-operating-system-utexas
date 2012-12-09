@@ -52,4 +52,6 @@ bool dir_add (struct dir *, const char *name, block_sector_t);
 bool dir_remove (struct dir *, const char *name);
 bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 
+bool lookup(const struct dir *dir, const char *name, struct dir_entry *ep, off_t *ofsp);
+
 #endif /* filesys/directory.h */

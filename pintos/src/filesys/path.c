@@ -11,6 +11,7 @@
 #include "threads/interrupt.h"
 
 #include "filesys/directory.h"
+#include "filesys/inode.h"
 
 /** Return TRUE if PATH is valid */
 bool
@@ -284,7 +285,48 @@ path_join2(const char *path1, const char *path2)
  */
 bool path_exists(const char *path)
 {
-  return path_isvalid(path);
+  bool success = path_isvalid(path);     // Path must first be valid
+  struct dir *dir = NULL;
+  struct dir_entry entry;
+
+  char *abspath = NULL, *sentry = NULL, *token = NULL, *save_ptr = NULL;
+  size_t offset = 0;
+
+  if (success) {
+    // So far so good: walk the tree from root to said directory
+    abspath = path_abspath(path);
+    dir = dir_open_root();
+
+    sentry = strtok_r(abspath, "/", &save_ptr);
+    token = sentry;
+    sentry = strtok_r(NULL, "/", &save_ptr);
+
+    while (token != NULL && success) {
+      printf("Token: %s\n", token);
+      if (sentry) printf("Sentry: %s\n", sentry);
+
+      if (sentry == NULL) {
+        // Token represents the last token in path: can be file or directory
+        success = lookup(dir, token, &entry, &offset);
+      }
+      else {
+        // Token is not the last token in path: must be a directory
+        success = lookup(dir, token, &entry, &offset);
+        success = success && entry.is_dir;
+        if (success) {
+          dir = dir_open(inode_open(entry.inode_sector));
+          success = dir != NULL;
+        }
+      }
+
+      offset = 0;
+      token = sentry;
+      sentry = strtok_r(NULL, "/", &save_ptr);
+    }
+  }
+
+//   printf("path_exists(%s): Trace 2 EXIT \t return %d\n", path, success);
+  return success;
 }
 
 /**
