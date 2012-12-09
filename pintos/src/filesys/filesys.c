@@ -13,11 +13,10 @@
 #include "threads/thread.h"
 #include "threads/synch.h"
 
+//======[ Global Definitions ]===============================================
+
 /* Partition that contains the file system. */
 struct block *fs_device;
-
-//======[ Global Definitions ]===============================================
-static struct semaphore open_sema;
 
 static void do_format(void);
 
@@ -38,9 +37,6 @@ filesys_init(bool format)
     do_format();
 
   free_map_open();
-
-  // Initialize semaphore(s)
-  sema_init(&open_sema, 1);
 }
 
 /* Shuts down the file system module, writing any unwritten data
@@ -99,13 +95,11 @@ filesys_open(const char *name)
   struct inode *inode = NULL;
 
 //   printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
-  sema_down(&open_sema);
   if (dir != NULL) {
     dir_lookup(dir, name, &inode);
 //     printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
   }
 
-  sema_up(&open_sema);
   dir_close(dir);
 //   printf("filesys_open(%s): Trace 2 EXIT \t return %x\n", name, inode);
   return file_open(inode);
