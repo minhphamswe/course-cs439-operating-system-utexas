@@ -369,27 +369,27 @@ void sysopen_handler(struct intr_frame *f)
   char *path = (char*) pop_stack(f);
 
   // Path name is NULL: return -1
-  if (path == NULL)
-  {
+  if (path == NULL) {
     f->eax = -1;
   }
-  if (strlen(path) == 0)
-  {
+  else if (strlen(path) == 0) {
     f->eax = -1;
   }
-  // Attempt to open PATH
-  struct file *file = filesys_open(path);
+  else {
+    // Attempt to open PATH
+    struct file *file = filesys_open(path);
 
-  // PATH cannot be opened: return -1
-  if (file == NULL)
-  {
-    f->eax = -1;
-  }
-  // PATH is opened as file: put it on the list of open file handles
-  else
-  {
-    // return the file descriptor
-    f->eax = thread_add_file_handler(file);
+    // PATH cannot be opened: return -1
+    if (file == NULL)
+    {
+      f->eax = -1;
+    }
+    // PATH is opened as file: put it on the list of open file handles
+    else
+    {
+      // return the file descriptor
+      f->eax = thread_add_file_handler(file);
+    }
   }
 }
 
@@ -405,14 +405,12 @@ void sysfilesize_handler(struct intr_frame *f)
 
   struct fileHandle *fhp = get_handle(fd);
 
-  if (fhp)
-  {
+  if (fhp) {
     sema_down(&filesys_sema);
     f->eax = file_length(fhp->file);
     sema_up(&filesys_sema);
   }
-  else
-  {
+  else {
     f->eax = -1;
   }
 }
@@ -763,7 +761,7 @@ void sysmkdir_handler(struct intr_frame* f)
  * system supports longer file names than the basic file system,
  * you should increase this value from the default of 14.
  */
-void sysreaddir_handler(struct intr_frame* f UNUSED)
+void sysreaddir_handler(struct intr_frame* f)
 {
 }
 
@@ -779,12 +777,15 @@ void sysisdir_handler(struct intr_frame* f)
 
   struct fileHandle *fhp = get_handle(fd);
 
-  if (fhp != NULL)
-  {
+  if (fhp != NULL) {
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
 
     f->eax = ptr_isdir(&ip->data.self);
+  }
+  else {
+    // Unknown file descriptor
+    f->eax = -1;
   }
 }
 
