@@ -100,6 +100,7 @@ static bool
 lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
+  char *abspath = path_abspath(name);
   // printf("lookup %s\n", name);
   if (!path_isvalid(name))
     return 0;
@@ -134,6 +135,7 @@ bool
 dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
+  char *abspath = path_abspath(name);
    // printf("dirlookup 1  %s\n", name);
   struct dir_entry e;
 
@@ -210,6 +212,7 @@ dir_lookup(const struct dir *dir, const char *name,
 bool
 dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 {
+  char *abspath = path_abspath(name);
   // printf("dir_add(%s) Tracer 1 \n", name);
   struct dir_entry e;
   off_t ofs;
@@ -298,6 +301,7 @@ done:
 bool
 dir_remove(struct dir *dir, const char *name)
 {
+  char *abspath = path_abspath(name);
   // printf("dir_remove(%s) Tracer 1 \n", name);
   char *toDelete = calloc(1, PATH_MAX * sizeof(name));
   struct dir_entry e;
@@ -376,6 +380,7 @@ done:
 bool
 dir_readdir(struct dir *dir, char *name)
 {
+  char *abspath = path_abspath(name);
   struct dir_entry e;
 
   //dir = dir_get_leaf(name);
@@ -401,6 +406,7 @@ dir_readdir(struct dir *dir, char *name)
 bool
 dir_create(struct dir *dir, const char *name, block_sector_t sector)
 {
+  char *abspath = path_abspath(name);
   // printf("dir_create(%s) Tracer 1 \n", name);
   
   char *newdir = calloc(1, PATH_MAX * sizeof(char));
@@ -513,6 +519,7 @@ done:
 bool
 dir_changedir(const char *name)
 {
+  char *abspath = path_abspath(name);
   // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
@@ -572,6 +579,7 @@ dir_changedir(const char *name)
 bool
 dir_child(struct dir *current, const char *child, struct dir *retdir)
 {
+  char *abspath = path_abspath(child);
   // printf("dir_child(%s) Tracer 1   current: %x\n", child, current);
   struct dir_entry e;
   retdir = calloc(1, sizeof(struct dir));
@@ -608,6 +616,7 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
 struct dir *
 dir_get_leaf(const char *name)
 {
+  char *abspath = path_abspath(name);
   // printf("dir_get_leaf(%s) Trace 1 \n", name);
   if (!path_isvalid(name))
     return NULL;
