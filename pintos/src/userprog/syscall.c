@@ -53,8 +53,6 @@ uint32_t pop_stack(struct intr_frame *f);
 struct fileHandle* get_handle(int fd);
 void terminate_thread(void);
 
-static struct semaphore filesys_sema;
-
 /* Read 4 bytes at the user virtual address UADDR
 * UADDR must be below PHYS_BASE
 * Returns the byte value if successful, -1 if a segfault occurred.
@@ -116,9 +114,6 @@ uint32_t pop_stack(struct intr_frame *f)
 void
 syscall_init(void)
 {
-  // Initialize semaphore(s)
-  sema_init(&filesys_sema, 1);
-
   // Register handler
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -321,9 +316,7 @@ void syscreate_handler(struct intr_frame *f)
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
     terminate_thread();
 
-  sema_down(&filesys_sema);
   f->eax = filesys_create(filename, filesize);
-  sema_up(&filesys_sema);
 }
 
 /**
@@ -339,9 +332,7 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = (char*) pop_stack(f);
 
-  sema_down(&filesys_sema);
   f->eax = filesys_remove(filename);
-  sema_up(&filesys_sema);
 }
 
 /**
@@ -406,9 +397,7 @@ void sysfilesize_handler(struct intr_frame *f)
   struct fileHandle *fhp = get_handle(fd);
 
   if (fhp) {
-    sema_down(&filesys_sema);
     f->eax = file_length(fhp->file);
-    sema_up(&filesys_sema);
   }
   else {
     f->eax = -1;
@@ -464,9 +453,7 @@ void sysread_handler(struct intr_frame *f)
 
     if (fhp)
     {
-      sema_down(&filesys_sema);
       f->eax = file_read(fhp->file, buffer, size);
-      sema_up(&filesys_sema);
     }
     else
     {
@@ -516,9 +503,7 @@ void syswrite_handler(struct intr_frame *f)
     // Is the file currently executing?
     if (fhp != NULL)
     {
-      sema_down(&filesys_sema);
       f->eax = file_write(fhp->file, buffer, bufferSize);
-      sema_up(&filesys_sema);
     }
     else
     {
@@ -556,9 +541,7 @@ void sysseek_handler(struct intr_frame *f)
 
   if (fhp)
   {
-    sema_down(&filesys_sema);
     file_seek(fhp->file, newpos);
-    sema_up(&filesys_sema);
   }
 
 }
@@ -580,9 +563,7 @@ void systell_handler(struct intr_frame *f)
   if (fhp)
   {
     // File descriptor found: read file
-    sema_down(&filesys_sema);
     f->eax = (uint32_t) file_tell(fhp->file);
-    sema_up(&filesys_sema);
   }
   else
   {
@@ -614,10 +595,8 @@ void sysclose_handler(struct intr_frame *f)
     // File descriptor found: read file
     if (fhp->fd == fd)
     {
-      sema_down(&filesys_sema);
       file_close(fhp->file);
       list_remove(e);
-      sema_up(&filesys_sema);
       return;
     }
   }
