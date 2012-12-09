@@ -7,6 +7,9 @@
  * Provide path-related functionalities.
  */
 
+/** Return the current working directory. */
+char* path_cwd(void);
+
 /** Return TRUE if PATH is valid */
 bool path_isvalid(const char *path);
 

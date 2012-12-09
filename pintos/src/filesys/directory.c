@@ -707,9 +707,3 @@ is_path(const char *name)
   free(tempname);
   return success;
 }
-
-char*
-dir_getcwd(void)
-{
-  return &thread_current()->pwd;
-}

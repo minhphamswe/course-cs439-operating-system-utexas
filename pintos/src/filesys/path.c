@@ -6,6 +6,7 @@
 #include "lib/stdio.h"
 #include "lib/debug.h"
 
+#include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/interrupt.h"
 
@@ -40,14 +41,15 @@ path_isvalid(const char *path)
 }
 
 /** Return a normalized absolutized version of the path name PATH. */
-// char *path_abspath(const char *path)
-// {
-//   printf("path_abspath(%s): Trace 1\n", path);
-//   printf("path_abspath(%s): Trace 2 \t dir_getcwd(): %s\n", path, dir_getcwd());
-//   printf("path_abspath(%s): Trace 3 \t path_join2(dir_getcwd(), path): %s\n", path, path_join2(dir_getcwd(), path));
-//   printf("path_abspath(%s): Trace 4 \t path_normpath(path_join2(dir_getcwd(), path): %s\n", path, path_normpath(path_join2(dir_getcwd(), path)));
-//   return path_normpath(path_join2(dir_getcwd(), path));
-// }
+char *path_abspath(const char *path)
+{
+  return path_normpath(path_join2(path_cwd(), path));
+}
+
+char *path_cwd(void)
+{
+  return &thread_current()->pwd;
+}
 
 /**
  * Return a normalized version of the path name PATH.
