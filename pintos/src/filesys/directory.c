@@ -555,7 +555,7 @@ dir_changedir(const char *name)
 
   if (path_exists(abspath)) {
     printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
-    t->pwd = abspath;
+    strlcpy(&t->pwd[0], abspath, strlen(abspath));
     return true;
   }
   else {
