@@ -426,7 +426,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   if (strcmp(abspath, name)) {
     abspath = "";
   }
-  // printf("dir_create(%s) Tracer 1 \n", name);
+//   printf("dir_create(%s) Tracer 1 \n", name);
   
   char *newdir = calloc(1, PATH_MAX * sizeof(char));
   if (!path_isvalid(name))
@@ -542,18 +542,19 @@ dir_changedir(const char *name)
   if (strcmp(abspath, name)) {
     abspath = "";
   }
-  // printf("dir_changedir(%s) Tracer 1\n", name);
+//   printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
     return false;
 
-  // printf("dir_changedir(%s) Tracer 2\n", name);
+//   printf("dir_changedir(%s) Tracer 2\n", name);
   // Not pre-user threads at this point, get the thread
   struct thread *t = thread_current();
 
   // Changing to root?
   if (strlen(name) == 1 && name[0] == '/')
   {
+//     printf("dir_changedir(%s) Tracer 2.1 EXIT \n", name);
     *t->pwd = '/';
     return true;
   }
@@ -564,36 +565,36 @@ dir_changedir(const char *name)
   // For get_leaf to work, directories must end in '/'
   if (name[strlen(name) - 1] != '/')
   {
-    // printf("dir_changedir(%s) Tracer 1.5 \n", temp);
+//     printf("dir_changedir(%s) Tracer 1.5 \n", temp);
     strlcat(temp, "/", sizeof(temp));
   }
 
-  // printf("dir_changedir(%s) Tracer 3\n", temp);
+//   printf("dir_changedir(%s) Tracer 3\n", temp);
   // Is the new directory valid?
   // If it's root it would have already returned, so dir_get_leaf should
   // return not root if valid, root otherwise
   // Keep pwd the same
-  if (dir_get_leaf(temp)->inode == dir_open_root()->inode)
+  if (dir_get_leaf(temp)->inode == NULL)
   {
-    // printf("dir_changedir(%s) Tracer 3.5  leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
+//     printf("dir_changedir(%s) Tracer 3.5 EXIT leaf: %x  root: %x\n", temp, dir_get_leaf(temp)->inode, dir_open_root()->inode);
     return false;
   }
 
-  // printf("dir_changedir(%s) Tracer 4\n", temp);
+//   printf("dir_changedir(%s) Tracer 4\n", temp);
   // Absolute path name?
   if (temp[0] == '/')
   {
     *t->pwd = temp;
-    // printf("dir_changedir(%s) Tracer 5\n", temp);
+//     printf("dir_changedir(%s) Tracer 5\n", temp);
   }
   // Relative path name?
   else
   {
-    // printf("dir_changedir(%s) Tracer 6\n", temp);
+//     printf("dir_changedir(%s) Tracer 6\n", temp);
     strlcat(t->pwd, temp, sizeof(t->pwd));
   }
 
-  // printf("dir_changedir(%s) Tracer 7\n", temp);
+//   printf("dir_changedir(%s) Tracer 7 EXIT\n", temp);
   return true;
 }
 
