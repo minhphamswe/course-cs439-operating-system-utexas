@@ -147,12 +147,12 @@ dir_lookup(const struct dir *dir, const char *name,
 
   // Strip path off of file name
   char *token, *prevtoken;
-  char *tempname = calloc(1, 256);
+  char *tempname = calloc(1, PATH_MAX);
   char *save_ptr;
 
   prevtoken = NULL;
 
-  strlcpy(tempname, name, 256);
+  strlcpy(tempname, name, PATH_MAX);
 
   for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
        token = strtok_r(NULL, "/", &save_ptr))
@@ -225,12 +225,12 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 
   // Strip path off of file name
   char *token, *prevtoken;
-  char *tempname = calloc(1, 256);
+  char *tempname = calloc(1, PATH_MAX);
   char *save_ptr;
 
   prevtoken = NULL;
 
-  strlcpy(tempname, name, 256);
+  strlcpy(tempname, name, PATH_MAX);
 
   for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
        token = strtok_r(NULL, "/", &save_ptr))
@@ -299,7 +299,7 @@ bool
 dir_remove(struct dir *dir, const char *name)
 {
   // printf("dir_remove(%s) Tracer 1 \n", name);
-  char *toDelete = calloc(1, 256 * sizeof(name));
+  char *toDelete = calloc(1, PATH_MAX * sizeof(name));
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
@@ -310,7 +310,7 @@ dir_remove(struct dir *dir, const char *name)
   {
     // We need everything but the last token, so find the last slash
     int index = strlen(name);
-    char *pathname = calloc(1, 256 * sizeof(char));
+    char *pathname = calloc(1, PATH_MAX * sizeof(char));
     
     while(name[index] != '/' && index > -1)
       index--;
@@ -327,7 +327,7 @@ dir_remove(struct dir *dir, const char *name)
 
     char *token, *prevtoken;
     char *save_ptr;
-    strlcpy(toDelete, name, 256);
+    strlcpy(toDelete, name, PATH_MAX);
 
     for (token = strtok_r(toDelete, "/", &save_ptr); token != NULL;
          token = strtok_r(NULL, "/", &save_ptr))
@@ -335,7 +335,7 @@ dir_remove(struct dir *dir, const char *name)
       prevtoken = token;
     }
 
-    strlcpy(toDelete, prevtoken, 256);
+    strlcpy(toDelete, prevtoken, PATH_MAX);
   }
   else
     strlcpy(toDelete, name, strlen(name) + 1);
@@ -403,7 +403,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
 {
   // printf("dir_create(%s) Tracer 1 \n", name);
   
-  char *newdir = calloc(1, 256 * sizeof(char));
+  char *newdir = calloc(1, PATH_MAX * sizeof(char));
   if (!is_valid_name(name))
     return 0;
 
@@ -417,7 +417,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   {
     // We need everything but the last token, so find the last slash
     int index = strlen(name);
-    char *pathname = calloc(1, 256 * sizeof(char));
+    char *pathname = calloc(1, PATH_MAX * sizeof(char));
     
     while(name[index] != '/' && index > -1)
       index--;
@@ -434,7 +434,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
 
     char *token, *prevtoken;
     char *save_ptr;
-    strlcpy(newdir, name, 256);
+    strlcpy(newdir, name, PATH_MAX);
 
     for (token = strtok_r(newdir, "/", &save_ptr); token != NULL;
          token = strtok_r(NULL, "/", &save_ptr))
@@ -442,7 +442,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
       prevtoken = token;
     }
 
-    strlcpy(newdir, prevtoken, 256);
+    strlcpy(newdir, prevtoken, PATH_MAX);
 
 //    strlcpy(newdir, (char *)name[index], strlen(name) - index + 1);
     // printf("dir_create(%s) Tracer 3   newdir: \"%s\"   dir: %x\n", name, newdir, dir);
@@ -529,8 +529,8 @@ dir_changedir(const char *name)
     return true;
   }
 
-  char *temp[256];
-  strlcpy(temp, name, 256);
+  char *temp[PATH_MAX];
+  strlcpy(temp, name, PATH_MAX);
 
   // For get_leaf to work, directories must end in '/'
   if (name[strlen(name) - 1] != '/')
@@ -619,8 +619,8 @@ dir_get_leaf(const char *name)
   }
   
   // printf("dir_get_leaf(%s) Trace 2 \n", name);
-  char *tempname = calloc(1, 256 * sizeof(char));
-  char *token = calloc(1, 256 * sizeof(char));;
+  char *tempname = calloc(1, PATH_MAX * sizeof(char));
+  char *token = calloc(1, PATH_MAX * sizeof(char));;
   char *save_ptr;
   struct dir *tmpdir;
   struct dir *lastdir = calloc(1, sizeof(struct dir));
@@ -720,7 +720,7 @@ is_valid_name(const char *name)
 bool
 is_path(const char *name)
 {
-  char *tempname = calloc(1, 256 * sizeof(char));
+  char *tempname = calloc(1, PATH_MAX * sizeof(char));
   char *save_ptr;
   bool success = true;
   
