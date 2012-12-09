@@ -728,19 +728,18 @@ dir_get_leaf(const char *name)
 bool
 is_path(const char *name)
 {
-  char *tempname = calloc(1, PATH_MAX * sizeof(char));
+  char tempname[PATH_MAX];
   char *save_ptr;
   bool success = true;
   
   if(!path_isvalid(name))
     success = false;
 
-  strlcpy(tempname, name, strlen(name) + 1);
+  strlcpy(&tempname, name, strlen(name) + 1);
   
   // Any slashes?
   if(strlen(strtok_r(tempname, "/", &save_ptr)) == strlen(name))
     success = false;
-    
-  free(tempname);
+
   return success;
 }
