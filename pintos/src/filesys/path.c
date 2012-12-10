@@ -293,7 +293,6 @@ path_join2(const char *path1, const char *path2)
  */
 bool path_exists(const char *path)
 {
-  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -310,8 +309,9 @@ bool path_exists(const char *path)
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
 
+    enum intr_level old_level = intr_disable();
     while (token != NULL && success) {
-      intr_set_level(old_level);
+      intr_enable();
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
         success = lookup(dir, token, &entry, &offset);
@@ -326,16 +326,17 @@ bool path_exists(const char *path)
           success = dir != NULL;
         }
       }
-      old_level = intr_disable();
+      intr_disable();
 
       offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
+
     dir_close(dir);
+    intr_set_level(old_level);
   }
 
-  intr_set_level(old_level);
   return success;
 }
 
@@ -360,7 +361,6 @@ bool path_isabs(const char *path)
  */
 bool path_isfile(const char *path)
 {
-  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -373,22 +373,22 @@ bool path_isfile(const char *path)
     abspath = path_abspath(path);
     dir = dir_open_root();
 
+    enum intr_level old_level = intr_disable();
+
     sentry = strtok_r(abspath, "/", &save_ptr);
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
 
     while (token != NULL && success) {
+      intr_enable();
+
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
-        intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
         success = success && !entry.is_dir;
       } else {
         // Token is not the last token in path: must be a directory
-        intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
         success = success && entry.is_dir;
 
         if (success) {
@@ -398,15 +398,17 @@ bool path_isfile(const char *path)
         }
       }
 
+      intr_disable();
+
       offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
     dir_close(dir);
+    intr_set_level(old_level);
   }
 
-  intr_set_level(old_level);
   return success;
 }
 
@@ -415,7 +417,6 @@ bool path_isfile(const char *path)
  */
 bool path_isdir(const char *path)
 {
-  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -428,37 +429,40 @@ bool path_isdir(const char *path)
     abspath = path_abspath(path);
     dir = dir_open_root();
 
+    enum intr_level old_level = intr_disable();
     sentry = strtok_r(abspath, "/", &save_ptr);
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
 
     while (token != NULL && success) {
+      intr_enable();
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
-        intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
         success = success && entry.is_dir;
       } else {
         // Token is not the last token in path: must be a directory
         intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
         success = success && entry.is_dir;
 
         if (success) {
+          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
           success = dir != NULL;
         }
       }
+      intr_disable();
 
       offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
+
+    dir_close(dir);
+    intr_set_level(old_level);
   }
 
-  intr_set_level(old_level);
   return success;
 }
 

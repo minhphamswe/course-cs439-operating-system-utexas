@@ -168,6 +168,7 @@ dir_lookup(const struct dir *dir, const char *name,
     *inode = NULL;
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
+  dir_close(dir);
   return *inode != NULL;
 }
 
@@ -221,8 +222,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
-//   free(obj_name);
-//   free(abspath);
+  inode_close(dir->inode);
   return success;
 }
 
@@ -598,9 +598,11 @@ dir_is_empty(const char *name)
   {
     if (e.in_use)
     {
+      dir_close(dir);
       return false;
     }
   }
 
+  dir_close(dir);
   return true;
 }
