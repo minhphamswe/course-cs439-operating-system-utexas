@@ -158,15 +158,16 @@ dir_lookup(const struct dir *dir, const char *name,
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
   struct dir_entry e;
+  struct dir *foo;
 
   // Change to pathed directory
-  dir = dir_get_leaf(dirname);
-  if (dir == NULL) {
+  foo = dir_get_leaf(dirname);
+  if (foo == NULL) {
     return false;
   }
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.1, abspath: %s, path_basename(abspath): %s \n", dir, name, inode, abspath, path_basename(abspath));
-  if (lookup(dir, basename, &e, NULL))
+  if (lookup(foo, basename, &e, NULL))
   {
     // // printf("dir_lookup(%x, %s, %x): Trace 2 \t e.inode_sector: %x\n", dir, name, inode, e.inode_sector);
     *inode = inode_open(e.inode_sector);
@@ -180,7 +181,7 @@ dir_lookup(const struct dir *dir, const char *name,
     *inode = NULL;
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
-  dir_close(dir);
+  dir_close(foo);
   return *inode != NULL;
 }
 
