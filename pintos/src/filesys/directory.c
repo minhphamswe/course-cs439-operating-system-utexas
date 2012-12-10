@@ -588,11 +588,11 @@ total_opens++;
   free(token);
 
   if (enddir) {
-    if (tmpdir && tmpdir->inode) dir_close(tmpdir);
+    dir_close(tmpdir);
     return lastdir;
   }
   else {
-    if (lastdir) dir_close(lastdir);
+    dir_close(lastdir);
     return tmpdir;
   }
 }
