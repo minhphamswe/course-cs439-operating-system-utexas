@@ -472,13 +472,13 @@ dir_get_leaf(const char *name)
   // // // printf("dir_get_leaf(%s) Trace 1 \n", name);
   if (!path_isvalid(name))
     return NULL;
-    
+
   // If root, will cause other problems, so take care of first
   if (strlen(name) == 1 && name[0] == '/')
   {
     return dir_open_root();
   }
-  
+
   // // // printf("dir_get_leaf(%s) Trace 2 \n", name);
   char *tempname = calloc(1, PATH_MAX * sizeof(char));
   char *token = calloc(1, PATH_MAX * sizeof(char));;
