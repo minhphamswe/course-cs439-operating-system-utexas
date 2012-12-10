@@ -65,6 +65,7 @@ char *path_normpath(const char *path)
 {
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
+  ASSERT(tempname != NULL);
   char *token, *ret = NULL, *save_ptr;
 
   strlcpy(tempname, path, strlen(path) + 1);
@@ -134,6 +135,7 @@ char *path_dirname(const char *path)
 {
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
+  ASSERT(tempname);
   char *sentry, *ret = NULL, *save_ptr, *token = NULL;
 
   strlcpy(tempname, path, strlen(path) + 1);
@@ -179,6 +181,7 @@ char *path_basename(const char *path)
 {
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
+  ASSERT(tempname);
   char *token = NULL, *ret = NULL, *save_ptr = NULL;
 
   strlcpy(tempname, path, strlen(path) + 1);
@@ -216,6 +219,7 @@ char *path_join(int num_paths, const char *path1, ...)
   char *ret, *tmp;
 
   ret = malloc(strlen(path1) + 1);
+  ASSERT(ret);
   strlcpy(ret, path1, strlen(path1) + 1);
 
   va_start(args, path1);
@@ -248,12 +252,14 @@ path_join2(const char *path1, const char *path2)
   if (path2 == NULL)
   {
     ret = malloc(strlen(path1) + 1);
+    ASSERT(ret != NULL);
     strlcpy(ret, path1, strlen(path1) + 1);
   }
   else if (path1 == NULL || path_isabs(path2))
   {
     // If PATH2 is an absolute path, then just return it
     ret = malloc(strlen(path2) + 1);
+    ASSERT(ret != NULL);
     strlcpy(ret, path2, strlen(path2) + 1);
   }
   else
@@ -262,6 +268,7 @@ path_join2(const char *path1, const char *path2)
     if (path1[strlen(path1) - 1] == '/')
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
+      ASSERT(ret != NULL);
       strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
       strlcpy(ret + strlen(path1),
               path2, strlen(path2) + 1);        // copy all of path2
@@ -269,6 +276,7 @@ path_join2(const char *path1, const char *path2)
     else
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
+      ASSERT(ret != NULL);
       strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
       strlcpy(ret + strlen(path1), "/", 2);     // copy the '/'
       strlcpy(ret + strlen(path1) + 1,

@@ -335,7 +335,7 @@ void sysremove_handler(struct intr_frame *f)
   char *filename = (char*) pop_stack(f);
 
   if (path_isroot(filename) ||
-     (!path_isfile(filename) && !dir_is_empty(filename)) ||
+     (path_isdir(filename) && !dir_is_empty(filename)) ||
      (!strcmp(path_abspath(filename), path_cwd())))
   {
     f->eax = 0;
@@ -715,7 +715,8 @@ void sysmkdir_handler(struct intr_frame* f)
 {
   char *dir = (char*) pop_stack(f);
 
-  bool success = path_isvalid(dir);
+  bool success = (!path_exists(dir) &&
+                  path_isdir(path_dirname(path_abspath(dir))));
   if (success) {
     success = filesys_mkdir(dir);
   }
