@@ -187,7 +187,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   bool success = false;
 
   // Change to pathed directory
-  dir = dir_get_leaf(abspath);
+  dir = dir_get_leaf(path_dirname(abspath));
   if(dir == NULL) {
     // printf("dir_add(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
     return false;
