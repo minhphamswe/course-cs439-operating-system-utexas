@@ -250,10 +250,10 @@ dir_remove(struct dir *dir, const char *name)
   struct inode *inode = NULL;
   bool success = false;
   off_t ofs;
+  struct dir *foo = NULL;
 
   // Change to pathed directory
-  if(is_path(name))
-  {
+  if(is_path(name)) {
     // We need everything but the last token, so find the last slash
     int index = strlen(name);
     char pathname[PATH_MAX];
@@ -264,11 +264,11 @@ dir_remove(struct dir *dir, const char *name)
     pathname[index] = '\0';
 
     if(strlen(pathname) == 0)
-      dir = dir_open_root();
+      foo = dir_open_root();
     else
-      dir = dir_get_leaf(pathname);
+      foo = dir_get_leaf(pathname);
 
-    if(dir == NULL)
+    if(foo == NULL)
       return false;
 
     char *token = NULL, *prevtoken = NULL, *save_ptr = NULL;
@@ -282,14 +282,16 @@ dir_remove(struct dir *dir, const char *name)
 
     strlcpy(toDelete, prevtoken, PATH_MAX);
   }
-  else
+  else {
     strlcpy(toDelete, name, strlen(name) + 1);
+    foo = dir_open(inode_open(dir->inode->sector));
+  }
 
-  ASSERT(dir != NULL);
+  ASSERT(foo != NULL);
   ASSERT(name != NULL);
 
   /* Find directory entry. */
-  if (!lookup(dir, toDelete, &e, &ofs))
+  if (!lookup(foo, toDelete, &e, &ofs))
     goto done;
 
   /* Open inode. */
@@ -307,7 +309,7 @@ dir_remove(struct dir *dir, const char *name)
   /* Erase directory entry. */
   e.in_use = false;
 
-  if (inode_write_at(dir->inode, &e, sizeof e, ofs) != sizeof e)
+  if (inode_write_at(foo->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
 
   /* Remove inode. */
@@ -316,7 +318,7 @@ dir_remove(struct dir *dir, const char *name)
 
 done:
 
-  dir_close(dir);
+  dir_close(foo);
   inode_close(inode);
   return success;
 }
