@@ -29,7 +29,7 @@ dir_create_root(block_sector_t sector)
   if (success)
   {
     struct inode *node = inode_open(sector);
-    ptr_set_isdir(&node->data.self);
+    inode_mark_dir(node);
     inode_close(node);
   }
 
@@ -313,7 +313,7 @@ bool
 dir_readdir(struct dir *dir, char *name)
 {
   char *abspath = path_abspath(name);
-//   // printf("dir_readdir(%x, %s): Trace 1 \t abspath \n"
+  printf("dir_readdir(%x, %s): Trace 1 \t abspath: %s \n", abspath);
   struct dir_entry e;
 
   //dir = dir_get_leaf(name);
@@ -436,15 +436,10 @@ done:
 
   if (success)
   {
-//     struct inode node;
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
-//     node.data.file_length = 0;
-//     node.data.prev_length = 0;
-//     node.data.node_length = 0;
-//     node.data.self = ptr_create(&node.sector);
-//     node.data.magic = INODE_MAGIC;
-//     node.data.doubleptr = NULL;
-//     block_write(fs_device, sector, &node.data);
+    struct inode *node = inode_open(sector);
+    inode_mark_dir(node);
+    inode_close(node);
   }
 
   free(newdir);

@@ -737,34 +737,33 @@ void sysreaddir_handler(struct intr_frame* f)
   int fd = (int) pop_stack(f);
   char *name = (char*) pop_stack(f);
 
-  if (path_isdot(name) || path_isdotdot(name)) {
-    // "." and ".." should not be returned by readdir
-    f->eax = 0;
-  }
-  else {
-    // Not "." or "..": get the handler corresponding to the descriptor
-    struct fileHandle *fhp = get_handle(fd);
+//   printf("sysreaddir_handler(%d, %s): Trace 1\n", fd, name);
 
-    if (fhp != NULL) {
-      // Found a handler: get its inode
-      struct file *fp = fhp->file;
-      struct inode *ip = file_get_inode(fp);
+  // Not "." or "..": get the handler corresponding to the descriptor
+  struct fileHandle *fhp = get_handle(fd);
 
-      // Check if the inode points to a directory
-      if (ptr_isdir(&ip->data.self)) {
-        // Yes it points to directory: Open and call dir_readdir on it
-        struct dir *dp = dir_open(ip);
-        f->eax = dir_readdir(dp, name);
-      }
-      else {
-        // No it is not: just return unsuccessful
-        f->eax = 0;
-      }
+//   printf("sysreaddir_handler(%d, %s): Trace 1.1 \t fhp: %x\n", fd, name, fhp);
+
+  if (fhp != NULL) {
+    // Found a handler: get its inode
+    struct file *fp = fhp->file;
+    struct inode *ip = file_get_inode(fp);
+
+    printf("sysreaddir_handler(%d, %s): Trace 2.1 \t ip: %x, inode_is_dir(ip): %x\n", fd, name, ip, inode_is_dir(ip));
+    // Check if the inode points to a directory
+    if (inode_is_dir(ip)) {
+      // Yes it points to directory: Open and call dir_readdir on it
+      struct dir *dp = dir_open(ip);
+      f->eax = dir_readdir(dp, name);
     }
     else {
-      // Unknown file descriptor
-      f->eax = -1;
+      // No it is not: just return unsuccessful
+      f->eax = 0;
     }
+  }
+  else {
+    // Unknown file descriptor
+    f->eax = -1;
   }
 }
 

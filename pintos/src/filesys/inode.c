@@ -78,6 +78,27 @@ bool ptr_isdir(const inode_ptr *ptr)
 
 //======[ Methods to Set/Query Attributes of inode ]=========================
 
+/** Return true if the metadata for this inode says it is a directory */
+bool inode_is_dir(struct inode* ip)
+{
+  ASSERT(ip != NULL);
+  return ptr_isdir(&ip->data.self);
+}
+
+/** Return true if the metadata for this inode says it is a file */
+bool inode_is_file(struct inode* ip)
+{
+  ASSERT(ip != NULL);
+  return !ptr_isdir(&ip->data.self);
+}
+
+/** Mark the metadata for this inode to say it is a directory */
+void inode_mark_dir(struct inode *ip)
+{
+  ASSERT(ip != NULL);
+  return ptr_set_isdir(&ip->data.self);
+}
+
 // Allocate a single new inode, along with its data. If ON_DISK is true, also
 // allocate space on disk for the inode.
 // Return the struct inode pointer if successful, NULL otherwise
