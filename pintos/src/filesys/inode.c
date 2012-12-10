@@ -463,9 +463,8 @@ inode_remove(struct inode *inode)
 off_t
 inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
+//   printf("inode_read_at(%x, %x, %d, %d): Trace 1 \t inode->sector: %x\n", inode, buffer_, size, offset, inode->sector);
   sema_down(&inode->extend_sema);
-
-  // // printf("inode_read_at(%x, %x, %d, %d): Trace 1\n", inode, buffer_, size, offset);
   ASSERT(inode != NULL);
   ASSERT(buffer_ != NULL);
 

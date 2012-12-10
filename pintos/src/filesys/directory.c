@@ -334,10 +334,11 @@ dir_readdir(struct dir *dir, char *name)
   struct dir_entry e;
 
   //dir = dir_get_leaf(name);
+//   printf("dir_readdir(%x, %s): Trace 1.1 \t dir->pos %d\n", dir, name, dir->pos);
 
   while (inode_read_at(dir->inode, &e, sizeof e, dir->pos) == sizeof e)
   {
-    // // printf("dir_readdir(%x, %s): Trace 1.1 \t dir->pos %d\n", dir, name, dir->pos);
+    // printf("dir_readdir(%x, %s): Trace 1.1 \t dir->pos %d\n", dir, name, dir->pos);
     dir->pos += sizeof e;
 
     if (e.in_use)

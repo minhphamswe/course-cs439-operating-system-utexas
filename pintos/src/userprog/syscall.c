@@ -391,8 +391,8 @@ void sysopen_handler(struct intr_frame *f)
         f->eax = thread_add_file_handler(file);
       }
       else {
-        struct dir *dir = dir_open(file->inode);
-        free(file);
+        struct dir *dir = dir_open(inode_open(file->inode->sector));
+        file_close(free);
         // return the file descriptor
         f->eax = thread_add_dir_handler(dir);
         dir_close(dir);
