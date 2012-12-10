@@ -1006,7 +1006,8 @@ thread_close_handler(int fd)
     if (fhp->fd == fd)
     {
       // Close file
-      file_close(fhp->file);
+      if (fhp->file) file_close(fhp->file);
+      if (fhp->dir)  dir_close(fhp->dir);
       
       // Remove from list
       enum intr_level old_level = intr_disable();

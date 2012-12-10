@@ -106,7 +106,7 @@ lookup(const struct dir *dir, const char *name,
 //   char *abspath = path_abspath(name);
   // printf("lookup(%x, %s, %x, %x): Trace 1 \t dir->inode: %x\n", dir, name, ep, ofsp, dir->inode);
 
-  // // // printf("lookup %s\n", name);
+  // printf("lookup %s\n", name);
   if (!path_isvalid(name))
     return 0;
 
@@ -146,7 +146,7 @@ dir_lookup(const struct dir *dir, const char *name,
   char *basename = path_basename(abspath);
   char *dirname = path_dirname(abspath);
 
-  // // printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
+  // printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
   struct dir_entry e;
 
   // Change to pathed directory
@@ -155,10 +155,10 @@ dir_lookup(const struct dir *dir, const char *name,
     return false;
   }
 
-  // // printf("dir_lookup(%x, %s, %x): Trace 1.1, abspath: %s, path_basename(abspath): %s \n", dir, name, inode, abspath, path_basename(abspath));
+  // printf("dir_lookup(%x, %s, %x): Trace 1.1, abspath: %s, path_basename(abspath): %s \n", dir, name, inode, abspath, path_basename(abspath));
   if (lookup(dir, basename, &e, NULL))
   {
-    // // printf("dir_lookup(%x, %s, %x): Trace 2 \t e.inode_sector: %x\n", dir, name, inode, e.inode_sector);
+    // printf("dir_lookup(%x, %s, %x): Trace 2 \t e.inode_sector: %x\n", dir, name, inode, e.inode_sector);
     *inode = inode_open(e.inode_sector);
 
     if (e.is_dir)
@@ -169,7 +169,7 @@ dir_lookup(const struct dir *dir, const char *name,
   else
     *inode = NULL;
 
-  // // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
+  // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
   dir_close(dir);
   return *inode != NULL;
 }
@@ -185,7 +185,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 {
   char *abspath = path_abspath(name);
 
-  // // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s\n", dir, name, inode_sector, abspath);
+  // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s\n", dir, name, inode_sector, abspath);
   struct dir_entry e;
   off_t ofs;
   bool success = false;
@@ -193,14 +193,14 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   // Change to pathed directory
   dir = dir_get_leaf(path_dirname(abspath));
   if(dir == NULL) {
-    // // printf("dir_add(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
+    // printf("dir_add(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
     free(abspath);
     return false;
   }
 
   /* Check that NAME is not in use. */
   char *obj_name = path_basename(abspath);
-  // // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s,, obj_name: %s\n", dir, name, inode_sector, abspath, obj_name);
+  // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s,, obj_name: %s\n", dir, name, inode_sector, abspath, obj_name);
   if (lookup(dir, obj_name, NULL, NULL))
     goto done;
 
@@ -287,9 +287,9 @@ dir_remove(struct dir *dir, const char *name)
 
   if (inode == NULL)
     goto done;
-struct dir *dir2 = dir_open_root();
-printf("Open count: %d, root open count: %d, total opens: %d \n", inode->open_cnt, dir2->inode->open_cnt, total_opens);
-dir_close(dir2);
+// struct dir *dir2 = dir_open_root();
+// printf("Open count: %d, root open count: %d, total opens: %d , sector: %x\n", inode->open_cnt, dir2->inode->open_cnt, total_opens, inode->sector);
+// dir_close(dir2);
 
   if (inode->open_cnt > 1)
     goto done;
@@ -306,6 +306,7 @@ dir_close(dir2);
 
 done:
 
+  dir_close(dir);
   inode_close(inode);
   return success;
 }
@@ -345,16 +346,17 @@ bool
 dir_create(struct dir *dir, const char *name, block_sector_t sector)
 {
   char *abspath = path_abspath(name);
-//   printf("dir_create(%s) Tracer 1 \t abspath: %s\n", name, abspath);
+  // printf("dir_create(%s) Tracer 1 \t path_dirname(abspath): %s\n", name, path_dirname(abspath));
 
   struct dir_entry e;
   off_t ofs;
   bool success = false;
+  struct dir *foo = NULL;
 
   // Change to pathed directory
-  dir = dir_get_leaf(path_dirname(abspath));
-  if(dir == NULL) {
-    // // printf("dir_create(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
+  foo = dir_get_leaf(path_dirname(abspath));
+  if(foo == NULL) {
+    // printf("dir_create(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
     free(abspath);
     return false;
   }
@@ -362,7 +364,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   /* Check that NAME is not in use. */
   char *newdir = path_basename(abspath);
   // printf("dir_create(%s) Tracer 1 \t newdir: %s\n", name, newdir);
-  if (lookup(dir, newdir, NULL, NULL))
+  if (lookup(foo, newdir, NULL, NULL))
     goto done;
 
   /* Set OFS to offset of free slot.
@@ -372,7 +374,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
      inode_read_at() will only return a short read at end of file.
      Otherwise, we'd need to verify that we didn't get a short
      read due to something intermittent such as low memory. */
-  for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+  for (ofs = 0; inode_read_at(foo->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (!e.in_use)
       break;
@@ -384,7 +386,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   e.is_dir = true;
   strlcpy(e.name, newdir, sizeof e.name);
   e.inode_sector = sector;
-  success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+  success = inode_write_at(foo->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
 
@@ -393,12 +395,12 @@ done:
     // printf("dir_create(%s) Tracer 7 \n", name);
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
     struct inode *node = inode_open(sector);
+
+    // printf("node: %x, foo->inode: %x\n", node, foo->inode);
     inode_mark_dir(node);
     block_write(fs_device, node->sector, &node->data);
     inode_close(node);
   }
-
-//   free(newdir);
   return success;
 }
 
@@ -407,25 +409,25 @@ bool
 dir_changedir(const char *name)
 {
   char *abspath = path_abspath(name);
-//   // // printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
-//   // // printf("dir_changedir(%s) Tracer 1\n", name);
+//   // printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
+//   // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
     return false;
 
-//   // // printf("dir_changedir(%s) Tracer 2\n", name);
+//   // printf("dir_changedir(%s) Tracer 2\n", name);
   // Not pre-user threads at this point, get the thread
   struct thread *t = thread_current();
 
   if (path_exists(abspath)) {
-//     // // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
+//     // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, sizeof(t->pwd));
-//     // // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
+//     // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
 //   free(abspath);
     return true;
   }
   else {
-//     // // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
+//     // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
 //    free(abspath);
     return false;
   }
@@ -449,11 +451,11 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
   if (lookup(current, child, &e, NULL))
   {
     retdir->inode = inode_open(e.inode_sector);
-    // // // printf("dir_child(%s) Tracer 2   inode: %x\n", child, retdir->inode);
+    // printf("dir_child(%s) Tracer 2   inode: %x\n", child, retdir->inode);
   }
   else
   {
-    // // // printf("dir_child(%s) Tracer 3 \n", child);
+    // printf("dir_child(%s) Tracer 3 \n", child);
     //free(retdir);
     retdir = NULL;
     return false;
@@ -464,7 +466,7 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
     //free(retdir);
     retdir = NULL;
     return false;
-    // // // printf("dir_child(%s) Tracer 4 \n", child);
+    // printf("dir_child(%s) Tracer 4 \n", child);
   }
 
   return true;
@@ -476,7 +478,7 @@ struct dir *
 dir_get_leaf(const char *name)
 {
 total_opens++;
-  // // // printf("dir_get_leaf(%s) Trace 1 \n", name);
+  // printf("dir_get_leaf(%s) Trace 1 \n", name);
   if (!path_isvalid(name))
     return NULL;
 
@@ -486,7 +488,7 @@ total_opens++;
     return dir_open_root();
   }
 
-  // // // printf("dir_get_leaf(%s) Trace 2 \n", name);
+  // printf("dir_get_leaf(%s) Trace 2 \n", name);
   char *tempname = calloc(1, PATH_MAX * sizeof(char));
   char *token = calloc(1, PATH_MAX * sizeof(char));;
   char *save_ptr;
@@ -494,11 +496,11 @@ total_opens++;
   struct dir *lastdir = calloc(1, sizeof(struct dir));
   bool enddir;
   struct thread *t = thread_current();
-  // // // printf("dir_get_leaf(%s) Trace 2.5 \n", name);
+  // printf("dir_get_leaf(%s) Trace 2.5 \n", name);
   if(!is_path(name))
     return(t->pwd);
 
-// // // printf("dir_get_leaf(%s) Trace 3 \n", name);
+// printf("dir_get_leaf(%s) Trace 3 \n", name);
   strlcpy(tempname, name, strlen(name) + 1);
 
   if (tempname[0] == '/')       /* Absolute path name */
@@ -506,18 +508,18 @@ total_opens++;
   else
     tmpdir = dir_get_leaf(t->pwd);
 
-// // // printf("dir_get_leaf(%s) Trace 4 \n", tempname);
+// printf("dir_get_leaf(%s) Trace 4 \n", tempname);
   //strlcpy(&token, t->pwd[1], strlen(t->pwd) + 1);
 
   if (tempname[strlen(tempname) - 1] == '/')
   {
     enddir = true;
-    // // // printf("dir_get_leaf(%s) Trace 5 \n", tempname);
+    // printf("dir_get_leaf(%s) Trace 5 \n", tempname);
   }
   else
   {
     enddir = false;
-    // // // printf("dir_get_leaf(%s) Trace 6 \n", tempname);
+    // printf("dir_get_leaf(%s) Trace 6 \n", tempname);
   }
 
   for (token = strtok_r(tempname, "/", &save_ptr); token != NULL;
@@ -539,18 +541,22 @@ total_opens++;
       else
       {
         // Looked for a directory that does not exist
+        if (lastdir && lastdir->inode)
+          dir_close(lastdir);
+        if (tmpdir && tmpdir->inode)
+          dir_close(tmpdir);
         return NULL;
       }
     }
   }
 
-// // // printf("dir_get_leaf(%s) Trace 8  Enddir = %d  Lastdir = %x\n", tempname, enddir, lastdir);
-// // // printf("dir_get_leaf(%s) Trace 9  tmpdir: %x  lastdir: %x\n", tempname, tmpdir->inode, lastdir->inode);
+// printf("dir_get_leaf(%s) Trace 8  Enddir = %d  Lastdir = %x\n", tempname, enddir, lastdir);
+// printf("dir_get_leaf(%s) Trace 9  tmpdir: %x  lastdir: %x\n", tempname, tmpdir->inode, lastdir->inode);
   free(tempname);
   free(token);
 
   if (enddir) {
-    dir_close(tmpdir);
+    if (tmpdir && tmpdir->inode) dir_close(tmpdir);
     return lastdir;
   }
   else {
