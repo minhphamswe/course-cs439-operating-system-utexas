@@ -86,7 +86,7 @@ struct file *
 filesys_open(const char *name)
 {
 //   char* abspath = path_abspath(name);
-  // printf("filesys_open(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+//   printf("filesys_open(%s): Trace 1 \t name: %s\n", name, name);
   
 //   // printf("filesys_open(%s): Trace 1\n", name);
 //   // printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
@@ -95,7 +95,10 @@ filesys_open(const char *name)
   struct inode *inode = NULL;
 
   // printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
-  if (dir != NULL) {
+  if (path_isroot(name)) {
+    inode = dir->inode;
+  }
+  else if (dir != NULL) {
     dir_lookup(dir, name, &inode);
 //     // printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
   }
