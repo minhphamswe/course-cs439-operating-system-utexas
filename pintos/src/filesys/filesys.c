@@ -86,7 +86,7 @@ filesys_create(const char *name, off_t initial_size)
 struct file *
 filesys_open(const char *name)
 {
-  char* abspath = path_abspath(name);
+//   char* abspath = path_abspath(name);
   // printf("filesys_open(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   
 //   // printf("filesys_open(%s): Trace 1\n", name);
