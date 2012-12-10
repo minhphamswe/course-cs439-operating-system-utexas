@@ -724,8 +724,10 @@ void sysmkdir_handler(struct intr_frame* f)
 {
   char *dir = (char*) pop_stack(f);
 
-  bool success;
-  success = filesys_mkdir(dir);
+  bool success = path_isvalid(dir);
+  if (success) {
+    success = filesys_mkdir(dir);
+  }
 
   f->eax = success;
 }
