@@ -303,8 +303,10 @@ dir_remove(struct dir *dir, const char *name)
  // printf("Open count: %d, root open count: %d, total opens: %d , sector: %x\n", inode->open_cnt, dir2->inode->open_cnt, total_opens, inode->sector);
 // dir_close(dir2);
 
-  if (inode->open_cnt > 1)
+  // Can't remove open directories. Files, though, are fair game
+  if (inode_is_dir(inode) && inode->open_cnt > 1) {
     goto done;
+  }
 
   /* Erase directory entry. */
   e.in_use = false;
