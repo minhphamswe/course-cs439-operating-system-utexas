@@ -222,7 +222,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   success = inode_write_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
 
 done:
-  inode_close(dir->inode);
+  dir_close(dir);
   return success;
 }
 
@@ -520,7 +520,7 @@ dir_get_leaf(const char *name)
        token = strtok_r(NULL, "/", &save_ptr))
   {
     memcpy(lastdir, tmpdir, sizeof(struct dir));
-    free(tmpdir);
+    dir_close(tmpdir);
     bool success;
     // printf("dir_get_leaf(%s) Trace 7, token : %s\n", tempname, token);
     success = dir_child(lastdir, token, tmpdir);
@@ -544,13 +544,13 @@ dir_get_leaf(const char *name)
 // // // printf("dir_get_leaf(%s) Trace 9  tmpdir: %x  lastdir: %x\n", tempname, tmpdir->inode, lastdir->inode);
   free(tempname);
   free(token);
-  
+
   if (enddir) {
-    free(tmpdir);
+    dir_close(tmpdir);
     return lastdir;
   }
   else {
-    free(lastdir);
+    if (lastdir) free(lastdir);
     return tmpdir;
   }
 }
