@@ -816,11 +816,18 @@ void sysinumber_handler(struct intr_frame* f)
 
   if (fhp != NULL)
   {
-    struct file *fp = fhp->file;
-    struct inode *ip = file_get_inode(fp);
-
-    f->eax = inode_get_inumber(ip);
+    if (fhp->file) {
+      f->eax = inode_get_inumber(file_get_inode(fhp->file));
+    }
+    else if (fhp->dir) {
+      f->eax = inode_get_inumber(dir_get_inode(fhp->dir));
+    }
+    else {
+      ASSERT(false);
+    }
   }
+  else
+    f->eax = -1;
 }
 
 // Fails gracefully whenever a program does something bad
