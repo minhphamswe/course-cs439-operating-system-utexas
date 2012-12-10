@@ -344,12 +344,12 @@ dir_readdir(struct dir *dir, char *name)
     if (e.in_use)
     {
       strlcpy(name, e.name, NAME_MAX + 1);
-      // // printf("dir_readdir(%x, %s): Trace 2 EXIT \t return %s\n", dir, name, name);
+//       printf("dir_readdir(%x, %s): Trace 2 EXIT \t return %s\n", dir, name, name);
       return true;
     }
   }
 
-  // // printf("dir_readdir(%x, ?): Trace 3 EXIT false\n", dir);
+//   printf("dir_readdir(%x, ?): Trace 3 EXIT false\n", dir);
   return false;
 }
 
