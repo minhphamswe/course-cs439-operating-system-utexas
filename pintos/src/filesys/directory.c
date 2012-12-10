@@ -140,19 +140,20 @@ dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
   char *abspath = path_abspath(name);
+  char *basename = path_basename(abspath);
+  char *dirname = path_dirname(abspath);
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
   struct dir_entry e;
 
   // Change to pathed directory
-  dir = dir_get_leaf(path_dirname(abspath));
+  dir = dir_get_leaf(dirname);
   if (dir == NULL) {
-    free(abspath);
     return false;
   }
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.1, abspath: %s, path_basename(abspath): %s \n", dir, name, inode, abspath, path_basename(abspath));
-  if (lookup(dir, path_basename(abspath), &e, NULL))
+  if (lookup(dir, basename, &e, NULL))
   {
     // // printf("dir_lookup(%x, %s, %x): Trace 2 \t e.inode_sector: %x\n", dir, name, inode, e.inode_sector);
     *inode = inode_open(e.inode_sector);
@@ -166,7 +167,6 @@ dir_lookup(const struct dir *dir, const char *name,
     *inode = NULL;
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
-  free(abspath);
   return *inode != NULL;
 }
 
@@ -561,7 +561,7 @@ is_path(const char *name)
   if(!path_isvalid(name))
     success = false;
 
-  strlcpy(&tempname, name, strlen(name) + 1);
+  strlcpy(&tempname[0], name, strlen(name) + 1);
   
   // Any slashes?
   if(strlen(strtok_r(tempname, "/", &save_ptr)) == strlen(name))

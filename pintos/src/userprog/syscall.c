@@ -403,6 +403,7 @@ void sysopen_handler(struct intr_frame *f)
     else
     {
       struct dir *dir = dir_open(file->inode);
+      file_close(file);
       // return the file descriptor
       f->eax = thread_add_dir_handler(dir);
     }
