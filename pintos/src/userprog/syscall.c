@@ -334,7 +334,9 @@ void sysremove_handler(struct intr_frame *f)
   // Get file name from stack
   char *filename = (char*) pop_stack(f);
 
-  if(path_isroot(filename) || (!path_isfile(filename) && !dir_is_empty(filename)))
+  if (path_isroot(filename) ||
+     (!path_isfile(filename) && !dir_is_empty(filename)) ||
+     (!strcmp(path_abspath(filename), path_cwd())))
   {
     f->eax = 0;
     return;
