@@ -716,8 +716,13 @@ void sysmkdir_handler(struct intr_frame* f)
 {
   char *dir = (char*) pop_stack(f);
 
-  bool success = (!path_exists(dir) &&
-                  path_isdir(path_dirname(path_abspath(dir))));
+  // Quick check so we don't have to call into the fs if we don't need to
+  bool success;
+  success = (
+              path_isvalid(dir) &&     // valid path name
+              !path_isdir(dir) &&      // directory doesn't already exist
+              path_isdir(path_dirname(path_abspath(dir)))  // parent exists
+            );
   if (success) {
     success = filesys_mkdir(dir);
   }
