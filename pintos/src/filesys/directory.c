@@ -312,7 +312,7 @@ bool
 dir_readdir(struct dir *dir, char *name)
 {
   char *abspath = path_abspath(name);
-//   // printf("dir_readdir(%x, %s): Trace 1 \t abspath \n"
+  printf("dir_readdir(%x, %s): Trace 1 \t abspath: %s \n", abspath);
   struct dir_entry e;
 
   //dir = dir_get_leaf(name);

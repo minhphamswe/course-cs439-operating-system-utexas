@@ -97,5 +97,8 @@ block_sector_t get_next_addr(struct inode *node);
 bool inode_fill(struct inode *current_node, uint32_t *bytes_left, uint32_t length);
 struct inode* inode_extend_link(struct inode *prev_node, uint32_t bytes_left, uint32_t length);
 
+bool inode_is_dir(struct inode* ip);
+bool inode_is_file(struct inode* ip);
+void inode_mark_dir(struct inode *ip);
 
 #endif /* filesys/inode.h */
