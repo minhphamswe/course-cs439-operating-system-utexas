@@ -438,7 +438,7 @@ done:
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
     struct inode *node = inode_open(sector);
     inode_mark_dir(node);
-    inode_close(node);
+//     inode_close(node);
   }
 
   free(newdir);
