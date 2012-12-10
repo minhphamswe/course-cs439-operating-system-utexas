@@ -310,11 +310,13 @@ void syscreate_handler(struct intr_frame *f)
   char *filename = (char*) pop_stack(f);
   off_t filesize = (off_t) pop_stack(f);
 
-  if (get_user((uint32_t*) filename) == -1)
+  if (get_user((uint32_t*) filename) == -1) {
     terminate_thread();
+  }
 
-  if (filename == NULL || strlen(filename) <= 0 || filesize < 0)
+  if (filename == NULL || strlen(filename) <= 0 || filesize < 0) {
     terminate_thread();
+  }
 
   f->eax = filesys_create(filename, filesize);
 }

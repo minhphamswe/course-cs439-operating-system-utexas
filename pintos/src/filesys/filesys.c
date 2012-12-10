@@ -69,6 +69,7 @@ filesys_create(const char *name, off_t initial_size)
                   && inode_create(inode_sector, initial_size)
                   && dir_add(dir, name, inode_sector));
 
+  // printf("filesys_create(%s, %d): Trace 1 \t success: %d\n", name, initial_size, success);
   if (!success && inode_sector != 0)
     free_map_release(inode_sector, 1);
 
@@ -88,20 +89,20 @@ filesys_open(const char *name)
   char* abspath = path_abspath(name);
   // printf("filesys_open(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   
-//   printf("filesys_open(%s): Trace 1\n", name);
-//   printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
+//   // printf("filesys_open(%s): Trace 1\n", name);
+//   // printf("filesys_open(%s): Trace 2 \t thread_current()->pwd: %s\n", name, thread_current()->pwd);
 
   struct dir *dir = dir_open_root();
   struct inode *inode = NULL;
 
-//   printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
+  // printf("filesys_open(%s): Trace 2.1 \t dir: %x, dir->inode: %x\n", name, dir, dir->inode);
   if (dir != NULL) {
     dir_lookup(dir, name, &inode);
-//     printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
+//     // printf("filesys_open(%s): Trace 2.1 \t inode: %x\n", name, inode);
   }
 
   dir_close(dir);
-//   printf("filesys_open(%s): Trace 2 EXIT \t return %x\n", name, inode);
+//   // printf("filesys_open(%s): Trace 2 EXIT \t return %x\n", name, inode);
   return file_open(inode);
 }
 
@@ -113,7 +114,7 @@ bool
 filesys_remove(const char *name)
 {
   char* abspath = path_abspath(name);
-  // printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+  // // printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   struct dir *dir = dir_open_root();
   bool success = dir != NULL && dir_remove(dir, name);
   dir_close(dir);
@@ -125,14 +126,14 @@ filesys_remove(const char *name)
 static void
 do_format(void)
 {
-  printf("Formatting file system...");
+  // printf("Formatting file system...");
   free_map_create();
 
   if (!dir_create_root(ROOT_DIR_SECTOR))
     PANIC("root directory creation failed");
 
   free_map_close();
-  printf("done.\n");
+  // printf("done.\n");
 }
 
 
@@ -158,7 +159,7 @@ bool
 filesys_mkdir(const char *name)
 {
   char* abspath = path_abspath(name);
-  // printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+  // // printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root();
   bool success = (dir != NULL
