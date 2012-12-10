@@ -187,7 +187,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   bool success = false;
 
   // Change to pathed directory
-  dir = dir_get_leaf(abspath);
+  dir = dir_get_leaf(path_dirname(abspath));
   if(dir == NULL) {
     // printf("dir_add(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
     return false;
@@ -230,9 +230,10 @@ bool
 dir_remove(struct dir *dir, const char *name)
 {
   char *abspath = path_abspath(name);
-  if (strcmp(abspath, name)) {
-    abspath = "";
-  }
+
+  // Don't remove our CWD
+  if (!strcmp(abspath, path_cwd()))
+    return false;
   // // printf("dir_remove(%s) Tracer 1 \n", name);
   char *toDelete = calloc(1, PATH_MAX * sizeof(name));
   struct dir_entry e;
@@ -622,4 +623,33 @@ is_path(const char *name)
     success = false;
 
   return success;
+}
+
+
+/* Checks DIR to see if it is a parent or not (can't remove parents) 
+   Returns 1 if directory is empty, 0 otherwise */
+bool
+dir_is_empty(const char *name)
+{
+  if (!path_isvalid(name))
+    return 0;
+
+  struct dir *dir = dir_get_leaf(name);
+
+  struct dir_entry e;
+  size_t ofs;
+
+  ASSERT(dir != NULL);
+  ASSERT(name != NULL);
+
+  for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e)
+  {
+    if (e.in_use)
+    {
+      return false;
+    }
+  }
+
+  return true;
 }
