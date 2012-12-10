@@ -233,7 +233,7 @@ bool
 dir_remove(struct dir *dir, const char *name)
 {
   // printf("dir_remove(%s) Tracer 1 \n", name);
-  char *toDelete = calloc(1, PATH_MAX * sizeof(name));
+  char toDelete[PATH_MAX];
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
@@ -244,8 +244,8 @@ dir_remove(struct dir *dir, const char *name)
   {
     // We need everything but the last token, so find the last slash
     int index = strlen(name);
-    char *pathname = calloc(1, PATH_MAX * sizeof(char));
-    
+    char pathname[PATH_MAX];
+
     while(name[index] != '/' && index > -1)
       index--;
     strlcpy(pathname, name, strlen(name));
@@ -255,12 +255,11 @@ dir_remove(struct dir *dir, const char *name)
       dir = dir_open_root();
     else
       dir = dir_get_leaf(pathname);
-    free(pathname);
+
     if(dir == NULL)
       return false;
 
-    char *token, *prevtoken;
-    char *save_ptr;
+    char *token = NULL, *prevtoken = NULL, *save_ptr = NULL;
     strlcpy(toDelete, name, PATH_MAX);
 
     for (token = strtok_r(toDelete, "/", &save_ptr); token != NULL;
