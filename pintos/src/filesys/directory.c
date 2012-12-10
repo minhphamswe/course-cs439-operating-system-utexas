@@ -570,3 +570,32 @@ is_path(const char *name)
 
   return success;
 }
+
+
+/* Checks DIR to see if it is a parent or not (can't remove parents) 
+   Returns 1 if directory is empty, 0 otherwise */
+bool
+dir_is_empty(const char *name)
+{
+  if (!path_isvalid(name))
+    return 0;
+
+  struct dir *dir = dir_get_leaf(name);
+
+  struct dir_entry e;
+  size_t ofs;
+
+  ASSERT(dir != NULL);
+  ASSERT(name != NULL);
+
+  for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e)
+  {
+    if (e.in_use)
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
