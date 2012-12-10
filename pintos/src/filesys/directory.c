@@ -163,6 +163,7 @@ dir_lookup(const struct dir *dir, const char *name,
   // Change to pathed directory
   foo = dir_get_leaf(dirname);
   if (foo == NULL) {
+    free(abspath);
     return false;
   }
 
@@ -182,6 +183,7 @@ dir_lookup(const struct dir *dir, const char *name,
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1.2 EXIT inode: %x\n", dir, name, inode, *inode);
   dir_close(foo);
+  free(abspath);
   return *inode != NULL;
 }
 
@@ -236,6 +238,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 
 done:
   dir_close(dir);
+  free(abspath);
   return success;
 }
 
@@ -427,6 +430,8 @@ done:
     inode_close(node);
   }
 
+  free(abspath);
+
   dir_close(foo);
   return success;
 }
@@ -450,12 +455,12 @@ dir_changedir(const char *name)
 //     // // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, sizeof(t->pwd));
 //     // // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
-//   free(abspath);
+    free(abspath);
     return true;
   }
   else {
 //     // // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
-//    free(abspath);
+    free(abspath);
     return false;
   }
 }
@@ -641,10 +646,12 @@ dir_is_empty(const char *name)
     if (e.in_use)
     {
       dir_close(dir);
+      free(abspath);
       return false;
     }
   }
 
   dir_close(dir);
+  free(abspath);
   return true;
 }
