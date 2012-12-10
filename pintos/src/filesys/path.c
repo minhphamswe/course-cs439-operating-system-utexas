@@ -311,16 +311,13 @@ bool path_exists(const char *path)
     sentry = strtok_r(NULL, "/", &save_ptr);
 
     while (token != NULL && success) {
+      intr_set_level(old_level);
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
-        intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
       } else {
         // Token is not the last token in path: must be a directory
-        intr_set_level(old_level);
         success = lookup(dir, token, &entry, &offset);
-        old_level = intr_disable();
         success = success && entry.is_dir;
 
         if (success) {
@@ -329,6 +326,7 @@ bool path_exists(const char *path)
           success = dir != NULL;
         }
       }
+      old_level = intr_disable();
 
       offset = 0;
       token = sentry;
