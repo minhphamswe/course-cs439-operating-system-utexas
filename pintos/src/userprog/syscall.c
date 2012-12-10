@@ -376,38 +376,26 @@ void sysopen_handler(struct intr_frame *f)
   else if (strlen(path) == 0) {
     f->eax = -1;
   }
-  else if (path_isfile(path)) {
-    // Attempt to open PATH
-    struct file *file = filesys_open(path);
-
-    // PATH cannot be opened: return -1
-    if (file == NULL)
-    {
-      f->eax = -1;
-    }
-    // PATH is opened as file: put it on the list of open file handles
-    else
-    {
-      // return the file descriptor
-      f->eax = thread_add_file_handler(file);
-    }
-  }
   else {
     // Attempt to open PATH
     struct file *file = filesys_open(path);
 
     // PATH cannot be opened: return -1
-    if (file == NULL)
-    {
+    if (file == NULL) {
       f->eax = -1;
     }
     // PATH is opened as file: put it on the list of open file handles
-    else
-    {
-      struct dir *dir = dir_open(file->inode);
-      file_close(file);
-      // return the file descriptor
-      f->eax = thread_add_dir_handler(dir);
+    else {
+      if (path_isfile(path)) {
+        // return the file descriptor
+        f->eax = thread_add_file_handler(file);
+      }
+      else {
+        struct dir *dir = dir_open(file->inode);
+//         file_close(file);
+        // return the file descriptor
+        f->eax = thread_add_dir_handler(dir);
+      }
     }
   }
 }
