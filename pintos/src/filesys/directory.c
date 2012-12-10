@@ -12,6 +12,8 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 
+int total_opens;
+
 // Function to check if a string has bad characters for a directory
 bool is_path(const char *name);
 
@@ -285,8 +287,9 @@ dir_remove(struct dir *dir, const char *name)
 
   if (inode == NULL)
     goto done;
-
-printf("Erasing %d \n", inode->open_cnt);
+struct dir *dir2 = dir_open_root();
+printf("Open count: %d, root open count: %d, total opens: %d \n", inode->open_cnt, dir2->inode->open_cnt, total_opens);
+dir_close(dir2);
 
   if (inode->open_cnt > 1)
     goto done;
@@ -472,6 +475,7 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
 struct dir *
 dir_get_leaf(const char *name)
 {
+total_opens++;
   // // // printf("dir_get_leaf(%s) Trace 1 \n", name);
   if (!path_isvalid(name))
     return NULL;

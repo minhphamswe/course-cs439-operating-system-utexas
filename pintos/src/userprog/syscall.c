@@ -395,6 +395,7 @@ void sysopen_handler(struct intr_frame *f)
 //         file_close(file);
         // return the file descriptor
         f->eax = thread_add_dir_handler(dir);
+        dir_close(dir);
       }
     }
   }
