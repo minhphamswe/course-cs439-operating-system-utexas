@@ -101,6 +101,7 @@ lookup(const struct dir *dir, const char *name,
        struct dir_entry *ep, off_t *ofsp)
 {
   char *abspath = path_abspath(name);
+//   printf("abspath: %s\n", abspath);
   if (strcmp(abspath, name)) {
     abspath = "";
   }
@@ -142,19 +143,14 @@ dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
   char *abspath = path_abspath(name);
-  if (strcmp(abspath, name)) {
-    abspath = "";
-  }
-//   printf("dir_lookup(%x, %s, %x): Trace 1\n", dir, name, inode);
+
+//   printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
   struct dir_entry e;
 
   // Change to pathed directory
-  if(is_path(name))
-  {
-    dir = dir_get_leaf(name);
-    if(dir == NULL)
-      return false;
-  }
+  dir = dir_get_leaf(abspath);
+  if(dir == NULL)
+    return false;
 
   // Strip path off of file name
   char *token, *prevtoken;

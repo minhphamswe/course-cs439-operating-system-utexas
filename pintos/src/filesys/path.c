@@ -302,17 +302,14 @@ bool path_exists(const char *path)
     sentry = strtok_r(NULL, "/", &save_ptr);
 
     while (token != NULL && success) {
-      printf("Token: %s\n", token);
-      if (sentry) printf("Sentry: %s\n", sentry);
-
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
         success = lookup(dir, token, &entry, &offset);
-      }
-      else {
+      } else {
         // Token is not the last token in path: must be a directory
         success = lookup(dir, token, &entry, &offset);
         success = success && entry.is_dir;
+
         if (success) {
           dir = dir_open(inode_open(entry.inode_sector));
           success = dir != NULL;
@@ -325,7 +322,6 @@ bool path_exists(const char *path)
     }
   }
 
-//   printf("path_exists(%s): Trace 2 EXIT \t return %d\n", path, success);
   return success;
 }
 
