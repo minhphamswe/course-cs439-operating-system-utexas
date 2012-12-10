@@ -31,6 +31,7 @@ dir_create_root(block_sector_t sector)
     struct inode *node = inode_open(sector);
     inode_mark_dir(node);
     block_write(fs_device, node->sector, &node->data);
+    inode_close(node);
   }
 
   return success;
@@ -285,12 +286,13 @@ dir_remove(struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+printf("Erasing %d \n", inode->open_cnt);
+
   if (inode->open_cnt > 1)
     goto done;
 
   /* Erase directory entry. */
   e.in_use = false;
-  // // // printf("Erasing %s \n", name);
 
   if (inode_write_at(dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
@@ -390,6 +392,7 @@ done:
     struct inode *node = inode_open(sector);
     inode_mark_dir(node);
     block_write(fs_device, node->sector, &node->data);
+    inode_close(node);
   }
 
 //   free(newdir);
@@ -448,14 +451,14 @@ dir_child(struct dir *current, const char *child, struct dir *retdir)
   else
   {
     // // // printf("dir_child(%s) Tracer 3 \n", child);
-    free(retdir);
+    //free(retdir);
     retdir = NULL;
     return false;
   }
 
   if (!e.is_dir)
   {
-    free(retdir);
+    //free(retdir);
     retdir = NULL;
     return false;
     // // // printf("dir_child(%s) Tracer 4 \n", child);

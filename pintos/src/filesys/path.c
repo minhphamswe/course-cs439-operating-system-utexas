@@ -324,6 +324,7 @@ bool path_exists(const char *path)
         success = success && entry.is_dir;
 
         if (success) {
+          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
           success = dir != NULL;
         }
@@ -333,6 +334,7 @@ bool path_exists(const char *path)
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
+    dir_close(dir);
   }
 
   intr_set_level(old_level);
@@ -392,6 +394,7 @@ bool path_isfile(const char *path)
         success = success && entry.is_dir;
 
         if (success) {
+          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
           success = dir != NULL;
         }
@@ -401,6 +404,8 @@ bool path_isfile(const char *path)
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
+
+    dir_close(dir);
   }
 
   intr_set_level(old_level);
