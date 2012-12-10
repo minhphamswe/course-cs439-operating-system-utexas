@@ -285,6 +285,7 @@ path_join2(const char *path1, const char *path2)
  */
 bool path_exists(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -322,6 +323,7 @@ bool path_exists(const char *path)
     }
   }
 
+  intr_set_level(old_level);
   return success;
 }
 
@@ -346,6 +348,7 @@ bool path_isabs(const char *path)
  */
 bool path_isfile(const char *path)
 {
+  enum intr_level old_level = intr_disable();
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -384,6 +387,7 @@ bool path_isfile(const char *path)
     }
   }
 
+  intr_set_level(old_level);
   return success;
 }
 
