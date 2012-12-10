@@ -286,6 +286,9 @@ dir_remove(struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if (inode->open_cnt > 1)
+    goto done;
+
   /* Erase directory entry. */
   e.in_use = false;
   // // // printf("Erasing %s \n", name);
@@ -413,12 +416,12 @@ dir_changedir(const char *name)
 //     // // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, sizeof(t->pwd));
 //     // // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
-    free(abspath);
+//   free(abspath);
     return true;
   }
   else {
 //     // // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
-    free(abspath);
+//    free(abspath);
     return false;
   }
 }
