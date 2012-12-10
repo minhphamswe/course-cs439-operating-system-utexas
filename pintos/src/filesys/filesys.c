@@ -159,7 +159,7 @@ bool
 filesys_mkdir(const char *name)
 {
   char* abspath = path_abspath(name);
-  // // printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+//   printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root();
   bool success = (dir != NULL
