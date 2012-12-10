@@ -118,7 +118,7 @@ lookup(const struct dir *dir, const char *name,
 
   for (ofs = 0; inode_read_at(dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) {
-//     printf("lookup(%x, %s, %x, %x): Trace 2 \t e.name: %s\n", dir, name, ep, ofsp, e.name);
+    printf("lookup(%x, %s, %x, %x): Trace 2 \t e.name: %s\n", dir, name, ep, ofsp, e.name);
     if (e.in_use && !strcmp(name, e.name))
     {
       if (ep != NULL)
