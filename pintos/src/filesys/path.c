@@ -298,7 +298,6 @@ bool path_exists(const char *path)
   struct dir_entry entry;
 
   char *abspath = NULL, *sentry = NULL, *token = NULL, *save_ptr = NULL;
-  size_t offset = 0;
 
   if (success) {
     // So far so good: walk the tree from root to said directory
@@ -314,26 +313,25 @@ bool path_exists(const char *path)
       intr_enable();
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
-        success = lookup(dir, token, &entry, &offset);
-      } else {
+        success = lookup(dir, token, &entry, &dir->pos);
+        dir_close(dir);
+      }
+      else {
         // Token is not the last token in path: must be a directory
-        success = lookup(dir, token, &entry, &offset);
-        success = success && entry.is_dir;
+        success = lookup(dir, token, &entry, &dir->pos) && entry.is_dir;
+        dir_close(dir);
 
         if (success) {
-          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
-          success = dir != NULL;
+          success = (dir != NULL);
         }
       }
       intr_disable();
 
-      offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
-    dir_close(dir);
     intr_set_level(old_level);
   }
 
@@ -366,7 +364,6 @@ bool path_isfile(const char *path)
   struct dir_entry entry;
 
   char *abspath = NULL, *sentry = NULL, *token = NULL, *save_ptr = NULL;
-  size_t offset = 0;
 
   if (success) {
     // So far so good: walk the tree from root to said directory
@@ -383,29 +380,27 @@ bool path_isfile(const char *path)
       intr_enable();
 
       if (sentry == NULL) {
-        // Token represents the last token in path: can be file or directory
-        success = lookup(dir, token, &entry, &offset);
-        success = success && !entry.is_dir;
-      } else {
+        // Token represents the last token in path: must be a file
+        success = lookup(dir, token, &entry, &dir->pos) && !entry.is_dir;
+        dir_close(dir);
+      }
+      else {
         // Token is not the last token in path: must be a directory
-        success = lookup(dir, token, &entry, &offset);
-        success = success && entry.is_dir;
+        success = lookup(dir, token, &entry, &dir->pos) && entry.is_dir;
+        dir_close(dir);
 
         if (success) {
-          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
-          success = dir != NULL;
+          success = (dir != NULL);
         }
       }
 
       intr_disable();
 
-      offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
-    dir_close(dir);
     intr_set_level(old_level);
   }
 
@@ -422,44 +417,41 @@ bool path_isdir(const char *path)
   struct dir_entry entry;
 
   char *abspath = NULL, *sentry = NULL, *token = NULL, *save_ptr = NULL;
-  size_t offset = 0;
 
   if (success) {
     // So far so good: walk the tree from root to said directory
     abspath = path_abspath(path);
     dir = dir_open_root();
+    ASSERT(dir != NULL);
 
     enum intr_level old_level = intr_disable();
     sentry = strtok_r(abspath, "/", &save_ptr);
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
 
-    while (token != NULL && success) {
+    while (success && token != NULL) {
       intr_enable();
       if (sentry == NULL) {
         // Token represents the last token in path: can be file or directory
-        success = lookup(dir, token, &entry, &offset);
-        success = success && entry.is_dir;
-      } else {
+        success = lookup(dir, token, &entry, &dir->pos) && entry.is_dir;
+        dir_close(dir);
+      }
+      else {
         // Token is not the last token in path: must be a directory
-        intr_set_level(old_level);
-        success = lookup(dir, token, &entry, &offset);
-        success = success && entry.is_dir;
+        success = lookup(dir, token, &entry, &dir->pos) && entry.is_dir;
+        dir_close(dir);
 
         if (success) {
-          dir_close(dir);
           dir = dir_open(inode_open(entry.inode_sector));
-          success = dir != NULL;
+          success = (dir != NULL);
         }
       }
       intr_disable();
 
-      offset = 0;
       token = sentry;
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
-    dir_close(dir);
     intr_set_level(old_level);
   }
 
