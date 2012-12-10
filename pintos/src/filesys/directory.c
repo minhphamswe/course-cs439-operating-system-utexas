@@ -29,7 +29,7 @@ dir_create_root(block_sector_t sector)
   if (success)
   {
     struct inode *node = inode_open(sector);
-    ptr_set_isdir(&node->data.self);
+    inode_mark_dir(node);
     inode_close(node);
   }
 
@@ -435,15 +435,10 @@ done:
 
   if (success)
   {
-//     struct inode node;
     success = inode_create(sector, BLOCK_SECTOR_SIZE);
-//     node.data.file_length = 0;
-//     node.data.prev_length = 0;
-//     node.data.node_length = 0;
-//     node.data.self = ptr_create(&node.sector);
-//     node.data.magic = INODE_MAGIC;
-//     node.data.doubleptr = NULL;
-//     block_write(fs_device, sector, &node.data);
+    struct inode *node = inode_open(sector);
+    inode_mark_dir(node);
+    inode_close(node);
   }
 
   free(newdir);

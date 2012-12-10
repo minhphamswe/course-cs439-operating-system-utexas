@@ -743,9 +743,9 @@ void sysreaddir_handler(struct intr_frame* f)
     struct file *fp = fhp->file;
     struct inode *ip = file_get_inode(fp);
 
-//     printf("sysreaddir_handler(%d, %s): Trace 2.1 \t ip: %x, ip->data.self: %x\n", fd, name, ip, ip->data.self);
+    printf("sysreaddir_handler(%d, %s): Trace 2.1 \t ip: %x, inode_is_dir(ip): %x\n", fd, name, ip, inode_is_dir(ip));
     // Check if the inode points to a directory
-    if (ptr_isdir(&ip->data.self)) {
+    if (inode_is_dir(ip)) {
       // Yes it points to directory: Open and call dir_readdir on it
       struct dir *dp = dir_open(ip);
       f->eax = dir_readdir(dp, name);
