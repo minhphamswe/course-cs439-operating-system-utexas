@@ -221,7 +221,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 
 done:
 //   free(obj_name);
-  free(abspath);
+//   free(abspath);
   return success;
 }
 
@@ -338,7 +338,7 @@ bool
 dir_create(struct dir *dir, const char *name, block_sector_t sector)
 {
   char *abspath = path_abspath(name);
-  // printf("dir_create(%s) Tracer 1 \t abspath: %s\n", name, abspath);
+//   printf("dir_create(%s) Tracer 1 \t abspath: %s\n", name, abspath);
 
   struct dir_entry e;
   off_t ofs;
@@ -391,7 +391,6 @@ done:
   }
 
 //   free(newdir);
-  free(abspath);
   return success;
 }
 
