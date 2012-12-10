@@ -114,7 +114,7 @@ bool
 filesys_remove(const char *name)
 {
   char* abspath = path_abspath(name);
-  // // printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+//   printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   struct dir *dir = dir_open_root();
   bool success = dir != NULL && dir_remove(dir, name);
   dir_close(dir);

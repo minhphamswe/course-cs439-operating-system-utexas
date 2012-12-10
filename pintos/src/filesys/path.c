@@ -410,8 +410,9 @@ bool path_isdir(const char *path)
 /** Return TRUE if PATH is the root directory (/) */
 bool path_isroot(const char *path)
 {
-  return (path_isvalid(path) &&
-          strlen(path) == 1 && path[0] == '/');
+  bool success = (path_isvalid(path) &&
+                  strlen(path) == 1 && path[0] == '/');
+  return success;
 }
 
 /** Return TRUE if PATH is the current directory (.) */

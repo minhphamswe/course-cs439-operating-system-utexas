@@ -30,7 +30,7 @@ dir_create_root(block_sector_t sector)
   {
     struct inode *node = inode_open(sector);
     inode_mark_dir(node);
-    inode_close(node);
+    block_write(fs_device, node->sector, &node->data);
   }
 
   return success;
@@ -575,10 +575,12 @@ is_path(const char *name)
 bool
 dir_is_empty(const char *name)
 {
-  if (!path_isvalid(name))
+  char *abspath = path_abspath(name);
+  if (!path_isvalid(name)) {
     return 0;
+  }
 
-  struct dir *dir = dir_get_leaf(name);
+  struct dir *dir = dir_get_leaf(abspath);
 
   struct dir_entry e;
   size_t ofs;
