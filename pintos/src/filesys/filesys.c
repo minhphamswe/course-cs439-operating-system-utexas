@@ -54,7 +54,6 @@ filesys_done(void)
 bool
 filesys_create(const char *name, off_t initial_size)
 {
-  char* abspath = path_abspath(name);
   // printf("filesys_create(%s, %d): Trace 1 \t name: %s, abspath: %s\n", name, initial_size, name, abspath);
   // Name is no longer implicitly checked on length below, must check
   // at creation of call
@@ -113,15 +112,14 @@ filesys_open(const char *name)
 bool
 filesys_remove(const char *name)
 {
-  char* abspath = path_abspath(name);
- //  printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
+//   printf("filesys_remove(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   struct dir *dir = dir_open_root();
   bool success = dir != NULL && dir_remove(dir, name);
   dir_close(dir);
 
   return success;
 }
-
+
 /* Formats the file system. */
 static void
 do_format(void)
@@ -136,16 +134,6 @@ do_format(void)
   // printf("done.\n");
 }
 
-
-/* Changes the current working directory of the process to dir
-   which may be relative or absolute. Returns true if successful,
-   false on failure. */
-bool filesys_chdir(const char *dirname)
-{
-
-}
-
-
 /* Creates a directory named NAME.
    Returns true if successful, false otherwise.
    Fails if a file/dir named NAME already exists,
@@ -158,7 +146,6 @@ bool filesys_chdir(const char *dirname)
 bool
 filesys_mkdir(const char *name)
 {
-  char* abspath = path_abspath(name);
 //   printf("filesys_mkdir(%s): Trace 1 \t name: %s, abspath: %s\n", name, name, abspath);
   block_sector_t inode_sector = 0;
   struct dir *dir = dir_open_root();
@@ -173,15 +160,4 @@ filesys_mkdir(const char *name)
   dir_close(dir);
 
   return success;
-}
-
-/**
- * Open a directory from a given path.
- * Return a pointer to the newly open directory if successful,
- * NULL otherwise.
- */
-struct dir*
-filesys_opendir(const char* path)
-{
-  return NULL;
 }
