@@ -155,7 +155,9 @@ dir_lookup(const struct dir *dir, const char *name,
   char *abspath = path_abspath(name);
   ASSERT(abspath != NULL);
   char *basename = path_basename(abspath);
+  ASSERT(basename != NULL);
   char *dirname = path_dirname(abspath);
+  ASSERT(dirname != NULL);
 
   // // printf("dir_lookup(%x, %s, %x): Trace 1, abspath: %s \n", dir, name, inode, abspath);
   struct dir_entry e;
@@ -199,6 +201,10 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 {
   char *abspath = path_abspath(name);
   ASSERT(abspath != NULL);
+  char *dirname = path_dirname(abspath);
+  ASSERT(dirname != NULL);
+  char *basename = path_basename(abspath);
+  ASSERT(basename != NULL);
 
   // // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s\n", dir, name, inode_sector, abspath);
   struct dir_entry e;
@@ -206,7 +212,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   bool success = false;
 
   // Change to pathed directory
-  dir = dir_get_leaf(path_dirname(abspath));
+  dir = dir_get_leaf(dirname);
   if(dir == NULL) {
     // // printf("dir_add(%x, %s, %x) Tracer 1.1 EXIT \t abspath: %s\n", dir, name, inode_sector, abspath);
     free(abspath);
@@ -214,7 +220,7 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   }
 
   /* Check that NAME is not in use. */
-  char *obj_name = path_basename(abspath);
+  char *obj_name = basename;
   // // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s,, obj_name: %s\n", dir, name, inode_sector, abspath, obj_name);
   if (lookup(dir, obj_name, NULL, NULL))
     goto done;
@@ -241,6 +247,8 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 done:
   dir_close(dir);
   free(abspath);
+  free(dirname);
+  free(basename);
   return success;
 }
 
@@ -376,6 +384,10 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   ASSERT(abspath != NULL);
 
   char *dirname = path_dirname(abspath);
+  ASSERT(dirname != NULL);
+
+  char *basename = path_basename(abspath);
+  ASSERT(basename != NULL);
   // // printf("dir_create(%s) Tracer 1 \t path_dirname(abspath): %s\n", name, path_dirname(abspath));
 
   struct dir_entry e;
@@ -394,7 +406,7 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
   }
 
   /* Check that NAME is not in use. */
-  char *newdir = path_basename(abspath);
+  char *newdir = basename;
   // // printf("dir_create(%s) Tracer 2 \t newdir: %s\n", name, newdir);
   if (lookup(foo, newdir, NULL, NULL))
     goto done;
@@ -435,6 +447,8 @@ done:
   }
 
   free(abspath);
+  free(dirname);
+  free(basename);
 
   dir_close(foo);
   return success;
@@ -446,7 +460,7 @@ dir_changedir(const char *name)
 {
   char *abspath = path_abspath(name);
   ASSERT(abspath != NULL);
-  printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
+//   printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
 //   // // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
