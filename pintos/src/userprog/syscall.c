@@ -309,27 +309,22 @@ void syscreate_handler(struct intr_frame *f)
   // Get file name and size from stack
   char *filename = (char*) pop_stack(f);
   off_t filesize = (off_t) pop_stack(f);
-//   printf("syscreate_handler(%s, %d):\n", filename,  filesize);
 
   if (get_user((uint32_t*) filename) == -1) {
-//     printf("syscreate_handler(%s, %d): Trace 1\n", filename,  filesize);
     terminate_thread();
   }
 
   if (filename == NULL || strlen(filename) <= 0 || filesize < 0) {
-//     printf("syscreate_handler(%s, %d): Trace 2\n", filename,  filesize);
     terminate_thread();
   }
 
   char *abspath = path_abspath(filename);
   if (abspath == NULL) {
-//     printf("syscreate_handler(%s, %d): Trace 3\n", filename,  filesize);
     // Too deep
     f->eax = 0;
     return;
   }
   else {
-//     printf("syscreate_handler(%s, %d): Trace 4\n", filename,  filesize);
     free(abspath);
     f->eax = filesys_create(filename, filesize);
   }
@@ -391,15 +386,12 @@ void sysopen_handler(struct intr_frame *f)
 {
   // Get path name
   char *path = (char*) pop_stack(f);
-  printf("sysopen_handler(%s): Trace 1\n", path);
 
   // Path name is NULL: return -1
   if (path == NULL) {
-    printf("sysopen_handler(%s): Trace 2 EXIT -1\n", path);
     f->eax = -1;
   }
   else if (strlen(path) == 0) {
-    printf("sysopen_handler(%s): Trace 3 EXIT -1\n", path);
     f->eax = -1;
   }
   else {
@@ -408,23 +400,19 @@ void sysopen_handler(struct intr_frame *f)
 
     // PATH cannot be opened: return -1
     if (file == NULL) {
-      printf("sysopen_handler(%s): Trace 4 EXIT -1\n", path);
       f->eax = -1;
     }
     // PATH is opened as file: put it on the list of open file handles
     else {
       if (path_isfile(path)) {
         // return the file descriptor
-//         printf("sysopen_handler(%s): Trace 5 EXIT\n", path);
         f->eax = thread_add_file_handler(file);
-        printf("sysopen_handler(%s): Trace 5 EXIT %d\n", path, f->eax);
       }
       else if (path_isdir(path)) {
         struct dir *dir = dir_open(inode_open(file->inode->sector));
         file_close(file);
         // return the file descriptor
         f->eax = thread_add_dir_handler(dir);
-        printf("sysopen_handler(%s): Trace 6 EXIT %d\n", path, f->eax);
       }
     }
   }
@@ -636,7 +624,6 @@ void sysclose_handler(struct intr_frame *f)
 {
   // Get the file descriptor from the stack
   int fd = (int) pop_stack(f);
-  printf("sysclose_handler(%d): Trace 1\n", fd);
 
   thread_close_handler(fd);
 }

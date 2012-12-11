@@ -75,10 +75,10 @@ make_tar_archive (const char *archive_name, char *files[], size_t file_cnt)
                          archive_fd, &write_error))
         success = false;
     }
-// 
-//   if (!do_write (archive_fd, zeros, 512, &write_error)
-//       || !do_write (archive_fd, zeros, 512, &write_error)) 
-//     success = false;
+
+  if (!do_write (archive_fd, zeros, 512, &write_error)
+      || !do_write (archive_fd, zeros, 512, &write_error))
+    success = false;
 
   close (archive_fd);
 
