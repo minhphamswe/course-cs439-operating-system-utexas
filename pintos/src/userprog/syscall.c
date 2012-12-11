@@ -342,11 +342,9 @@ void sysremove_handler(struct intr_frame *f)
 {
   // Get file name from stack
   char *filename = (char*) pop_stack(f);
-// printf("filename: %s\n", filename);
   
   char *abspath = path_abspath(filename);
   if (abspath == NULL) {
-//     printf("here\n");
     // Too deep
     f->eax = 0;
     return;
@@ -773,12 +771,8 @@ void sysreaddir_handler(struct intr_frame* f)
   int fd = (int) pop_stack(f);
   char *name = (char*) pop_stack(f);
 
-//   printf("sysreaddir_handler(%d, %s): Trace 1\n", fd, name);
-
   // Not "." or "..": get the handler corresponding to the descriptor
   struct fileHandle *fhp = get_handle(fd);
-
-//   printf("sysreaddir_handler(%d, %s): Trace 1.1 \t fhp: %x\n", fd, name, fhp);
 
   if (fhp != NULL) {
     // Found a handler: get its inode
@@ -787,7 +781,6 @@ void sysreaddir_handler(struct intr_frame* f)
     if (fhp->dir) {
       // Yes it points to directory: Open and call dir_readdir on it
       f->eax = dir_readdir(fhp->dir, name);
-//       printf("sysreaddir_handler(%d, %s): Trace 2.2 EXIT \t ip: %x, inode_is_dir(ip): %x\n", fd, name, ip, inode_is_dir(ip));
     }
     else {
       // No it is not: just return unsuccessful
