@@ -169,7 +169,10 @@ char *path_dirname(const char *path)
   }
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
-  ASSERT(tempname);
+  if (tempname == NULL) {
+    intr_set_level(old_level);
+    return NULL;
+  }
   char *sentry, *ret = NULL, *save_ptr, *token = NULL;
 
   strlcpy(tempname, path, strlen(path) + 1);
@@ -218,7 +221,10 @@ char *path_basename(const char *path)
   }
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
-  ASSERT(tempname);
+  if (tempname == NULL) {
+    intr_set_level(old_level);
+    return NULL;
+  }
   char *token = NULL, *ret = NULL, *save_ptr = NULL;
 
   strlcpy(tempname, path, strlen(path) + 1);
