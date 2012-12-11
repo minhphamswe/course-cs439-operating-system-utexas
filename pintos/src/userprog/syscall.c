@@ -342,11 +342,11 @@ void sysremove_handler(struct intr_frame *f)
 {
   // Get file name from stack
   char *filename = (char*) pop_stack(f);
-printf("filename: %s\n", filename);
+// printf("filename: %s\n", filename);
   
   char *abspath = path_abspath(filename);
   if (abspath == NULL) {
-    printf("here\n");
+//     printf("here\n");
     // Too deep
     f->eax = 0;
     return;
