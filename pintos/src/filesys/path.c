@@ -44,7 +44,18 @@ path_isvalid(const char *path)
 /** Return a normalized absolutized version of the path name PATH. */
 char *path_abspath(const char *path)
 {
-  return path_normpath(path_join2(path_cwd(), path));
+  char *join = path_join2(path_cwd(), path);
+  if (join == NULL) {
+    return NULL;
+  }
+  printf("path_abspath(%s): Trace 1 \n\t join: %s\n", path, join);
+
+  char *norm = path_normpath(join);
+  if (norm == NULL) {
+    return NULL;
+  }
+  printf("path_abspath(%s): Trace 2 \n\t norm: %s\n", path, norm);
+  return norm;
 }
 
 char *path_cwd(void)
@@ -63,10 +74,14 @@ char *path_cwd(void)
  */
 char *path_normpath(const char *path)
 {
+  if (path == NULL)
+    return NULL;
+
   enum intr_level old_level = intr_disable();
+
   char *tempname = malloc(strlen(path) + 1);
   ASSERT(tempname != NULL);
-  char *token, *ret = NULL, *save_ptr;
+  char *token, *ret = NULL, *save_ptr, *ret_buffer = NULL;
 
   strlcpy(tempname, path, strlen(path) + 1);
 
@@ -101,6 +116,10 @@ char *path_normpath(const char *path)
       if (ret == NULL) {
         if (path_isabs(path)) {
           ret = path_join2("/", token);
+          if (ret == NULL) {
+            intr_set_level(old_level);
+            return NULL;
+          }
         }
         else {
           ret = token;
@@ -108,6 +127,10 @@ char *path_normpath(const char *path)
       }
       else {
         ret = path_join2(ret, token);
+        if (ret == NULL) {
+          intr_set_level(old_level);
+          return NULL;
+        }
       }
     }
   }
@@ -121,8 +144,16 @@ char *path_normpath(const char *path)
     }
   }
 
+  ret_buffer = malloc(strlen(ret) + 1);
+  if (ret_buffer == NULL) {
+    intr_set_level(old_level);
+    return NULL;
+  }
+  
+  strlcpy(ret_buffer, ret, strlen(ret) + 1);
+
   intr_set_level(old_level);
-  return ret;
+  return ret_buffer;
 }
 
 /**
@@ -133,6 +164,9 @@ char *path_normpath(const char *path)
  */
 char *path_dirname(const char *path)
 {
+  if (path == NULL) {
+    return NULL;
+  }
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
   ASSERT(tempname);
@@ -179,6 +213,9 @@ char *path_dirname(const char *path)
  */
 char *path_basename(const char *path)
 {
+  if (path == NULL) {
+    return NULL;
+  }
   enum intr_level old_level = intr_disable();
   char *tempname = malloc(strlen(path) + 1);
   ASSERT(tempname);
@@ -247,19 +284,27 @@ path_join2(const char *path1, const char *path2)
   ASSERT(path1 != NULL || path2 != NULL);
   enum intr_level old_level = intr_disable();
   
-  char *ret;
+  char *ret = NULL;
 
   if (path2 == NULL)
   {
     ret = malloc(strlen(path1) + 1);
-    ASSERT(ret != NULL);
+    if (ret == NULL) {
+      printf("path_join2(%s, %s): Trace 1 EXIT return NULL\n", path1, path2);
+      intr_set_level(old_level);
+      return NULL;
+    }
     strlcpy(ret, path1, strlen(path1) + 1);
   }
   else if (path1 == NULL || path_isabs(path2))
   {
     // If PATH2 is an absolute path, then just return it
     ret = malloc(strlen(path2) + 1);
-    ASSERT(ret != NULL);
+    if (ret == NULL) {
+      printf("path_join2(%s, %s): Trace 2 EXIT return NULL\n", path1, path2);
+      intr_set_level(old_level);
+      return NULL;
+    }
     strlcpy(ret, path2, strlen(path2) + 1);
   }
   else
@@ -268,7 +313,11 @@ path_join2(const char *path1, const char *path2)
     if (path1[strlen(path1) - 1] == '/')
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
-      ASSERT(ret != NULL);
+      if (ret == NULL) {
+        printf("path_join2(%s, %s): Trace 3 EXIT return NULL\n", path1, path2);
+        intr_set_level(old_level);
+        return NULL;
+      }
       strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
       strlcpy(ret + strlen(path1),
               path2, strlen(path2) + 1);        // copy all of path2
@@ -276,7 +325,11 @@ path_join2(const char *path1, const char *path2)
     else
     {
       ret = malloc(strlen(path1) + strlen(path2) + 2);
-      ASSERT(ret != NULL);
+      if (ret == NULL) {
+        printf("path_join2(%s, %s): Trace 4 EXIT return NULL\n", path1, path2);
+        intr_set_level(old_level);
+        return NULL;
+      }
       strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
       strlcpy(ret + strlen(path1), "/", 2);     // copy the '/'
       strlcpy(ret + strlen(path1) + 1,
@@ -293,6 +346,9 @@ path_join2(const char *path1, const char *path2)
  */
 bool path_exists(const char *path)
 {
+  if (path == NULL) {
+    return false;
+  }
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -302,6 +358,10 @@ bool path_exists(const char *path)
   if (success) {
     // So far so good: walk the tree from root to said directory
     abspath = path_abspath(path);
+    if (abspath == NULL) {
+      // Can't tell: better say now
+      return false;
+    }
     dir = dir_open_root();
 
     sentry = strtok_r(abspath, "/", &save_ptr);
@@ -359,6 +419,9 @@ bool path_isabs(const char *path)
  */
 bool path_isfile(const char *path)
 {
+  if (path == NULL) {
+    return false;
+  }
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -368,6 +431,10 @@ bool path_isfile(const char *path)
   if (success) {
     // So far so good: walk the tree from root to said directory
     abspath = path_abspath(path);
+    if (abspath == NULL) {
+      // Can't tell: better say now
+      return false;
+    }
     dir = dir_open_root();
 
     enum intr_level old_level = intr_disable();
@@ -412,6 +479,9 @@ bool path_isfile(const char *path)
  */
 bool path_isdir(const char *path)
 {
+  if (path == NULL) {
+    return false;
+  }
   bool success = path_isvalid(path);     // Path must first be valid
   struct dir *dir = NULL;
   struct dir_entry entry;
@@ -421,6 +491,10 @@ bool path_isdir(const char *path)
   if (success) {
     // So far so good: walk the tree from root to said directory
     abspath = path_abspath(path);
+    if (abspath == NULL) {
+      // Can't tell: better say now
+      return false;
+    }
     dir = dir_open_root();
     ASSERT(dir != NULL);
 

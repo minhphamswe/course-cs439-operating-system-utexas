@@ -153,6 +153,7 @@ dir_lookup(const struct dir *dir, const char *name,
            struct inode **inode)
 {
   char *abspath = path_abspath(name);
+  ASSERT(abspath != NULL);
   char *basename = path_basename(abspath);
   char *dirname = path_dirname(abspath);
 
@@ -197,6 +198,7 @@ bool
 dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
 {
   char *abspath = path_abspath(name);
+  ASSERT(abspath != NULL);
 
   // // printf("dir_add(%x, %s, %x) Tracer 1 \t abspath: %s\n", dir, name, inode_sector, abspath);
   struct dir_entry e;
@@ -371,6 +373,8 @@ dir_create(struct dir *dir, const char *name, block_sector_t sector)
 
 
   char *abspath = path_abspath(name);
+  ASSERT(abspath != NULL);
+
   char *dirname = path_dirname(abspath);
   // // printf("dir_create(%s) Tracer 1 \t path_dirname(abspath): %s\n", name, path_dirname(abspath));
 
@@ -441,7 +445,8 @@ bool
 dir_changedir(const char *name)
 {
   char *abspath = path_abspath(name);
-//   // // printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
+  ASSERT(abspath != NULL);
+  printf("dir_changedir(%s): Trace 1 \t abspath: %s\n", name, abspath);
 //   // // printf("dir_changedir(%s) Tracer 1\n", name);
   // Valid looking name?
   if (!path_isvalid(name))
@@ -455,12 +460,12 @@ dir_changedir(const char *name)
 //     // // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, sizeof(t->pwd));
 //     // // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
-    free(abspath);
+    if (abspath) free(abspath);
     return true;
   }
   else {
 //     // // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
-    free(abspath);
+    if (abspath) free(abspath);
     return false;
   }
 }
@@ -627,10 +632,12 @@ is_path(const char *name)
 bool
 dir_is_empty(const char *name)
 {
-  char *abspath = path_abspath(name);
   if (!path_isvalid(name)) {
     return 0;
   }
+
+  char *abspath = path_abspath(name);
+  ASSERT(abspath != NULL);
 
   struct dir *dir = dir_get_leaf(abspath);
 
