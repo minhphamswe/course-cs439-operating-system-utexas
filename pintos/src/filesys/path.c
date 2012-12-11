@@ -48,13 +48,11 @@ char *path_abspath(const char *path)
   if (join == NULL) {
     return NULL;
   }
-//   printf("path_abspath(%s): Trace 1 \n\t join: %s\n", path, join);
 
   char *norm = path_normpath(join);
   if (norm == NULL) {
     return NULL;
   }
-//   printf("path_abspath(%s): Trace 2 \n\t norm: %s\n", path, norm);
   return norm;
 }
 
@@ -321,7 +319,6 @@ path_join2(const char *path1, const char *path2)
   {
     ret = malloc(strlen(path1) + 1);
     if (ret == NULL) {
-//       printf("path_join2(%s, %s): Trace 1 EXIT return NULL\n", path1, path2);
       intr_set_level(old_level);
       return NULL;
     }
@@ -332,7 +329,6 @@ path_join2(const char *path1, const char *path2)
     // If PATH2 is an absolute path, then just return it
     ret = malloc(strlen(path2) + 1);
     if (ret == NULL) {
-//       printf("path_join2(%s, %s): Trace 2 EXIT return NULL\n", path1, path2);
       intr_set_level(old_level);
       return NULL;
     }
@@ -345,7 +341,6 @@ path_join2(const char *path1, const char *path2)
     {
       ret = malloc(strlen(path1) + strlen(path2) + 1);
       if (ret == NULL) {
-//         printf("path_join2(%s, %s): Trace 3 EXIT return NULL\n", path1, path2);
         intr_set_level(old_level);
         return NULL;
       }
@@ -357,7 +352,6 @@ path_join2(const char *path1, const char *path2)
     {
       ret = malloc(strlen(path1) + strlen(path2) + 2);
       if (ret == NULL) {
-//         printf("path_join2(%s, %s): Trace 4 EXIT return NULL\n", path1, path2);
         intr_set_level(old_level);
         return NULL;
       }
