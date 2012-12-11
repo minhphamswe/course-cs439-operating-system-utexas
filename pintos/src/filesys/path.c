@@ -392,6 +392,7 @@ bool path_exists(const char *path)
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
+    if (abspath) free(abspath);
     intr_set_level(old_level);
   }
 
@@ -468,6 +469,7 @@ bool path_isfile(const char *path)
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
+    if (abspath) free(abspath);
     intr_set_level(old_level);
   }
 
@@ -526,6 +528,7 @@ bool path_isdir(const char *path)
       sentry = strtok_r(NULL, "/", &save_ptr);
     }
 
+    if (abspath) free(abspath);
     intr_set_level(old_level);
   }
 

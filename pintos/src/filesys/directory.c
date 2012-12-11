@@ -460,12 +460,12 @@ dir_changedir(const char *name)
 //     // // printf("dir_changedir(%s) Tracer 2 EXIT\n", abspath);
     strlcpy(&t->pwd[0], abspath, sizeof(t->pwd));
 //     // // printf("&t->pwd[0]: %s\n", &t->pwd[0]);
-    if (abspath) free(abspath);
+    free(abspath);
     return true;
   }
   else {
 //     // // printf("dir_changedir(%s) Tracer 3 EXIT\n", abspath);
-    if (abspath) free(abspath);
+    free(abspath);
     return false;
   }
 }
@@ -519,9 +519,8 @@ total_opens++;
   }
 
   // // printf("dir_get_leaf(%s) Trace 2 \n", name);
-  char *tempname = calloc(1, PATH_MAX * sizeof(char));
-  char *token = calloc(1, PATH_MAX * sizeof(char));;
-  char *save_ptr;
+  char *tempname[PATH_MAX];
+  char *token, *save_ptr;
   struct dir *tmpdir;
   struct dir *lastdir = calloc(1, sizeof(struct dir));
   bool enddir;
@@ -594,8 +593,8 @@ total_opens++;
 
 // // printf("dir_get_leaf(%s) Trace 8  Enddir = %d  Lastdir = %x\n", tempname, enddir, lastdir);
   // // printf("dir_get_leaf(%s) Trace 9  tmpdir: %x  lastdir: %x\n", tempname, tmpdir->inode, lastdir->inode);
-  free(tempname);
-  free(token);
+//   free(tempname);
+//   free(token);
 
   if (enddir) {
     dir_close(tmpdir);

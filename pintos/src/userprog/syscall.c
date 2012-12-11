@@ -318,7 +318,16 @@ void syscreate_handler(struct intr_frame *f)
     terminate_thread();
   }
 
-  f->eax = filesys_create(filename, filesize);
+  char *abspath = path_abspath(filename);
+  if (abspath == NULL) {
+    // Too deep
+    f->eax = 0;
+    return;
+  }
+  else {
+    free(abspath);
+    f->eax = filesys_create(filename, filesize);
+  }
 }
 
 /**
@@ -333,16 +342,27 @@ void sysremove_handler(struct intr_frame *f)
 {
   // Get file name from stack
   char *filename = (char*) pop_stack(f);
-
-  if (path_isroot(filename) ||
-     (path_isdir(filename) && !dir_is_empty(filename)) ||
-     (!strcmp(path_abspath(filename), path_cwd())))
-  {
+printf("filename: %s\n", filename);
+  
+  char *abspath = path_abspath(filename);
+  if (abspath == NULL) {
+    printf("here\n");
+    // Too deep
     f->eax = 0;
     return;
   }
-
-  f->eax = filesys_remove(filename);
+  else {
+    if (path_isroot(filename) ||
+        (path_isdir(filename) && !dir_is_empty(filename)) ||
+        (!strcmp(abspath, path_cwd()))) {
+      free(abspath);
+      f->eax = 0;
+    }
+    else {
+      free(abspath);
+      f->eax = filesys_remove(filename);
+    }
+  }
 }
 
 /**
