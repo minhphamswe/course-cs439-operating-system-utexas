@@ -189,6 +189,8 @@ dir_add(struct dir *dir, const char *name, block_sector_t inode_sector)
   char *basename = path_basename(abspath);
   ASSERT(basename != NULL);
 
+//   printf("dir_add(%x, %s, %d): abspatH: %s\n", dir, name, inode_sector, abspath);
+
   struct dir_entry e;
   off_t ofs;
   bool success = false;
@@ -474,7 +476,7 @@ total_opens++;
     return dir_open_root();
   }
 
-  char *tempname[PATH_MAX];
+  char tempname[PATH_MAX];
   char *token, *save_ptr;
   struct dir *tmpdir;
   struct dir *lastdir = calloc(1, sizeof(struct dir));

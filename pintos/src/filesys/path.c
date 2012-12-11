@@ -449,6 +449,7 @@ bool path_isfile(const char *path)
     return false;
   }
   bool success = path_isvalid(path);     // Path must first be valid
+//   printf("path_isfile(%s): Trace 1 \t return %d\n", path, success);
   struct dir *dir = NULL;
   struct dir_entry entry;
 
@@ -468,6 +469,16 @@ bool path_isfile(const char *path)
     sentry = strtok_r(abspath, "/", &save_ptr);
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
+
+//     printf("path_isfile(%s): Trace 1.1 \t token %s\n", path, token);
+//     printf("path_isfile(%s): Trace 1.2 \t sentry %s\n", path, sentry);
+    if (token == NULL) {
+      if (abspath) free(abspath);
+      intr_set_level(old_level);
+      success = false;
+//       printf("path_isfile(%s): Trace 2 EXIT \t return %d\n", path, success);
+      return success;
+    }
 
     while (token != NULL && success) {
       intr_enable();
@@ -498,6 +509,7 @@ bool path_isfile(const char *path)
     intr_set_level(old_level);
   }
 
+//   printf("path_isfile(%s): Trace 3 EXIT \t return %d\n", path, success);
   return success;
 }
 
@@ -510,6 +522,7 @@ bool path_isdir(const char *path)
     return false;
   }
   bool success = path_isvalid(path);     // Path must first be valid
+//   printf("path_isdir(%s): Trace 1 \t return %d\n", path, success);
   struct dir *dir = NULL;
   struct dir_entry entry;
 
@@ -529,6 +542,14 @@ bool path_isdir(const char *path)
     sentry = strtok_r(abspath, "/", &save_ptr);
     token = sentry;
     sentry = strtok_r(NULL, "/", &save_ptr);
+
+    if (token == NULL) {
+      if (abspath) free(abspath);
+      intr_set_level(old_level);
+      success = true;
+//       printf("path_isdir(%s): Trace 2 EXIT \t return %d\n", path, success);
+      return success;
+    }
 
     while (success && token != NULL) {
       intr_enable();
@@ -557,6 +578,7 @@ bool path_isdir(const char *path)
     intr_set_level(old_level);
   }
 
+//   printf("path_isdir(%s): Trace 3 EXIT \t return %d\n", path, success);
   return success;
 }
 
