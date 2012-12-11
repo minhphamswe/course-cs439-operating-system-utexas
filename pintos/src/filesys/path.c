@@ -81,7 +81,7 @@ char *path_normpath(const char *path)
       }
       else {
         // Undefined edge case: anything goes
-        if (path_isabs(tempname)) {
+        if (path_isabs(path)) {
           ret = "/";
           continue;
         }
@@ -275,7 +275,7 @@ path_join2(const char *path1, const char *path2)
     }
     else
     {
-      ret = malloc(strlen(path1) + strlen(path2) + 1);
+      ret = malloc(strlen(path1) + strlen(path2) + 2);
       ASSERT(ret != NULL);
       strlcpy(ret, path1, strlen(path1) + 1);       // copy all but '\0'
       strlcpy(ret + strlen(path1), "/", 2);     // copy the '/'
