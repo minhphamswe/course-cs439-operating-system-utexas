@@ -1,25 +1,35 @@
-       	       	    +---------------------------+
-		    |		CS 140		|
+       	+---------------------------+
+		    |		      CS 439          	|
 		    | PROJECT 3: VIRTUAL MEMORY	|
-		    |	   DESIGN DOCUMENT	|
+		    |	   DESIGN DOCUMENT	      |
 		    +---------------------------+
+
+Name:  Eric Aschner
+UTeid: easchner
+csid:  easchner
+Section: 52996
+
 
 ---- GROUP ----
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Minh Pham - mlp2279
 
 ---- PRELIMINARIES ----
 
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please give them here.
 
+We implemented a second chance eviction policy.  Please give us some EC. :)
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+
+None.
+
+
 
 			PAGE TABLE MANAGEMENT
 			=====================
@@ -30,24 +40,83 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+In page.h
+  struct page_table
+    A list of pages used by a process.  This is a per process list.
+  
+  struct page_entry
+    A single page entry.  This keeps track of tid, user virtual address,
+    physical (frame) address, if it's writable, swapped, etc.
+  
+In page.c
+  static struct semaphore filesys_sema
+    A semaphore to ensure we don't read multiple pages into a frame at one time.
+    
+In frame.h
+  struct frame
+    Keeps track of a frame.  Once created the physical address does not change,
+    but the tid, user virtual address, if pinned, etc. will be changed as the
+    page changes or gets used.
+    
+In frame.c
+  static struct list all_frames
+    The list of all frames that have been created.  Can get up to User Memory /
+    Page Size in length.  (383 is default)
+
+  static struct list_elem *clockhand
+    Once an eviction is necessary, it starts at the beinning of the list and
+    circles around it until a candidate is found.  Uses second chance.
+    Tick-tock goes the clock, your (page's) fate is inevitable.
+
 ---- ALGORITHMS ----
 
 >> A2: In a few paragraphs, describe your code for locating the frame,
 >> if any, that contains the data of a given page.
 
+We use the preexisting code to map from user virtual address to physical frame
+address.  Whenever the page is loaded onto a frame, we map it.  Whenever it is
+removed, either through completion of process or swapping, we unmap it.  On a
+page fault we check to see where the page should be located.  If still on file
+then get it, if in swap the retrieve it etc.  Each process also has a list that
+keeps track of its own pages and where they are and those entries are not
+removed until the page will no longer be required.
+
 >> A3: How does your code coordinate accessed and dirty bits between
 >> kernel and user virtual addresses that alias a single frame, or
 >> alternatively how do you avoid the issue?
+
+When evicting, we check for access through both kernel and user virtual
+addresses.  Any access should generally be through user address only, but in
+order to ensure no issues, we check both and reset both.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: When two user processes both need a new frame at the same time,
 >> how are races avoided?
 
+Interrupts are turned off any time a new page is allocated or attached to frame.
+So whenever the first process asks for a frame it blocks any other process from
+being able to get a new frame or evict an existing one.  Once that frame is
+allocated, it belongs to that thread and interrupts are turned back on.  Once
+given to that thread it can be allocated or unswapped on that thread's time and
+synchronization is no longer needed.  If the frame was given through an eviction
+then the frame returned is now at the very end of the clock and has an entire
+pass (plus a second chance being that it has been newly accessed) to get used
+again to avoid eviction.
+
 ---- RATIONALE ----
 
 >> A5: Why did you choose the data structure(s) that you did for
 >> representing virtual-to-physical mappings?
+
+By mapping both frames to pages and pages to frames it is easy to change one
+with just the other without having to look through a long list each time.  It
+may be a little convuluted, but anytime we need to change a page we can change
+the frame metadata without much trouble and vice versa and it allows us to keep
+track of frames and pages independently.  Another good side effect is that we do
+not have to continually create and destroy pages nor frames.  The page structure
+is the same regardless where the page is.  The frame structure stays the same
+and in the same spot in the list, it just gets recycled.
 
 		       PAGING TO AND FROM DISK
 		       =======================
@@ -58,18 +127,59 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+In swap.h
+  struct swap_slot
+    Keeps track of a swap slot, much like a frame but for the swap partition.
+    
+In swap.c
+  static struct block* swap_block;
+    Pointer to the block used by the swap partition, just to keep from making
+    system calls for every read/write.
+
+  static uint32_t swap_size;
+    The size of the swap block (default is 512 bytes)
+
+  static uint32_t next_sector;
+    Keeps track of next free sector on the swap parition.
+
+  struct list swap_list;  
+    List of all swap slots, similar to list of all frames
+
 ---- ALGORITHMS ----
 
 >> B2: When a frame is required but none is free, some frame must be
 >> evicted.  Describe your code for choosing a frame to evict.
 
+We have a second chance clock.  On the first eviction the clockhand is set to
+the beginning of the list.  On the first pass it keeps going until an unused and
+clean page is found and if so, evicts that page from the frame.  If that page
+was from file and still clean, it is not sent to swap.  Each time a page is
+skipped its accessed flag is reset.  On the second pass we get less picky and
+don't care if it was recently accessed.  Since the bit was changed on first pass
+and we have interrupts off, this should be true for all pages.  On the third
+pass we just evict whomever is first.  On all passes, pinned pages are skipped.
+
 >> B3: When a process P obtains a frame that was previously used by a
 >> process Q, how do you adjust the page table (and any other data
 >> structures) to reflect the frame Q no longer has?
 
+Each time a process faults it calls allocate frame.  Allocate frame may return
+a new frame or may return a recycled one through eviction.  In either case that
+function will reset all meta data in the list to the new page.  It also zeros
+out the memory to ensure you can't read another process' data.  The evicted
+page's individual page structure is updated so that it no longer points to the
+physical frame address and is now noted as swapped.  The page is also unmapped
+to physical memory at this time.
+
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
+
+If it is any access in kernel space, it is rejected.  If it is a read of a page
+that does not exist then it is rejected.  This allows us to continue project 2
+functionality.  If it is a write or is called during process setup (kernel mode)
+this would be extended.  This allows us to extend stack during run time or
+map heap space during process setup.
 
 ---- SYNCHRONIZATION ----
 
@@ -78,21 +188,50 @@ FirstName LastName <email@domain.example>
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
 
+Whenever anything touches the swap data list (since it is global) then
+interrupts are turned off.  This ensures one process doesn't mess with a swap
+slot while another process is doing something with it.  This prevents deadlock
+by ensuring no hold and wait.  Any time anything is actually written to disk
+then the interrupts are turned off.  This is required since writing to disk
+sleeps (and thus would never return without interrupts).  It is okay for this
+to happen as once that process is given that slot then that whole slot is
+reserved until unswapped.  Until the swap is completed the slot is not marked
+completed so the page can not be swapped back in.
+
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
 >> the page during the eviction process?  How do you avoid a race
 >> between P evicting Q's frame and Q faulting the page back in?
+
+Once going to swap, the page is marked as in swap.  The swap slot is not marked
+as in swap until the write for the entire page is completed.  So if an address
+faulted and needed to go to swap, it would have to wait for the entire page to
+be written to swap before being allowed to read from swap.
 
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
 >> cannot interfere by e.g. attempting to evict the frame while it is
 >> still being read in?
 
+The page is pinned until completed.  Any pinned page can not be evicted
+regardless of it's other attributes.
+
 >> B8: Explain how you handle access to paged-out pages that occur
 >> during system calls.  Do you use page faults to bring in pages (as
 >> in user programs), or do you have a mechanism for "locking" frames
 >> into physical memory, or do you use some other design?  How do you
 >> gracefully handle attempted accesses to invalid virtual addresses?
+
+User virtual addresses are treated as physical addresses.  Both user and kernel
+access will cause the same page fault and allow swapping in the same way.  Any
+fault in a system call would be treated the same way as a user fault would be,
+with the exception of a read from undefined address.  In a system call it would
+expand the stack and it would get zeros.  A user call would just terminate.
+Since this case is generally well checked for system calls, it should not occur.
+
+A call to any address above PHYS_BASE from user mode will terminate the thread.
+The system calls check this before running the call in kernel mode and should
+catch and terminate before it occurs.
 
 ---- RATIONALE ----
 
@@ -103,6 +242,16 @@ FirstName LastName <email@domain.example>
 >> where your design falls along this continuum and why you chose to
 >> design it this way.
 
+Single lock (through interrupts).  However our lock only deals with the meta
+data.  Reads and writes with swap happen without any locks.  They are flagged
+upon completion to prevent a read from a swap while writing.  This allows
+multiple reads and writes to occur at the same time, but not for the same data,
+while still only using the one lock (interrupt).
+
+For design choice, honestly we didn't even think that much about it.  We knew
+that the meta data must be locked and that read and write must not be locked
+through interrupts, and it just came together that way.
+
 			 MEMORY MAPPED FILES
 			 ===================
 
@@ -111,6 +260,8 @@ FirstName LastName <email@domain.example>
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
+Didn't do it.  Sorry.
 
 ---- ALGORITHMS ----
 
@@ -134,20 +285,43 @@ FirstName LastName <email@domain.example>
 			   ================
 
 Answering these questions is optional, but it will help us improve the
-course in future quarters.  Feel free to tell us anything you
+course in future SEMESTERS.  Feel free to tell us anything you
 want--these questions are just to spur your thoughts.  You may also
 choose to respond anonymously in the course evaluations at the end of
-the quarter.
+the SEMESTER.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+We spent four days tracking down one bug that caused one failure.  We ended up
+rewriting large sections of code and introduced two new failures which were
+difficult to track down, but at least possible.  Without this headache (and
+honestly, not even touching this project for the first week to study for the
+exam) we likely would have been able to implement sharing.  Memory mapped files
+would seem to take a long time and wouldn't have been worth the effort in our
+opinion.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+The swapping section was enjoyable and worth it.  I feel that shared memory
+and memory mapped files would have also been neat to work on as both deal with
+enhancing the performance of the OS beyond the basics.  It would have been nice
+to get them going, but there just isn't enough time.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+
+I've been back and forth on this.  In the first couple of projects we always had
+'stub' code.  Functions that existed and either didn't work or worked in limited
+capacity.  While it is nice to have freedom to do what we want and there is
+something to be said for learning all aspects of code design (implementation,
+debugging, expansion of features, etc) it would have made things quicker to
+have a structural foundation.  We didn't spend much time making our own, but we
+did make a few mistakes along the way and a few things we would change doing it
+all over again.  It may have helped some of the other groups as a springboard as
+well judging by some piazza posts.
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?

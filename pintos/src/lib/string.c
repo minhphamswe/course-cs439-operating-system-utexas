@@ -1,5 +1,5 @@
-#include <string.h>
-#include <debug.h>
+#include "lib/string.h"
+#include "lib/debug.h"
 
 /* Copies SIZE bytes from SRC to DST, which must not overlap.
    Returns DST. */

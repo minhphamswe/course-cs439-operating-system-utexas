@@ -4,12 +4,26 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "lib/debug.h"
+#ifdef VM
+  #include "vm/frame.h"
+  #include "vm/page.h"
+  #include "vm/swap.h"
+#endif
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
+static struct semaphore extend_sema;    // Protect stack extension
+static struct semaphore fault_sema;     // Protect page fault handler
+
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+#ifdef VM
+static void extend_stack (struct intr_frame *, void *fault_addr);
+#endif
+static void kill_process (struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -58,6 +72,9 @@ exception_init (void)
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+
+  sema_init(&extend_sema, 1);
+  sema_init(&fault_sema, 1);
 }
 
 /* Prints exception statistics. */
@@ -143,29 +160,92 @@ page_fault (struct intr_frame *f)
   /* Count page faults. */
   page_fault_cnt++;
 
+#ifdef VM
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-/*  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);*/
-  thread_current()->retVal = -1;
-  thread_exit();
-  
-  int tmp;
-  uint32_t new_eax = 0xffffffff;
-  asm ("movl %%eax, %0; movl %1, %%eax;"
-       : "=g" (tmp)
-       : "g" (new_eax));
-  asm ("jmp %0;"
-       :: "g" (tmp));
+  if (not_present && write && !user) {
+    // System write: try to allocate more space if page not owned
+    if (!load_page(fault_addr)) {
+      extend_stack(f, fault_addr);
+    }
+  }
+  else if (not_present && write && user) {
+    // User write: try to allocate more space if page not owned
+    if (!load_page(fault_addr)) {
+      extend_stack(f, fault_addr);
+    }
+  }
+  else if (not_present && !write && !user) {
+    // System read: kill if page not owned
+    if (!load_page(fault_addr)) {
+      kill_process(f);
+    }
+  }
+  else if (not_present && !write && user) {
+    // User read: kill if page not owned
+    if (!load_page(fault_addr)) {
+      kill_process(f);
+    }
+  }
+  else if (!not_present && !write && user) {
+    // User read access violation: kill if page not owned
+    if (!load_page(fault_addr)) {
+      kill_process(f);
+    }
+  }
+  else if (!not_present && write && user) {
+    // User write access violation: kill unconditionally
+    kill_process(f);
+  }
+  else {
+    // Illegal access: kill process
+    kill_process(f);
+  }
+#else
+  kill_process(f);
+#endif
 }
 
+#ifdef VM
+/// Extend the stack from the faulting addres up to the base pointer of the faulting thread
+/// Called by page_fault
+static void
+extend_stack (struct intr_frame *f, void *fault_addr) {
+  ASSERT(f != NULL);
+  ASSERT(f->frame_pointer != NULL);
+  uint32_t bottom = (((uint32_t) fault_addr) / PGSIZE) * PGSIZE;
+  uint32_t top = (((uint32_t) f->frame_pointer) / PGSIZE) * PGSIZE;
+  uint32_t addr;
+  bool success = false;
+
+  // Only one process should extend the stack at a time
+  sema_down(&extend_sema);
+
+  for (addr = bottom; addr < top ; addr += PGSIZE) {
+    // Obtain the page associated with the faulting address
+    struct page_entry *entry = allocate_page((void*) addr);
+
+    if (!load_page_entry(entry)) {
+      break;
+    }
+    success = true;
+  }
+  sema_up(&extend_sema);
+
+  // If the extension fails, this is an access violation: kill process
+  if (!success) {
+    kill_process(f);
+  }
+}
+#endif
+
+/// Kill a process
+static void
+kill_process (struct intr_frame *f UNUSED)
+{
+  thread_set_exit_status(thread_current()->tid, -1);
+  thread_exit();
+}

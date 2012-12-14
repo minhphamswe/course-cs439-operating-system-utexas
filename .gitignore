@@ -4,6 +4,11 @@
 
 # Build products
 *.o
+*.d
+*.output
+*.result
+*.errors
+
 time_calls_cc
 time_calls_cpp
 fib

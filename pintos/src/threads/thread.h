@@ -2,10 +2,14 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
-#include <list.h>
+#include "kernel/list.h"
 #include <stdint.h>
 #include "threads/synch.h"
+
 #include "filesys/file.h"
+#include "filesys/directory.h"
+
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -85,6 +89,13 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
+//======[ #define Macros ]===================================================
+
+/* Can only have 16 files in the OS for part 2 anyway */
+#define MAXOPENFILES 16
+
+//======[ Struct Definitions ]===============================================
+
 typedef struct priority_lock {
   struct lock* lock;
   struct thread* thread;                 /* Whose donation we are using */
@@ -92,13 +103,22 @@ typedef struct priority_lock {
 
 // A single open file handler.
 struct fileHandle {
-  //struct inode *node;
   struct file *file;
+  struct dir *dir;
   int fd;
   struct list_elem fileElem;
 };
 
-#define MAXOPENFILES 16           /* Can only have 16 files in the OS for part 2 anyway */
+// A structure to hold the exit status for a thread
+struct exit_status {
+  tid_t tid;
+  int status;
+
+  /* List elemnets */
+  struct list_elem exit_elem;   /* insert into global table of exit status */
+  struct list_elem wait_elem;   /* insert into thread's list of waited pid */
+  struct list_elem child_elem;  /* insert into thread's list of child pid */
+};
 
 struct thread
 {
@@ -112,11 +132,10 @@ struct thread
   int numDonors;                  /* Number of donors waiting */
   int nice;                       /* Niceness value of the thread */
   int recent_cpu;                 /* Recently-used CPU time (float) */
-  int retVal;                     /* The return value when exiting */
+  struct file *ownfile;           /* My file, keep open to prevent writes */
 
   struct semaphore wait_sema;     /* Semaphore to signify the process waiter*/
   struct semaphore exec_sema;     /* Semaphore to signify the process executer*/
-  bool exec_value;                /* Whether or not we could successfully execute */
 
   /* Keep track of who donated to us */
   struct priority_lock donors[PRI_DEPTH];
@@ -126,10 +145,24 @@ struct thread
 
   /* Shared between thread.c and synch.c. */
   struct list_elem elem;          /* List element. */
-  
+
+  /* List element for the wait-on list of the parent thread */
+  struct list_elem wait_elem;
+
+  /* List element for the children list of the parent thread */
+  struct list_elem child_elem;
+
   /* Keep track of open files */
   struct list handles;            /* List element for open files */
+  struct list wait_list;          /* List of child threads waited on */
+  struct list child_list;         /* List of all child threads */
+
+  struct page_table pages;
+
   int nextFD;                     /* The next file, increment */
+  
+  /* Keep track of current directory */
+  char pwd[PATH_MAX];
 
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
@@ -168,6 +201,8 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
+
+/* Functions to support thread scheduling */
 int thread_get_priority (void);
 void thread_set_priority (int);
 void updateActivePriority(struct thread *thread);
@@ -177,6 +212,20 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/* Functions to support waiting for child threads */
 struct thread* thread_by_tid(tid_t tid);
+bool thread_is_child(tid_t tid);
+bool thread_has_waited(tid_t tid);
+
+struct exit_status* thread_get_exit_status(tid_t tid);
+void thread_set_exit_status(tid_t tid, int status);
+void thread_clear_child_exit_status(struct thread *t);
+
+void thread_mark_waited(struct exit_status* es);
+
+/* Functions to support file handlers */
+int thread_add_file_handler(struct file *file);
+int thread_add_dir_handler(struct dir *dir);
+void thread_close_handler(int fd);
 
 #endif /* threads/thread.h */

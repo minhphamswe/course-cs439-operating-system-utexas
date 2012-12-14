@@ -1,10 +1,12 @@
 #include "threads/thread.h"
-#include <debug.h>
-#include <stddef.h>
-#include <random.h>
-#include <stdio.h>
-#include <string.h>
-#include <kernel/list.h>
+
+#include "lib/debug.h"
+#include "lib/stddef.h"
+#include "lib/random.h"
+#include "lib/stdio.h"
+#include "lib/string.h"
+#include "lib/kernel/list.h"
+
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -17,7 +19,11 @@
 #include "threads/synch.h"
 #include <devices/timer.h>
 #ifdef USERPROG
-#include "userprog/process.h"
+  #include "userprog/process.h"
+#endif
+
+#ifdef VM
+  #include "vm/swap.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -32,6 +38,10 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+/* List of all exit status. Processes are added to this list when they exit
+ * and removed when they or their parent exit. */
+static struct list exit_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -103,6 +113,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&exit_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -239,8 +250,10 @@ thread_create (const char *name, int priority,
 
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL) {
+    printf("%s failed to get page\n");
     return TID_ERROR;
+  }
 
   /* Initialize thread. */
   init_thread (t, name, priority);
@@ -281,6 +294,17 @@ thread_create (const char *name, int priority,
       t->nativePriority = PRI_MAX;
   }
 
+  /* Add child tid to the current thread's child queue */
+  struct exit_status *es = malloc(sizeof(struct exit_status));
+  es->tid = t->tid;
+  es->status = 0;
+  list_push_back(&exit_list, &es->exit_elem);
+  list_push_back(&thread_current()->child_list, &es->child_elem);
+#ifdef VM
+  page_table_init(&t->pages);
+#endif
+
+  /* Re-enable interrupt */
   intr_set_level (old_level);
 
   /* Add to run queue. */
@@ -390,8 +414,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+//   clean_swap(thread_current()->tid);          // Clean out any left swaps
   list_remove (&thread_current()->allelem);   // disappear before dying
-  sema_up(&thread_current()->wait_sema);      // signal before dying
   thread_current()->status = THREAD_DYING;    // die. farewell, world...
   schedule ();
   NOT_REACHED ();
@@ -531,8 +555,7 @@ thread_by_tid(tid_t tid)
   struct thread *tp;
 
   // Disable interrupts before going through the thread list
-  enum intr_level old_level;
-  old_level = intr_disable ();
+  enum intr_level old_level = intr_disable ();
 
   for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
   {
@@ -632,9 +655,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
+  t->magic = THREAD_MAGIC;
+
+  /* Initialize values for native and effective priority */
   t->priority = priority;
   t->nativePriority = priority;
-  t->magic = THREAD_MAGIC;
+
+  /* Initialize values and structures for the priority donation system */
   t->numDonors = 0;
 
   int i;
@@ -645,18 +672,27 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donees.thread = NULL;
   t->donees.lock = NULL;
 
+  /* Initialize values for the advanced scheduler */
   t->nice = 0;
   t->recent_cpu = 0;
-  sema_init(&t->wait_sema, 0);
-  sema_init(&t->exec_sema, 0);
-  t->retVal = 0;
-  t->exec_value = false;
 
-  // List and index for open files
+  /* Initialize list and index for open files */
   t->nextFD = 2;
+  enum intr_level old_level = intr_disable();
   list_init(&t->handles);
 
+  /* Initialize wait-on and child list for WAIT system call */
+  sema_init(&t->wait_sema, 0);
+  sema_init(&t->exec_sema, 0);
+  list_init(&t->wait_list);
+  list_init(&t->child_list);
+
+  /* When done, add thread to all-thread list */
   list_push_back(&all_list, &(t->allelem));
+  intr_set_level(old_level);
+  
+  /* Initialize present working directory as the root */
+  strlcpy(t->pwd, "/", 2);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -797,3 +833,188 @@ updateActivePriority(struct thread *thread)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/** Return true if the thread with this tid is our child thread. */
+bool thread_is_child(tid_t tid)
+{
+  struct thread *t = thread_current();
+  struct exit_status *es;
+  struct list_elem *e;
+
+  enum intr_level old_level = intr_disable();
+  for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, child_elem);
+      if (es->tid == tid) {
+        intr_set_level(old_level);
+        return true;
+      }
+  }
+  intr_set_level(old_level);
+  return false;
+}
+
+/** Return true if we have started waiting for the thread with this tid. */
+bool thread_has_waited(tid_t tid)
+{
+  struct thread *t = thread_current();
+  struct exit_status *es;
+  struct list_elem *e;
+
+  enum intr_level old_level = intr_disable();
+  for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, wait_elem);
+    if (es->tid == tid) {
+      intr_set_level(old_level);
+      return true;
+    }
+  }
+
+  intr_set_level(old_level);
+  return false;
+}
+
+/** Return a pointer to an exit_status struct if the thread has exited,
+ *  a null pointer otherwise. */
+struct exit_status* thread_get_exit_status(tid_t tid)
+{
+  struct exit_status *es;
+  struct list_elem *e;
+
+  enum intr_level old_level = intr_disable();
+  for (e = list_begin(&exit_list); e != list_end(&exit_list);
+       e = list_next(e)) {
+    es = list_entry(e, struct exit_status, exit_elem);
+    if (es->tid == tid) {
+      // The pid supplied is of a thread that has run
+      intr_set_level(old_level);
+      return es;
+    }
+  }
+  intr_set_level(old_level);
+  return NULL;
+}
+
+/** Set the exit status of this pid to the new status. */
+void thread_set_exit_status(tid_t tid, int status)
+{
+  enum intr_level old_level = intr_disable();
+
+  struct exit_status *es = thread_get_exit_status(tid);
+  es->status = status;
+
+  intr_set_level(old_level);
+}
+
+
+/** Remove the pid and exit status of all of this thread's children from the
+ *  exit list.
+ */
+void thread_clear_child_exit_status(struct thread* t)
+{
+  struct list_elem *e;
+  struct exit_status *es;
+
+  enum intr_level old_level = intr_disable();
+  for (e = list_begin(&t->wait_list); e != list_end(&t->wait_list);
+       e = list_remove(e)) {
+    es = list_entry(e, struct exit_status, wait_elem);
+    list_remove(&es->exit_elem);
+    list_remove(&es->child_elem);
+  }
+  intr_set_level(old_level);
+}
+
+
+/** Move the exit_status structure to the current thread's already-waited-on
+ *  list. */
+void thread_mark_waited(struct exit_status* es)
+{
+  struct thread *t = thread_current();
+  enum intr_level old_level = intr_disable();
+  list_remove(&es->exit_elem);
+  list_push_front(&t->wait_list, &es->wait_elem);
+  intr_set_level(old_level);
+}
+
+/**
+ * Add a handler for a file into the current thread's list
+ * of open handlers.
+ * Return the file descriptor of the new handler, or -1 if anything failed
+ */
+int thread_add_file_handler(struct file *file) {
+  struct thread *t = thread_current();
+
+  // Disable interrupts
+  enum intr_level old_level = intr_disable();
+
+  // Construct a new file handler and add it to list
+  struct fileHandle *new_handle = malloc(sizeof(struct fileHandle));
+  new_handle->file = file;
+  new_handle->dir = NULL;
+  new_handle->fd = t->nextFD++;
+  list_push_back(&t->handles, &new_handle->fileElem);
+
+  // Reenable interrupts
+  intr_set_level(old_level);
+
+  // Return the file descriptor
+  return new_handle->fd;
+}
+
+
+/**
+ * Add a handler for a directory into the current thread's list
+ * of open handlers.
+ * Return the file descriptor of the new handler, or -1 if anything failed
+ */
+int thread_add_dir_handler(struct dir *dir) {
+  struct thread *t = thread_current();
+
+  // Disable interrupts
+  enum intr_level old_level = intr_disable();
+
+  // Construct a new file handler and add it to list
+  struct fileHandle *new_handle = malloc(sizeof(struct fileHandle));
+  new_handle->file = NULL;
+  new_handle->dir = dir;
+  new_handle->fd = t->nextFD++;
+  list_push_back(&t->handles, &new_handle->fileElem);
+
+  // Reenable interrupts
+  intr_set_level(old_level);
+
+  // Return the file descriptor
+  return new_handle->fd;
+}
+/** Close the file handler matching the file descriptor fd. If none matches,
+ *  do nothing. */
+void
+thread_close_handler(int fd)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
+
+  // Search for file descriptor in the thread open-file handles
+  for (e = list_begin(&t->handles); e != list_end(&t->handles);
+       e = list_next(e))
+  {
+    struct fileHandle *fhp = list_entry(e, struct fileHandle, fileElem);
+
+    // File descriptor found: read file
+    if (fhp->fd == fd)
+    {
+      // Close file
+      if (fhp->file) file_close(fhp->file);
+      if (fhp->dir)  dir_close(fhp->dir);
+      
+      // Remove from list
+      enum intr_level old_level = intr_disable();
+      list_remove(e);
+      intr_set_level(old_level);
+
+      return;
+    }
+  }
+}

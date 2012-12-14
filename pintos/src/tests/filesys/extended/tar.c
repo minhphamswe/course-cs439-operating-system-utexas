@@ -66,10 +66,10 @@ make_tar_archive (const char *archive_name, char *files[], size_t file_cnt)
       return false;
     }
 
-  for (i = 0; i < file_cnt; i++) 
+  for (i = 0; i < file_cnt; i++)
     {
       char file_name[128];
-      
+
       strlcpy (file_name, files[i], sizeof file_name);
       if (!archive_file (file_name, sizeof file_name,
                          archive_fd, &write_error))
@@ -77,7 +77,7 @@ make_tar_archive (const char *archive_name, char *files[], size_t file_cnt)
     }
 
   if (!do_write (archive_fd, zeros, 512, &write_error)
-      || !do_write (archive_fd, zeros, 512, &write_error)) 
+      || !do_write (archive_fd, zeros, 512, &write_error))
     success = false;
 
   close (archive_fd);

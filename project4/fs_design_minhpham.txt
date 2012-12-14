@@ -1,0 +1,285 @@
+                    +---------------------------+
+                    |           CS 439          |
+                    |   PROJECT 4: FILE SYSTEM  |
+                    |      DESIGN DOCUMENT      |
+                    +---------------------------+
+
+---- Name ----
+
+>> Fill your name, UT EID, CS login, email address, and unique number:
+
+Name: Minh Pham
+EID: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+
+---- GROUP ----
+
+>> Fill the names, UT EIDs, CS logins, email addresses, and unique numbers
+>> of your group members.
+
+Name1: Eric Aschner
+EID1: easchner
+CS login: easchner
+Email: eric_aschner@hotmail.com
+Unique Number: 52996
+
+Name2: Minh Pham
+EID2: mlp2279
+CS login: minhpham
+Email: minh.pham@utexas.edu
+Unique Number: 52996
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+Part of the API for our path manipulation code is based on the Python
+os.path module. Link: http://docs.python.org/2/library/os.path.html.
+The specification for path_dirname and path_basename are based on the UNIX
+man pages for dirname and basename, respectively.
+
+             INDEXED AND EXTENSIBLE FILES
+             ============================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+We added a new type, called inode_ptr that represent pointer (in inodes) to
+either data blocks or inode blocks (so any disk block, basically).
+Each inode_ptr is 16 bit long. 14 bits are dedicated to storing disk sector
+address of data blocks. The other 2 bits are to check if a block is allocated
+(1 bit) and is a directory (1 bit).
+
+typedef uint16_t inode_ptr;
+
+/* Number of sectors per inode */
+#define NODE_CAPACITY 244
+
+/* Number of bytes stored per inode (= NODE_CAPACITY * BLOCK_SECTOR_SIZE) */
+#define BYTE_CAPACITY (BLOCK_SECTOR_SIZE * NODE_CAPACITY)
+
+Each inode_disk is 512 bytes, so after subtracting metadata stored in each
+inode itself, can contain 244 pointers to data blocks. Each inode_disk also
+contain metadata on how long the file/directory is, how many bytes was used
+by previous inodes (explained in next section), the bytes used in the current
+inode, a pointer to self to identify it as a directory or a file, and a
+pointer to the next inode (explained in next section).
+
+struct inode_disk
+{
+  off_t file_length;                    // File length in bytes
+  off_t prev_length;                    // Combined length of previous inodes
+  off_t node_length;                    // Number of bytes used in this node
+  inode_ptr self;                       // Pointer to myself, for reference
+  uint32_t magic;                       // Magic number
+  inode_ptr doubleptr;                  // Pointer to next indirect inode
+  inode_ptr blockptrs[NODE_CAPACITY];   // Index of data pointers
+};
+
+The in-memory inode is basically the same, with the added semaphore
+extend_sema to provide synchronization, and a boolean to check if it's a
+directory or file (redundant, and actually end up not being used).
+
+/* In-memory inode. */
+struct inode
+{
+  struct list_elem elem;              // Element in inode list.
+  block_sector_t sector;              // Sector number of disk location.
+  int open_cnt;                       // Number of openers.
+  bool removed;                       // True if deleted, false otherwise
+  int deny_write_cnt;                 // 0: writes ok, >0: deny writes.
+  struct semaphore extend_sema;
+  bool is_dir;                        // 0 is file, 1 is directory
+
+  struct inode_disk data;             // Inode content.
+  struct inode* next;                 // The subsequent inode struct pointer
+};
+
+>> A2: What is the maximum size of a file supported by your inode
+>> structure?  Show your work.
+
+In our design, a file is actually composed of not one but multiple inodes.
+I guess we could call our inode an "indirect block" - it's a hybrid of both.
+There is no limit to how many inodes can be chained together. However, the
+limit on file size lies in the size of the pointer to disk sector. The pointer
+only carry 14 bits of address, so the maximum number of disk sectors it
+can distinguish is 2^14 = 16,384 (sectors).
+Each sector is 512 bytes, so that's 16,384 x 512 bytes = 8 (MB). That is the
+maximum size of a file supported by our structure.
+
+---- SYNCHRONIZATION ----
+
+>> A3: Explain how your code avoids a race if two processes attempt to
+>> extend a file at the same time.
+
+Each inode in our scheme contains a semaphore. When a file is to be extended,
+the semaphore in the first inode of the file is acquired. So if 2 processes
+attempt to extend a file at the same, one will have to wait for the other
+to finish.
+
+>> A4: Suppose processes A and B both have file F open, both
+>> positioned at end-of-file.  If A reads and B writes F at the same
+>> time, A may read all, part, or none of what B writes.  However, A
+>> may not read data other than what B writes, e.g. if B writes
+>> nonzero data, A is not allowed to see all zeros.  Explain how your
+>> code avoids this race.
+
+In our code, when a file is extended it is padded with all zeros. Other than
+when it is extended, nothing is written to the file that isn't what a
+process is writing. Therefore, the only case we needs to guard against is
+when the file is extended. Our solution is for reader processes to acquire
+the extension sema of the first inode in the file as well. In this way,
+a file that is extending cannot be read until it's done being extended, and
+data being written into.
+
+>> A5: Explain how your synchronization design provides "fairness".
+>> File access is "fair" if readers cannot indefinitely block writers
+>> or vice versa.  That is, many processes reading from a file cannot
+>> prevent forever another process from writing the file, and many
+>> processes writing to a file cannot prevent another process forever
+>> from reading the file.
+
+In our scheme, readers do not block writers unless writers are trying to
+extend the file, and vice-versa. Therefore, in order for them to block
+each other forever, the file must be extended forever. This is impossible.
+The reader should therefore get the reading right as soon as the extending
+writer releases.
+
+---- RATIONALE ----
+
+>> A6: Is your inode structure a multilevel index?  If so, why did you
+>> choose this particular combination of direct, indirect, and doubly
+>> indirect blocks?  If not, why did you choose an alternative inode
+>> structure, and what advantages and disadvantages does your
+>> structure have, compared to a multilevel index?
+
+Our structure is not a multilevel index structure. It's closer to to linked
+list of indirect blocks: Each inode (or indirect block) points to the next,
+and all inode (or indirect block) itself points to data blocks. We chose
+this structure because we believe it is simpler to implement, given our
+time constraint.
+
+This structure has the disadvantage of high worst-case overhead (worst 100%).
+Another disadvantage is that getting to the end of the list
+is O(n) operation. Also, since all inodes carry metadata, change to file
+length is an O(n) operation (n being the length of the file in the number of
+inodes). Since each inode has a capacity of 121 kB (= 244 sectors * 512 bytes/sector)
+this isn't really a problem in our use case, since most files don't take up more
+than 1 inode.
+
+An advantage besides simplecity is good best-case overhead: 1 inode block for
+every 244 data blocks, so less than 0.5%.
+
+                SUBDIRECTORIES
+                ==============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+We added a new #define for the maximum length of a path.
+
+#define PATH_MAX 256
+
+We didn't change directory at all, besides adding a boolean to check if an
+entry is a directory
+
+struct dir_entry
+{
+  block_sector_t inode_sector;        /* Sector number of header. */
+  char name[NAME_MAX + 1];            /* Null terminated file name. */
+  bool in_use;                        /* In use or free? */
+  bool is_dir;                        /* Is a directory? */
+};
+
+---- ALGORITHMS ----
+
+>> B2: Describe your code for traversing a user-specified path.  How
+>> do traversals of absolute and relative paths differ?
+
+Relative paths are first augmented with the current working directory of
+the current thread to get an absolute path. The absolute path is broken down
+by a string tokenizer. A directory is opened at the root, and lookup each
+token in turn, and if the token exists and is the name of a directory entry
+that is a directory, the directory entry is descended into. This continues
+until the last token, which can be a file or a directory, and the appropriate
+action is taken depending.
+
+---- SYNCHRONIZATION ----
+
+>> B4: How do you prevent races on directory entries?  For example,
+>> only one of two simultaneous attempts to remove a single file
+>> should succeed, as should only one of two simultaneous attempts to
+>> create a file with the same name, and so on.
+
+Open and removals are treated specially at the inode level to prevent
+race conditions. Each function that opens or removes inodes are wrapped all
+around with semas. Therefore, processes that attempt to open or remove the
+same file or directory (no difference, since this is implemented at the inode
+leve) have to wait for each other to finish. The check to see if the file
+has been opened/exists, etc. is done after the sema is released, so it's not
+possible to create the same file after another process has done the same.
+
+>> B5: Does your implementation allow a directory to be removed if it
+>> is open by a process or if it is in use as a process's current
+>> working directory?  If so, what happens to that process's future
+>> file system operations?  If not, how do you prevent it?
+
+The implemention does not allow for a directory to be removed if it is either
+open by a process or is the current working directory.
+
+To prevent removal of open directories, we check the number of openers of
+its inodes. This is done in the filesystem code.
+
+To prevent removal of the current working directory, we string-compare
+the normalized absolute path of the directory being removed with the
+normalized absolute path of the current working directory (same = no removal).
+This is done at the syscall level to prevent unneccesary descends into the
+filesystem (expensive, involves disk read).
+
+---- RATIONALE ----
+
+>> B6: Explain why you chose to represent the current directory of a
+>> process the way you did.
+
+We represent the current directory of a process with just the string
+representing its absolute path. This makes it easy to debug (by printing out
+the string), do syntactic manipulation on it (like getting the absolute path
+of the parent directory). Changing directory is also as simple as copying
+a new string over after verifying that the path points to a directory.
+
+               SURVEY QUESTIONS
+               ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students in future quarters?
+
+>> Any other comments?
